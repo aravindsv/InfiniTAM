@@ -323,20 +323,29 @@ void SaveImageToFile(const ITMFloatImage* image, const char* fileName)
 
 bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName)
 {
-	PNGReaderData pngData;
+  PNGReaderData pngData;
 	bool usepng = false;
 
 	int xsize, ysize;
 	FormatType type;
 	bool binary;
 	FILE *f = fopen(fileName, "rb");
-	if (f == NULL) return false;
+  // TODO(andrei): Improve this error handling.
+
+	if (f == NULL) { 
+    fprintf(stderr, "Could not open file %s.\n", fileName);
+    return false;
+  }
 	type = pnm_readheader(f, &xsize, &ysize, &binary);
 	if ((type != RGB_8u)&&(type != RGBA_8u)) {
 		fclose(f);
 		f = fopen(fileName, "rb");
 		type = png_readheader(f, xsize, ysize, pngData);
 		if ((type != RGB_8u)&&(type != RGBA_8u)) {
+      fprintf(
+          stderr,
+          "Invalid image type read from PNG header: %d\nAcceptable ones are: %d and %d.\n",
+          type, RGB_8u, RGBA_8u);
 			fclose(f);
 			return false;
 		}
@@ -351,6 +360,7 @@ bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName)
 	if (type != RGBA_8u) data = new unsigned char[xsize*ysize * 3];
 	else data = (unsigned char*)image->GetData(MEMORYDEVICE_CPU);
 
+  // TODO(andrei): Improve error reporting here.
 	if (usepng) {
 		if (!png_readdata(f, xsize, ysize, pngData, data)) { fclose(f); delete[] data; return false; }
 	} else if (binary) {
@@ -382,13 +392,21 @@ bool ReadImageFromFile(ITMShortImage *image, const char *fileName)
 	int xsize, ysize;
 	bool binary;
 	FILE *f = fopen(fileName, "rb");
-	if (f == NULL) return false;
+	if (f == NULL) {
+    fprintf(stderr, "Could not open file %s.\n", fileName);
+    return false;
+  }
+
 	FormatType type = pnm_readheader(f, &xsize, &ysize, &binary);
 	if ((type != MONO_16s) && (type != MONO_16u)) {
 		fclose(f);
 		f = fopen(fileName, "rb");
 		type = png_readheader(f, xsize, ysize, pngData);
 		if ((type != MONO_16s) && (type != MONO_16u)) {
+      fprintf(
+          stderr,
+          "Invalid image type read from PNG header: %d\nAcceptable ones are: %d and %d.\n",
+          type, MONO_16s, MONO_16u);
 			fclose(f);
 			return false;
 		}
@@ -398,11 +416,26 @@ bool ReadImageFromFile(ITMShortImage *image, const char *fileName)
 
 	short *data = new short[xsize*ysize];
 	if (usepng) {
-		if (!png_readdata(f, xsize, ysize, pngData, data)) { fclose(f); delete[] data; return false; }
+		if (!png_readdata(f, xsize, ysize, pngData, data)) {
+      fprintf(stderr, "Could not read PNG data.\n");
+      fclose(f);
+      delete[] data;
+      return false;
+    }
 	} else if (binary) {
-		if (!pnm_readdata_binary(f, xsize, ysize, type, data)) { fclose(f); delete[] data; return false; }
+		if (!pnm_readdata_binary(f, xsize, ysize, type, data)) {
+      fprintf(stderr, "Could not read binary PNM data.\n");
+      fclose(f);
+      delete[] data;
+      return false;
+    }
 	} else {
-		if (!pnm_readdata_ascii(f, xsize, ysize, type, data)) { fclose(f); delete[] data; return false; }
+		if (!pnm_readdata_ascii(f, xsize, ysize, type, data)) {
+      fprintf(stderr, "Could not read ASCII PNM data.\n");
+      fclose(f);
+      delete[] data;
+      return false;
+    }
 	}
 	fclose(f);
 
