@@ -39,11 +39,16 @@ ITMLibSettings::ITMLibSettings(void)
 	/// enable or disable bilateral depth filtering;
 	useBilateralFilter = false;
 
-	//trackerType = TRACKER_COLOR;
+	// TODO(andrei): Original was just 'TRACKER_ICP'. Should be able to set
+	// this using a command line flag. If we were to add support for tracking
+	// using, e.g., FOVIS or libviso, or "ground truth data" (e.g., dumped by a
+	// tool running libviso into a txt file in advance), I'm guessing it would
+	// be an addition to this enum.
+//	trackerType = TRACKER_COLOR;
 	trackerType = TRACKER_ICP;
-	//trackerType = TRACKER_REN;
+//	trackerType = TRACKER_REN;
 	//trackerType = TRACKER_IMU;
-	//trackerType = TRACKER_WICP;
+//	trackerType = TRACKER_WICP;
 
 	/// model the sensor noise as  the weight for weighted ICP
 	modelSensorNoise = false;
@@ -70,10 +75,14 @@ ITMLibSettings::ITMLibSettings(void)
 		trackingRegime[2] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[3] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[4] = TRACKER_ITERATION_ROTATION;
-	}
+//	}
 
-	if (trackerType == TRACKER_REN) noICPRunTillLevel = 1;
-	else noICPRunTillLevel = 0;
+	if (trackerType == TRACKER_REN) {
+		noICPRunTillLevel = 1;
+	}
+	else {
+		noICPRunTillLevel = 0;
+	}
 
 	if ((trackerType == TRACKER_COLOR) && (!ITMVoxel::hasColorInformation)) {
 		printf("Error: Color tracker requires a voxel type with color information!\n");

@@ -57,7 +57,9 @@ void ITMColorTracker_CPU::G_oneLevel(float *gradient, float *hessian, ITMPose *p
 	float scaleForOcclusions;
 
 	bool rotationOnly = iterationType == TRACKER_ITERATION_ROTATION;
-	int numPara = rotationOnly ? 3 : 6, startPara = rotationOnly ? 3 : 0, numParaSQ = rotationOnly ? 3 + 2 + 1 : 6 + 5 + 4 + 3 + 2 + 1;
+	int numPara = rotationOnly ? 3 : 6,
+			startPara = rotationOnly ? 3 : 0,
+			numParaSQ = rotationOnly ? (3 + 2 + 1) : (6 + 5 + 4 + 3 + 2 + 1);
 
 	float globalGradient[6], globalHessian[21];
 	for (int i = 0; i < numPara; i++) globalGradient[i] = 0.0f;
