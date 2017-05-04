@@ -31,7 +31,7 @@ namespace ITMLib {
 
         // TODO read OxTS dump using KITTI toolkit and look at pose info.
 
-        ITMLib::Objects::readOxtsliteData(groundTruthFpath);
+        vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
       }
 
       void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {

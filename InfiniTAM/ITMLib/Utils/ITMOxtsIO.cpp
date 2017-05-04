@@ -1,11 +1,44 @@
 
+#include <cmath>
 #include <cstdio>
+#include <sstream>
+#include <iomanip>
+#include <cstring>
+
 #include "ITMOxtsIO.h"
+#include "ITMMath.h"
 
 using namespace std;
 
 namespace ITMLib {
   namespace Objects {
+
+    // TODO(andrei): Expose this function and put it in a more generic
+    // utility module.
+    /// \brief Convenient string formatting utility.
+    /// Originally from StackOverflow: https://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf
+    std::string format(const std::string& fmt, ...) {
+      // Keeps track of the resulting string size.
+      size_t out_size = fmt.size() * 2;
+      std::unique_ptr<char[]> formatted;
+      va_list ap;
+      while (true) {
+        formatted.reset(new char[out_size]);
+        std::strcpy(&formatted[0], fmt.c_str());
+        va_start(ap, fmt);
+        int final_n = vsnprintf(&formatted[0], out_size, fmt.c_str(), ap);
+        va_end(ap);
+        if (final_n < 0 || final_n >= out_size) {
+          int size_update = final_n - static_cast<int>(out_size) + 1;
+          out_size += abs(size_update);
+        }
+        else {
+          break;
+        }
+      }
+
+      return std::string(formatted.get());
+    }
 
     void readTimestampWithNanoseconds(
         const string &input,
@@ -23,10 +56,9 @@ namespace ITMLib {
       time->tm_sec = second;
     }
 
-
     vector<tm> readTimestamps(const string& dir) {
-      const string ts_fpath = dir + "/timestamps.txt";
-      ifstream fin(ts_fpath.c_str());
+      const string timestampFpath = dir + "/timestamps.txt";
+      ifstream fin(timestampFpath.c_str());
       vector<tm> timestamps;
 
       string line;
@@ -40,15 +72,123 @@ namespace ITMLib {
       return timestamps;
     }
 
+    /// \brief Compute the Mercator scale from the latitude.
+    double latToScale(double latitude) {
+      return cos(latitude * M_PI / 180.0);
+    }
 
+    /// \brief Converts lat/lon coordinates to Mercator coordinates.
+    Vector2d latLonToMercator(double latitude, double longitude, double scale) {
+      const double EarthRadius = 6378137.0;
+      double mx = scale * longitude * M_PI * EarthRadius / 180.0;
+      double my = scale * EarthRadius * log(tan( (90 + latitude) * M_PI / 360 ));
+      return Vector2d(mx, my);
+    }
+
+    OxTSFrame readOxtslite(const string& fpath) {
+      ifstream fin(fpath.c_str());
+      OxTSFrame resultFrame;
+      fin >> resultFrame.lat >> resultFrame.lon >> resultFrame.alt
+          >> resultFrame.roll >> resultFrame.pitch >> resultFrame.yaw
+          >> resultFrame.vn >> resultFrame.ve >> resultFrame.vf
+          >> resultFrame.vl >> resultFrame.vu >> resultFrame.ax
+          >> resultFrame.ay >> resultFrame.az >> resultFrame.af
+          >> resultFrame.al >> resultFrame.au >> resultFrame.wx
+          >> resultFrame.wy >> resultFrame.wz >> resultFrame.wf
+          >> resultFrame.wl >> resultFrame.wu >> resultFrame.posacc
+          >> resultFrame.velacc >> resultFrame.navstat >> resultFrame.numsats
+          >> resultFrame.posmode >> resultFrame.velmode >> resultFrame.orimode;
+      return resultFrame;
+    }
+
+    vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames) {
+      double scale = latToScale(oxtsFrames[0].lat);
+      vector<Matrix4f> poses;
+
+      // TODO(andrei): Ensure matrix initialization order is correct. The
+      // Matrix classes used here are COLUMN major!!
+      // TODO(andrei): Ensure precision is consistent.
+
+      // TODO(andrei): Document this very clearly.
+      bool tr_initialized = false;
+      Matrix4f tr_0_inv;
+
+//      for (const OxTSFrame& frame : oxtsFrames) {
+      for (int frameIdx = 0; frameIdx < oxtsFrames.size(); ++frameIdx) {
+        const OxTSFrame &frame = oxtsFrames[frameIdx];
+        // Extract the 3D translation information
+        Vector2d translation2d = latLonToMercator(frame.lat, frame.lon, scale);
+        Vector3d translation(translation2d.x, translation2d.y, frame.alt);
+
+        // Extract the 3D rotation information
+        // See the OxTS user manual, pg. 71, for more information.
+        float rollf = (float) frame.roll;
+        float pitchf = (float) frame.pitch;
+        float yawf = (float) frame.yaw;
+
+        Matrix3f rotX(          1,           0,            0,
+                                0,  cos(rollf),  -sin(rollf),
+                                0,  sin(rollf),   cos(rollf));
+        Matrix3f rotY( cos(pitchf),          0,   sin(pitchf),
+                                 0,          1,             0,
+                      -sin(pitchf),          0,   cos(pitchf));
+        Matrix3f rotZ(   cos(yawf), -sin(yawf),             0,
+                         sin(yawf),  cos(yawf),             0,
+                                 0,          0,             1);
+
+        Matrix3f rot = rotZ * rotY * rotZ;
+
+        Matrix4f transform;
+        // TODO utility for this
+        for (int x = 0; x < 3; ++x) {
+          for (int y = 0; y < 3; ++y) {
+            transform(x, y) = rot(x, y);
+          }
+        }
+
+        for(int row = 0; row < 3; row++) {
+          transform(3, row) = (float) translation[row];
+        }
+
+        transform(3, 0) = 0;
+        transform(3, 1) = 0;
+        transform(3, 2) = 0;
+        transform(3, 3) = 1;
+
+
+        // TODO make this more concise
+        if (! tr_initialized) {
+          tr_initialized = true;
+          if (!transform.inv(tr_0_inv)) {
+            throw runtime_error(format("Ill-posed transform matrix inversion "
+                                       "in frame %d.", frameIdx));
+          }
+        }
+      }
+
+      return poses;
+    }
+
+    /// \brief Reads a set of ground truth OxTS IMU/GPU unit from a directory.
+    /// \note This function, together with its related utilities, are based on
+    /// the kitti devkit authored by Prof. Andreas Geiger.
     vector<OxTSFrame> readOxtsliteData(const string& dir) {
-      // TODO
+      // TODO(andrei): In the future, consider using the C++14 filesystem API
+      // to make this code cleaner and more portable.
       vector<OxTSFrame> res;
 
       auto timestamps = readTimestamps(dir);
-      // then read the actual stuff from 'dir/data'.
-
       cout << "Read " << timestamps.size() << " timestamps." << endl;
+
+      for(size_t i = 0; i < timestamps.size(); ++i) {
+        stringstream ss;
+        ss << dir << "/data/" << setw(10) << i;
+        cout << ss.str() << endl;
+
+        // TODO(andrei): Should we expect missing data? Does that occur in
+        // KITTI?
+        res.push_back(readOxtslite(ss.str().c_str()));
+      }
 
       return res;
     }
