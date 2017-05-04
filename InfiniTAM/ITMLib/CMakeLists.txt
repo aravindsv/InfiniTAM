@@ -19,6 +19,7 @@ Engine/ITMRenTracker.cpp
 Engine/ITMTrackerFactory.cpp
 Engine/ITMTrackingController.cpp
 Engine/ITMVisualisationEngine.cpp
+Engine/ITMGroundTruthTracker.cpp
 )
 
 SET(ITMLIB_ENGINE_HEADERS
@@ -40,6 +41,7 @@ Engine/ITMTrackingController.h
 Engine/ITMViewBuilder.h
 Engine/ITMVisualisationEngine.h
 Engine/ITMMeshingEngine.h
+Engine/ITMGroundTruthTracker.h
 )
 
 ##

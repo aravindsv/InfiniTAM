@@ -42,7 +42,9 @@ namespace ITMLib
 				//! Identifies a tracker based on depth image and IMU measurement
 				TRACKER_IMU,
 				//! Identifies a tracker that use weighted ICP only on depth image
-				TRACKER_WICP
+				TRACKER_WICP,
+				//! Identifies a tracker which uses a set of known poses.
+				TRACKER_GROUND_TRUTH
 			} TrackerType;
 
 			/// Select the type of tracker to use
@@ -68,6 +70,12 @@ namespace ITMLib
 
 			/// Further, scene specific parameters such as voxel size
 			ITMLib::Objects::ITMSceneParams sceneParams;
+
+			// For ITMGroundTruthTracker: The location of the ground truth pose
+			// information folder. Currently, only the OxTS format is supported (the
+			// one in which the KITTI dataset ground truth pose information is
+			// provided).
+      std::string groundTruthPostFpath;
 
 			ITMLibSettings(void);
 			~ITMLibSettings(void);

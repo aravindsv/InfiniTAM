@@ -45,10 +45,11 @@ ITMLibSettings::ITMLibSettings(void)
 	// tool running libviso into a txt file in advance), I'm guessing it would
 	// be an addition to this enum.
 //	trackerType = TRACKER_COLOR;
-	trackerType = TRACKER_ICP;
+//	trackerType = TRACKER_ICP;
 //	trackerType = TRACKER_REN;
 	//trackerType = TRACKER_IMU;
 //	trackerType = TRACKER_WICP;
+  trackerType = TRACKER_GROUND_TRUTH;
 
 	/// model the sensor noise as  the weight for weighted ICP
 	modelSensorNoise = false;
@@ -75,7 +76,7 @@ ITMLibSettings::ITMLibSettings(void)
 		trackingRegime[2] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[3] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[4] = TRACKER_ITERATION_ROTATION;
-//	}
+	}
 
 	if (trackerType == TRACKER_REN) {
 		noICPRunTillLevel = 1;
@@ -87,6 +88,10 @@ ITMLibSettings::ITMLibSettings(void)
 	if ((trackerType == TRACKER_COLOR) && (!ITMVoxel::hasColorInformation)) {
 		printf("Error: Color tracker requires a voxel type with color information!\n");
 	}
+
+  // TODO(andrei): Consider setting this via the command line.
+	groundTruthPostFpath = "/home/andrei/datasets/kitti/2011_09_26"
+			"/2011_09_26_drive_0019_sync/oxts/data";
 }
 
 ITMLibSettings::~ITMLibSettings()
