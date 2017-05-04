@@ -151,13 +151,14 @@ Objects/ITMMesh.h
 set(ITMLIB_UTILS_SOURCES
 Utils/ITMCalibIO.cpp
 Utils/ITMLibSettings.cpp
-)
+        Utils/ITMOxtsIO.cpp)
 
 set(ITMLIB_UTILS_HEADERS
 Utils/ITMCalibIO.h
 Utils/ITMLibDefines.h
 Utils/ITMLibSettings.h
 Utils/ITMMath.h
+Utils/ITMOxtsIO.h
 )
 
 #################################################################

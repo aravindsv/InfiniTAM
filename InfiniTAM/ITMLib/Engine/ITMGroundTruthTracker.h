@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "ITMTracker.h"
+#include "../Utils/ITMOxtsIO.h"
 
 namespace ITMLib {
   namespace Engine {
@@ -29,6 +30,8 @@ namespace ITMLib {
         cout << "Will read data from: " << groundTruthFpath << endl;
 
         // TODO read OxTS dump using KITTI toolkit and look at pose info.
+
+        ITMLib::Objects::readOxtsliteData(groundTruthFpath);
       }
 
       void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
