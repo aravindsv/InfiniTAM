@@ -63,7 +63,8 @@ void ITMDepthTracker::PrepareForEvaluation()
 {
 	for (int i = 1; i < viewHierarchy->noLevels; i++)
 	{
-		ITMTemplatedHierarchyLevel<ITMFloatImage> *currentLevelView = viewHierarchy->levels[i], *previousLevelView = viewHierarchy->levels[i - 1];
+		ITMTemplatedHierarchyLevel<ITMFloatImage> *currentLevelView = viewHierarchy->levels[i],
+				*previousLevelView = viewHierarchy->levels[i - 1];
 		lowLevelEngine->FilterSubsampleWithHoles(currentLevelView->depth, previousLevelView->depth);
 		currentLevelView->intrinsics = previousLevelView->intrinsics * 0.5f;
 
@@ -144,6 +145,9 @@ void ITMDepthTracker::ApplyDelta(const Matrix4f & para_old, const float *delta, 
 
 void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView *view)
 {
+	std::cout << "Old pose:" << std::endl;
+	std::cout << trackingState->pose_d->GetM() << std::endl;
+
 	this->SetEvaluationData(trackingState, view);
 	this->PrepareForEvaluation();
 
@@ -196,5 +200,8 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 			if (HasConverged(step)) break;
 		}
 	}
+
+	std::cout << "New pose:" << std::endl;
+	std::cout << trackingState->pose_d->GetM() << std::endl;
 }
 

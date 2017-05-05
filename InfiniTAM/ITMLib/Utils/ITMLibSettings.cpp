@@ -48,8 +48,13 @@ ITMLibSettings::ITMLibSettings(void)
 //	trackerType = TRACKER_ICP;
 //	trackerType = TRACKER_REN;
 	//trackerType = TRACKER_IMU;
-//	trackerType = TRACKER_WICP;
-  trackerType = TRACKER_GROUND_TRUTH;
+	trackerType = TRACKER_WICP;
+//  trackerType = TRACKER_GROUND_TRUTH;
+
+//	0.999995, -0.00282649, -0.00141512, 0.00113069
+//	0.00141608, 0.000337298, 0.999999, -0.0441675
+//	0, 0, 0, 1
+
 
 	/// model the sensor noise as  the weight for weighted ICP
 	modelSensorNoise = false;

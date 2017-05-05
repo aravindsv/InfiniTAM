@@ -146,6 +146,10 @@ namespace ITMLib {
         float pitchf = (float) frame.pitch;
         float yawf = (float) frame.yaw;
 
+        if (frameIdx < 10) {
+          cout << rollf << " " << pitchf << " " << yawf << endl;
+        }
+
         Matrix3f rotX(          1,           0,            0,
                                 0,  cos(rollf),  -sin(rollf),
                                 0,  sin(rollf),   cos(rollf));
@@ -162,29 +166,32 @@ namespace ITMLib {
         // TODO utility for this (setTransform(Matrix4f&, const Matrix3f&, const Vector3f&)
         for (int x = 0; x < 3; ++x) {
           for (int y = 0; y < 3; ++y) {
-            transform(x, y) = rot(x, y);
+            transform(y, x) = rot(x, y);
           }
         }
 
-        for(int row = 0; row < 3; row++) {
-          transform(3, row) = (float) translation[row];
-        }
+        transform(3, 0) = (float) translation[0];
+        transform(3, 1) = (float) translation[1];
+        transform(3, 2) = (float) translation[2];
+        cout << "Translation: " << translation << endl;
 
         transform(0, 3) = 0;
         transform(1, 3) = 0;
         transform(2, 3) = 0;
         transform(3, 3) = 1;
 
-        cout << "Transform [" << frameIdx << "]:" << endl;
-        prettyPrint(cout, transform);
+//        cout << "Transform [" << frameIdx << "]:" << endl;
+//        prettyPrint(cout, transform);
 
         // TODO make this more concise
         if (! tr_initialized) {
+          cout << "Initializing inv transform to first frame." << endl;
           tr_initialized = true;
           if (!transform.inv(tr_0_inv)) {
             throw runtime_error(format("Ill-posed transform matrix inversion "
                                        "in frame %d.", frameIdx));
           }
+          cout << "Here it is:" << endl << tr_0_inv << endl;
         }
 
         Matrix4f newPose = tr_0_inv * transform;
@@ -192,6 +199,12 @@ namespace ITMLib {
 //        prettyPrint(cout, newPose);
 //        poses.push_back(transform);
         poses.push_back(newPose);
+
+        if (frameIdx < 10) {
+          cout << "New transform:" << endl << transform << endl;
+          cout << "New transform (relative to first): " << endl << newPose
+               << endl;
+        }
       }
 
       // TODO(andrei): We may actually just require incremental poses, not

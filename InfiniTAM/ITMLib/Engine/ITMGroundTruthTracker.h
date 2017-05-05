@@ -46,7 +46,8 @@ namespace ITMLib {
         cout << "Old pose: " << endl;
         cout << trackingState->pose_d->GetM() << endl;
 
-        trackingState->pose_d->SetM(groundTruthPoses[currentFrame]);
+//        trackingState->pose_d->SetM(groundTruthPoses[currentFrame]);
+        trackingState->pose_d->SetInvM(groundTruthPoses[currentFrame]);
 
         cout << "New pose: " << endl;
         cout << trackingState->pose_d->GetM() << endl;
