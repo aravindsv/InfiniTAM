@@ -172,6 +172,7 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
 			uiEngine->isRecording = true;
 		}
 		break;
+  case 'q':
 	case 'e':
 	case 27: // esc key
 		printf("exiting ...\n");
@@ -237,6 +238,19 @@ void UIEngine::glutMouseButtonFunction(int button, int state, int x, int y)
 		}
 		uiEngine->mouseLastClick.x = x;
 		uiEngine->mouseLastClick.y = y;
+
+#ifdef __linux__
+		// Linux typically does NOT support explicit handlers for the scroll wheel, so
+		// we do it here instead.
+		// Wheel reports as button 3(scroll up) and button 4(scroll down).
+		// We only want to do this on 'GLUT_DOWN', since every scroll event actually
+		// triggers both an UP and a DOWN callback, but we don't need both.
+		if ((button == 3) || (button == 4))
+		{
+			int buttonDir = (button == 3) ? 1 : -1;
+			UIEngine::glutMouseWheelFunction(button, buttonDir, x, y);
+		}
+#endif
 	}
 	else if (state == GLUT_UP) uiEngine->mouseState = 0;
 }
@@ -284,8 +298,7 @@ void UIEngine::glutMouseMoveFunction(int x, int y)
 	static const float scale_rotation = 0.005f;
 	static const float scale_translation = 0.0025f;
 
-	switch (uiEngine->mouseState)
-	{
+	switch (uiEngine->mouseState) {
 	case 1:
 	{
 		// left button: rotation
@@ -311,10 +324,13 @@ void UIEngine::glutMouseMoveFunction(int x, int y)
 		uiEngine->needsRefresh = true;
 		break;
 	}
-	default: break;
+
+	default:
+		break;
 	}
 }
 
+// Note: this callback does NOT get called on Linux!
 void UIEngine::glutMouseWheelFunction(int button, int dir, int x, int y)
 {
 	UIEngine *uiEngine = UIEngine::Instance();

@@ -13,7 +13,6 @@ namespace ITMLib {
     using namespace ITMLib::Objects;
     using namespace std;
 
-
     /**
      * Dummy tracker which relays pose information from a file.
      */
