@@ -16,7 +16,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
 
 #endif
 
@@ -109,8 +108,6 @@ namespace ORUtils
 			this->isAllocated_CPU = false;
 			this->isAllocated_CUDA = false;
 			this->isMetalCompatible = false;
-
-			std::cout << "ctor #2 alloc" << std::endl;
 
 			switch (memoryType)
 			{
@@ -215,9 +212,6 @@ namespace ORUtils
 
 			if (allocate_CUDA)
 			{
-				// XXX: remove this and the <iostream> include.
-				std::cout << "Will allocate CUDA block of size " << dataSize << "."
-               		<< std::endl;
 #ifndef COMPILE_WITHOUT_CUDA
 				if (dataSize == 0) data_cuda = NULL;
 				else ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataSize * sizeof(T)));
