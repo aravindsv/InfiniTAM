@@ -95,7 +95,9 @@ namespace ITMLib {
     // \brief TODO doc
     vector<OxTSFrame> readOxtsliteData(const std::string& dir);
 
-    vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames);
+    vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames,
+                                 vector<Vector3f>& trans,
+                                 vector<Matrix3f>& rots);
 
   }
 }

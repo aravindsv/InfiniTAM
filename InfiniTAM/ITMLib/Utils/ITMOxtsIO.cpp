@@ -121,7 +121,10 @@ namespace ITMLib {
       return resultFrame;
     }
 
-    vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames) {
+    vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames,
+                                 vector<Vector3f>& trans,
+                                 vector<Matrix3f>& rots
+    ) {
       double scale = latToScale(oxtsFrames[0].lat);
       vector<Matrix4f> poses;
 
@@ -138,7 +141,7 @@ namespace ITMLib {
         const OxTSFrame &frame = oxtsFrames[frameIdx];
         // Extract the 3D translation information
         Vector2d translation2d = latLonToMercator(frame.lat, frame.lon, scale);
-        Vector3d translation(translation2d.x, translation2d.y, frame.alt);
+        Vector3f translation(translation2d.x, translation2d.y, frame.alt);
 
         // Extract the 3D rotation information from yaw, pitch, and roll.
         // See the OxTS user manual, pg. 71, for more information.
@@ -161,6 +164,9 @@ namespace ITMLib {
                                  0,          0,             1);
 
         Matrix3f rot = rotZ * rotY * rotX;
+
+//        rots.push_back(rot);
+//        trans.push_back(translation);
 
         Matrix4f transform;
         // TODO utility for this (setTransform(Matrix4f&, const Matrix3f&, const Vector3f&)

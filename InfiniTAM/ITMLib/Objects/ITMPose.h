@@ -25,7 +25,7 @@ namespace ITMLib
 				struct {
 					float tx, ty, tz;
 					float rx, ry, rz;
-				}each;
+				} each;
 			} params;
 
 			/** The pose as a 4x4 transformation matrix ("modelview

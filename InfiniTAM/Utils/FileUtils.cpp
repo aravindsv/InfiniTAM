@@ -45,7 +45,8 @@ static FormatType png_readheader(FILE *fp, int & width, int & height, PNGReaderD
 
 	fread(header, 1, 8, fp);
 	if (png_sig_cmp(header, 0, 8)) {
-		//"not a PNG file"
+		fprintf(stderr, "Failed to read PNG input: Not actually PNG file\n");
+		fprintf(stderr, "Header read: %s\n", header);
 		return type;
 	}
 
@@ -53,18 +54,18 @@ static FormatType png_readheader(FILE *fp, int & width, int & height, PNGReaderD
 	internal.png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
 	if (!internal.png_ptr) {
-		//"png_create_read_struct failed"
+		fprintf(stderr, "png_create_read_struct failed\n");
 		return type;
 	}
 
 	internal.info_ptr = png_create_info_struct(internal.png_ptr);
 	if (!internal.info_ptr) {
-		//"png_create_info_struct failed"
+		fprintf(stderr, "png_create_info_struct failed\n");
 		return type;
 	}
 
 	if (setjmp(png_jmpbuf(internal.png_ptr))) {
-		//"setjmp failed"
+		fprintf(stderr, "setjmp failed\n");
 		return type;
 	}
 
@@ -89,6 +90,8 @@ static FormatType png_readheader(FILE *fp, int & width, int & height, PNGReaderD
 		if (bit_depth == 8) type = RGBA_8u;
 		// bit depth 16 is not accepted
 	}
+
+	fprintf(stderr, "Unknown color type. color_type=%d, bit_depth=%d.\n", color_type, bit_depth);
 	// other color types are not accepted
 #endif
 
@@ -130,28 +133,51 @@ static FormatType pnm_readheader(FILE *f, int *xsize, int *ysize, bool *binary)
 	bool isBinary = true;
 
 	/* read identifier */
-	if (fscanf(f, "%[^ \n\t]", tmp) != 1) return type;
+	if (fscanf(f, "%[^ \n\t]", tmp) != 1) {
+		fprintf(stderr, "Could not understand pnm identifier.\n");
+		return FORMAT_UNKNOWN;
+	}
 	if (!strcmp(tmp, pgm_id)) type = MONO_8u;
 	else if (!strcmp(tmp, pgm_ascii_id)) { type = MONO_8u; isBinary = false; }
 	else if (!strcmp(tmp, ppm_id)) type = RGB_8u;
 	else if (!strcmp(tmp, ppm_ascii_id)) { type = RGB_8u; isBinary = false; }
-	else return type;
+	else {
+		fprintf(stderr, "Unknown pnm format ID: %s\n", tmp);
+		return FORMAT_UNKNOWN;
+	}
 
 	/* read size */
-	if (!fscanf(f, "%i", &xs)) return FORMAT_UNKNOWN;
-	if (!fscanf(f, "%i", &ys)) return FORMAT_UNKNOWN;
+	if (!fscanf(f, "%i", &xs)) {
+		fprintf(stderr, "Could not read pnm file x-size.\n");
+		return FORMAT_UNKNOWN;
+	}
+	if (!fscanf(f, "%i", &ys)) {
+		fprintf(stderr, "Could not read pnm file y-size.\n");
+		return FORMAT_UNKNOWN;
+	}
 
-	if (!fscanf(f, "%i", &max_i)) return FORMAT_UNKNOWN;
-	if (max_i < 0) return FORMAT_UNKNOWN;
+	if (!fscanf(f, "%i", &max_i)) {
+		fprintf(stderr, "Could not read pnm file max i.\n");
+		return FORMAT_UNKNOWN;
+	}
+	if (max_i < 0) {
+		fprintf(stderr, "Invalid (negative) max_i value in pnm file: %d.\n", max_i);
+		return FORMAT_UNKNOWN;
+	}
 	else if (max_i <= (1 << 8)) {}
 	else if ((max_i <= (1 << 15)) && (type == MONO_8u)) type = MONO_16s;
 	else if ((max_i <= (1 << 16)) && (type == MONO_8u)) type = MONO_16u;
-	else return FORMAT_UNKNOWN;
+	else {
+		fprintf(stderr, "Invalid  max_i value in pnm file: %d.\n", max_i);
+		return FORMAT_UNKNOWN;
+	}
 	fgetc(f);
 
 	if (xsize) *xsize = xs;
 	if (ysize) *ysize = ys;
 	if (binary) *binary = isBinary;
+
+	fprintf(stderr, "Read PNM type: %d\n", type);
 
 	return type;
 }
@@ -399,8 +425,16 @@ bool ReadImageFromFile(ITMShortImage *image, const char *fileName)
 
 	FormatType type = pnm_readheader(f, &xsize, &ysize, &binary);
 	if ((type != MONO_16s) && (type != MONO_16u)) {
+		if (type == RGB_8u || type == MONO_8u) {
+			fprintf(stderr, "8-bit files are not supported by InfiniTAM. Culprit: [%s]\n", fileName);
+			fclose(f);
+			return false;
+		}
+		// Awesome error handling... If the PNM is valid but 8-bit, the system idiotically tries to
+		// (uselessly) interpret it as a PNG and starts complaining about the PNG (which was CLEARLY
+		// a VALID PNM) is invalid. TODO(andrei): Improve this error handling.
 		fclose(f);
-		f = fopen(fileName, "rb");
+		f = fopen(fileName, "rb");    // TODO(andrei): Can't we just fseek back to the start?
 		type = png_readheader(f, xsize, ysize, pngData);
 		if ((type != MONO_16s) && (type != MONO_16u)) {
       fprintf(

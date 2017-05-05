@@ -22,6 +22,9 @@ namespace ITMLib {
       int currentFrame = 0;
       vector<Matrix4f> groundTruthPoses;
 
+      vector<Vector3f> groundTruthTrans;
+      vector<Matrix3f> groundTruthRots;
+
     protected:
 
     public:
@@ -33,11 +36,10 @@ namespace ITMLib {
 
         vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
         // TODO(andrei): We probably only care about relative poses, right?
-        groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames);
+        groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames, groundTruthTrans, groundTruthRots);
       }
 
       void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
-        // TODO(andrei): populate the appropriate attribute(s) of trackingState.
         cout << "Ground truth tracking." << endl;
 
         this->currentFrame++;
@@ -45,8 +47,14 @@ namespace ITMLib {
         cout << "Old pose: " << endl;
         cout << trackingState->pose_d->GetM() << endl;
 
-//        trackingState->pose_d->SetM(groundTruthPoses[currentFrame]);
-        trackingState->pose_d->SetInvM(groundTruthPoses[currentFrame]);
+        Matrix4f invM;
+        groundTruthPoses[currentFrame].inv(invM);
+        float aux = invM.m30;
+        invM.m30 = invM.m32;
+        invM.m32 = aux;
+        trackingState->pose_d->SetInvM(invM);
+//	      trackingState->pose_d->SetRT(groundTruthRots[currentFrame],
+//                                     groundTruthTrans[currentFrame]);
 
         cout << "New pose: " << endl;
         cout << trackingState->pose_d->GetM() << endl;
