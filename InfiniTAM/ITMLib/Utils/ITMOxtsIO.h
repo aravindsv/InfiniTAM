@@ -1,13 +1,12 @@
-
-
 #pragma once
 
 #include <cstdarg>
 #include <iostream>
-#include <fstream>
 #include <vector>
 
 #include <stdint.h>
+
+#include "ITMMath.h"
 
 namespace ITMLib {
   namespace Objects {
@@ -95,6 +94,9 @@ namespace ITMLib {
 
     // \brief TODO doc
     vector<OxTSFrame> readOxtsliteData(const std::string& dir);
+
+    vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames);
+
   }
 }
 

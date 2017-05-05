@@ -20,7 +20,8 @@ namespace ITMLib {
     class ITMGroundTruthTracker : public ITMTracker {
 
     private:
-      const string groundTruthFpath;
+      int currentFrame = 0;
+      vector<Matrix4f> groundTruthPoses;
 
     protected:
 
@@ -32,19 +33,23 @@ namespace ITMLib {
         // TODO read OxTS dump using KITTI toolkit and look at pose info.
 
         vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
+        // TODO(andrei): We probably only care about relative poses, right?
+        groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames);
       }
 
       void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
         // TODO(andrei): populate the appropriate attribute(s) of trackingState.
         cout << "Ground truth tracking." << endl;
 
-        const float dummy[] = {
-          1, 0, 0, 0,
-          0, 1, 0, 0,
-          0, 0, 1, 0
-        };
-        Matrix4f currentM(dummy);
-        trackingState->pose_d->SetM(currentM);
+        this->currentFrame++;
+
+        cout << "Old pose: " << endl;
+        cout << trackingState->pose_d->GetM() << endl;
+
+        trackingState->pose_d->SetM(groundTruthPoses[currentFrame]);
+
+        cout << "New pose: " << endl;
+        cout << trackingState->pose_d->GetM() << endl;
       }
 
       // Note: this doesn't seem to get used much in InfiniTAM. It's just

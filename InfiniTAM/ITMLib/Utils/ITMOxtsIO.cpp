@@ -1,16 +1,17 @@
 
 #include <cmath>
 #include <cstdio>
-#include <sstream>
-#include <iomanip>
 #include <cstring>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
 
 #include "ITMOxtsIO.h"
-#include "ITMMath.h"
 
 using namespace std;
 
 namespace ITMLib {
+  // TODO(andrei): Better namespace name?
   namespace Objects {
 
     // TODO(andrei): Expose this function and put it in a more generic
@@ -72,6 +73,18 @@ namespace ITMLib {
       return timestamps;
     }
 
+    /// \brief Customized matrix printing useful for debugging.
+    void prettyPrint(ostream &out, const Matrix4f& m) {
+      stringstream ss;
+      for (size_t row = 0; row < 4; ++row) {
+        for (size_t col = 0; col < 4; ++col) {
+          out << setw(10) << setprecision(4) << right
+              << m.m[col * 4 + row] << ", ";
+        }
+        out << endl;
+      }
+    }
+
     /// \brief Compute the Mercator scale from the latitude.
     double latToScale(double latitude) {
       return cos(latitude * M_PI / 180.0);
@@ -87,6 +100,13 @@ namespace ITMLib {
 
     OxTSFrame readOxtslite(const string& fpath) {
       ifstream fin(fpath.c_str());
+      if (! fin.is_open()) {
+        throw runtime_error(format("Could not open pose file [%s].", fpath.c_str()));
+      }
+      if (fin.bad()) {
+        throw runtime_error(format("Could not read pose file [%s].", fpath.c_str()));
+      }
+
       OxTSFrame resultFrame;
       fin >> resultFrame.lat >> resultFrame.lon >> resultFrame.alt
           >> resultFrame.roll >> resultFrame.pitch >> resultFrame.yaw
@@ -111,16 +131,16 @@ namespace ITMLib {
 
       // TODO(andrei): Document this very clearly.
       bool tr_initialized = false;
+      // Keeps track of the inverse transform of the initial pose.
       Matrix4f tr_0_inv;
 
-//      for (const OxTSFrame& frame : oxtsFrames) {
-      for (int frameIdx = 0; frameIdx < oxtsFrames.size(); ++frameIdx) {
+      for (size_t frameIdx = 0; frameIdx < oxtsFrames.size(); ++frameIdx) {
         const OxTSFrame &frame = oxtsFrames[frameIdx];
         // Extract the 3D translation information
         Vector2d translation2d = latLonToMercator(frame.lat, frame.lon, scale);
         Vector3d translation(translation2d.x, translation2d.y, frame.alt);
 
-        // Extract the 3D rotation information
+        // Extract the 3D rotation information from yaw, pitch, and roll.
         // See the OxTS user manual, pg. 71, for more information.
         float rollf = (float) frame.roll;
         float pitchf = (float) frame.pitch;
@@ -136,10 +156,10 @@ namespace ITMLib {
                          sin(yawf),  cos(yawf),             0,
                                  0,          0,             1);
 
-        Matrix3f rot = rotZ * rotY * rotZ;
+        Matrix3f rot = rotZ * rotY * rotX;
 
         Matrix4f transform;
-        // TODO utility for this
+        // TODO utility for this (setTransform(Matrix4f&, const Matrix3f&, const Vector3f&)
         for (int x = 0; x < 3; ++x) {
           for (int y = 0; y < 3; ++y) {
             transform(x, y) = rot(x, y);
@@ -150,11 +170,13 @@ namespace ITMLib {
           transform(3, row) = (float) translation[row];
         }
 
-        transform(3, 0) = 0;
-        transform(3, 1) = 0;
-        transform(3, 2) = 0;
+        transform(0, 3) = 0;
+        transform(1, 3) = 0;
+        transform(2, 3) = 0;
         transform(3, 3) = 1;
 
+        cout << "Transform [" << frameIdx << "]:" << endl;
+        prettyPrint(cout, transform);
 
         // TODO make this more concise
         if (! tr_initialized) {
@@ -164,7 +186,16 @@ namespace ITMLib {
                                        "in frame %d.", frameIdx));
           }
         }
+
+        Matrix4f newPose = tr_0_inv * transform;
+//        cout << "Pose [" << frameIdx << "]: " << endl;
+//        prettyPrint(cout, newPose);
+//        poses.push_back(transform);
+        poses.push_back(newPose);
       }
+
+      // TODO(andrei): We may actually just require incremental poses, not
+      // absolute ones. Documnent the output very clearly either way!
 
       return poses;
     }
@@ -182,7 +213,7 @@ namespace ITMLib {
 
       for(size_t i = 0; i < timestamps.size(); ++i) {
         stringstream ss;
-        ss << dir << "/data/" << setw(10) << i;
+        ss << dir << "/data/" << setw(10) << setfill('0') << i << ".txt";
         cout << ss.str() << endl;
 
         // TODO(andrei): Should we expect missing data? Does that occur in
