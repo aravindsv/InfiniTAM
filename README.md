@@ -86,7 +86,7 @@ Undefined symbols for architecture x86_64:
       __GLOBAL__I_a in libITMLib.a(ITMLib_generated_ITMDepthTracker_CUDA.cu.o)
      [...]
 ```
-In the current version of InfiniTAM these errors are avoided by specifying ```CMAKE_CXX_FLAGS=-stdlib=libstdc++``` whenever clang is detected as complier. However, future versions of CUDA might not require this anymore or even get confused and/or require ```CUDA_HOST_COMPILER=/usr/bin/clang``` instead.
+In the current version of InfiniTAM these errors are avoided by specifying `CMAKE_CXX_FLAGS=-stdlib=libstdc++` whenever clang is detected as complier. However, future versions of CUDA might not require this anymore or even get confused and/or require `CUDA_HOST_COMPILER=/usr/bin/clang` instead.
 
 If a version of GLUT other than freeglut is used, the InfiniTAM sample application has problems on exit, as it is currently not explicitly cleaning up CUDA memory or closing the OpenNI device. Use freeglut to avoid this if you experience any problems.
 
@@ -106,7 +106,26 @@ If no OpenNI support has been compiled in, the program can be used for offline p
 The arguments are essentially masks for sprintf and the %04i will be replaced by a running number, accordingly.
 
 
-# 3. Additional Documentation
+# 3. HOWTOs
+
+ * To enable RGB support, or to swap from a short-based to a float-based SDF
+   representation, change `ITMVoxel`'s typedef in `ITMLibDefines.h`.
+ * On older GPUs with less GPU memory, InfiniTAM can often crash after running
+   out of memory. Lowering `SDF_LOCAL_BLOCK_NUM` to something like `0x10000` is
+   a good starting point for preventing this. It limits the maximum number of
+   memory blocks InfiniTAM keeps in memory, reducing its memory footprint.
+   It also limits the memory used by the meshing engine (see the definition of
+   `noMaxTriangles` in `ITMMesh.h`). It does this at the cost of performance,
+   since the system then ends up doing more swapping, but if you're on
+   a desktop computer this shouln't be an issue (e.g., I did this on an ancient
+   GeForce GTX 580 with 1.5 gigs of RAM and the system could still run WAY
+   faster than real-time).
+ * For even more tweaks, check out `ITMLibSettings.h`. Here, you can change
+   things such as which tracker the system uses (the default is the ICP-based
+   one).
+
+
+# 4. Additional Documentation
 
 Apart from the doxygen documentation there should also be a technical report
 shipped along with this package. It is also available from the official project
