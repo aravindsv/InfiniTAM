@@ -143,6 +143,17 @@ void ITMDepthTracker::ApplyDelta(const Matrix4f & para_old, const float *delta, 
 	para_new = Tinc * para_old;
 }
 
+// Taken from 'ITMPose' to aid with debugging.
+// XXX TODO(andrei): Remove this!!!
+Matrix3f getRot(const Matrix4f M) {
+	Matrix3f R;
+	R.m[0 + 3*0] = M.m[0 + 4*0]; R.m[1 + 3*0] = M.m[1 + 4*0]; R.m[2 + 3*0] = M.m[2 + 4*0];
+	R.m[0 + 3*1] = M.m[0 + 4*1]; R.m[1 + 3*1] = M.m[1 + 4*1]; R.m[2 + 3*1] = M.m[2 + 4*1];
+	R.m[0 + 3*2] = M.m[0 + 4*2]; R.m[1 + 3*2] = M.m[1 + 4*2]; R.m[2 + 3*2] = M.m[2 + 4*2];
+	return R;
+}
+
+
 void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView *view)
 {
 	std::cout << "Old pose:" << std::endl;
@@ -201,7 +212,11 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 		}
 	}
 
-	std::cout << "New pose:" << std::endl;
-	std::cout << trackingState->pose_d->GetM() << std::endl;
+	// TODO(andrei): Remove this debug code.
+	std::cout << "New pose (in KITTI format):" << std::endl;
+	std::cout << trackingState->pose_d->GetInvM() << std::endl;
+//	Matrix3f R = getRot(trackingState->pose_d->GetM());
+//	std::cout << "Rotation: " << std::endl << R << std::endl;
+//	std::cout << "Rot. det: " << R.det() << std::endl;
 }
 

@@ -30,7 +30,8 @@ __global__ void ComputeNormalAndWeight_device(const float* depth_in, Vector4f* n
 //
 //---------------------------------------------------------------------------
 
-void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, bool useBilateralFilter, bool modelSensorNoise)
+void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage,
+                                     bool useBilateralFilter, bool modelSensorNoise)
 {
 	if (*view_ptr == NULL)
 	{

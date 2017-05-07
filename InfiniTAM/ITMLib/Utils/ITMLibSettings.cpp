@@ -48,13 +48,13 @@ ITMLibSettings::ITMLibSettings(void)
 //	trackerType = TRACKER_ICP;
 //	trackerType = TRACKER_REN;
 	//trackerType = TRACKER_IMU;
-	trackerType = TRACKER_WICP;
-//  trackerType = TRACKER_GROUND_TRUTH;
+//	trackerType = TRACKER_WICP;
+  trackerType = TRACKER_GROUND_TRUTH;
 
 	/// model the sensor noise as  the weight for weighted ICP
 	modelSensorNoise = false;
 	if (trackerType == TRACKER_WICP) modelSensorNoise = true;
-	
+
 
 	// builds the tracking regime. level 0 is full resolution
 	if (trackerType == TRACKER_IMU)

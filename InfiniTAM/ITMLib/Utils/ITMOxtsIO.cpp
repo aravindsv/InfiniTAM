@@ -75,13 +75,19 @@ namespace ITMLib {
 
     /// \brief Customized matrix printing useful for debugging.
     void prettyPrint(ostream &out, const Matrix4f& m) {
-      stringstream ss;
+	    out << "[";
       for (size_t row = 0; row < 4; ++row) {
+	      if (row > 0) {
+		      out << " ";
+	      }
+	      out << "[";
         for (size_t col = 0; col < 4; ++col) {
-          out << setw(10) << setprecision(4) << right
-              << m.m[col * 4 + row] << ", ";
+          out << setw(6) << setprecision(4) << fixed << right << m.m[col * 4 + row];
+	        if (col < 3) {
+		        out << ", ";
+	        }
         }
-        out << endl;
+        out << "]" << endl;
       }
     }
 

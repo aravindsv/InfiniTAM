@@ -142,12 +142,15 @@ void ITMPose::SetModelViewFromParams()
 	R.m[1 + 3 * 2] = b - a;
 	R.m[2 + 3 * 1] = b + a;
 
+	// Set the rotation part.
 	M.m[0 + 4*0] = R.m[0 + 3*0]; M.m[1 + 4*0] = R.m[1 + 3*0]; M.m[2 + 4*0] = R.m[2 + 3*0];
 	M.m[0 + 4*1] = R.m[0 + 3*1]; M.m[1 + 4*1] = R.m[1 + 3*1]; M.m[2 + 4*1] = R.m[2 + 3*1];
 	M.m[0 + 4*2] = R.m[0 + 3*2]; M.m[1 + 4*2] = R.m[1 + 3*2]; M.m[2 + 4*2] = R.m[2 + 3*2];
 
+	// Set the translation part.
 	M.m[0 + 4*3] = T.v[0]; M.m[1 + 4*3] = T.v[1]; M.m[2 + 4*3] = T.v[2];
 
+	// Set the last row to [0 0 0 1].
 	M.m[3 + 4*0] = 0.0f; M.m[3 + 4*1] = 0.0f; M.m[3 + 4*2] = 0.0f; M.m[3 + 4*3] = 1.0f;
 }
 

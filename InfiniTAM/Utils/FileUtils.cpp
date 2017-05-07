@@ -434,7 +434,7 @@ bool ReadImageFromFile(ITMShortImage *image, const char *fileName)
 		// (uselessly) interpret it as a PNG and starts complaining about the PNG (which was CLEARLY
 		// a VALID PNM) is invalid. TODO(andrei): Improve this error handling.
 		fclose(f);
-		f = fopen(fileName, "rb");    // TODO(andrei): Can't we just fseek back to the start?
+		f = fopen(fileName, "rb");    // TODO(andrei): Could we fseek here?
 		type = png_readheader(f, xsize, ysize, pngData);
 		if ((type != MONO_16s) && (type != MONO_16u)) {
       fprintf(
