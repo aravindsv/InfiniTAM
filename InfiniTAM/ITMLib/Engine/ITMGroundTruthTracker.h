@@ -26,8 +26,6 @@ namespace ITMLib {
       vector<Vector3f> groundTruthTrans;
       vector<Matrix3f> groundTruthRots;
 
-	    ifstream myfile;    // the input stream for Xinyuan's code (TODO(andrei): pre-read this.)
-
       // TODO(andrei): Move this shit out of here.
       vector<Matrix4f> readKittiOdometryPoses(const std::string &fpath) {
         ifstream fin(fpath.c_str());
@@ -87,114 +85,40 @@ namespace ITMLib {
 //        vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
         // TODO(andrei): We probably only care about relative poses, right?
 //        groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames, groundTruthTrans, groundTruthRots);
-//	      groundTruthPoses = readKittiOdometryPoses("/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt");
-	      myfile = ifstream("/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt");
+	      groundTruthPoses = readKittiOdometryPoses("/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt");
       }
 
 	    // Andrei's shitty slav version.
-//      void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
-//
-//				Matrix4f M = groundTruthPoses[currentFrame];
-//	      Matrix3f R = getRot(M);
-//	      cout << "Ground truth pose matrix: " << endl;
-//	      prettyPrint(cout, M);
-//	      cout << "Rotation of the pose matrix: " << endl << R << endl;
-//
-//	      if (fabs(R.det() - 1.0f) > 0.001) {
-//		      cerr << "WARNING: Detected left-handed rotation matrix!!!" << endl;
-//		      cout << "det(R) = " << R.det() << endl;
-//	      }
-//
-//	      Matrix4f invM;
-//	      M.inv(invM);
-//	      cout << "Tracking normalization coef: " << invM.m33 << endl;
-//
-//	      // TODO(andrei): Figure out how to correct the pose for proper integration.
-//
-//	      // The sane thing *seems* to be to set the inverse of M to the GT pose we read,
-//	      // since that *seems* to be the convention InfiniTAM is using.
-//
-//	      trackingState->pose_d->SetM(invM);
-////	      trackingState->pose_d->Coerce();
-//
-//	      cout << "New pose in trackingState:" << endl;
-//	      prettyPrint(cout, trackingState->pose_d->GetM());
-//	      cout << endl;
-//
-//	      this->currentFrame++;
-//      }
-
-      // Xiyuan's glorious chinese version.
       void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
-	      std::cout<<"Tracking Pose"<<std::endl<<trackingState->pose_d->GetInvM()<<std::endl;
-	      double poseValue[3][4];
-	      Matrix4f currentPose = * (new Matrix4f());
-	      Matrix4f kinectTrans = Matrix4f();
-	      float kinectTransVal[16] = {1.0, 0.0 , 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
-	      for(int i=0;i<16;i++)
-	      {
-		      kinectTrans.m[i] = kinectTransVal[i];
+
+				Matrix4f M = groundTruthPoses[currentFrame];
+	      Matrix3f R = getRot(M);
+	      cout << "Ground truth pose matrix: " << endl;
+	      prettyPrint(cout, M);
+	      cout << "Rotation of the pose matrix: " << endl << R << endl;
+
+	      if (fabs(R.det() - 1.0f) > 0.001) {
+		      cerr << "WARNING: Detected left-handed rotation matrix!!!" << endl;
+		      cout << "det(R) = " << R.det() << endl;
 	      }
-	      Matrix4f kinectTransInv = Matrix4f();
-	      kinectTrans.inv(kinectTransInv);
-	      std::cout<<"inverse kinect pose"<<kinectTransInv<<std::endl;
 
-	      Matrix4f transPose = Matrix4f();
-	      Matrix4f invPose = Matrix4f();
-	      Matrix4f inversePose = Matrix4f();
-	      Matrix4f transInvPose = Matrix4f();
-	      std::cout<<"GroundTruth Tracking Pose"<<std::endl;
-	      for(int i=0;i<3;i++)
-	      {
-		      for(int j=0;j<4;j++)
-		      {
-			      myfile>>poseValue[i][j];
-			      currentPose.m[i*4+j]= poseValue[i][j];
-			      std::cout<<poseValue[i][j]<<" ";
-		      }
-		      std::cout<<std::endl;
-	      }
-	      currentPose.m[12] = 0.0;
-	      currentPose.m[13] = 0.0;
-	      currentPose.m[14] = 0.0;
-	      currentPose.m[15] = 1.0;
+	      Matrix4f invM;
+	      M.inv(invM);
+	      cout << "Tracking normalization coef: " << invM.m33 << endl;
 
-//    transPose = kinectTrans* currentPose * kinectTransInv;
-	      transPose = currentPose;
+	      // TODO(andrei): Figure out how to correct the pose for proper integration.
 
+	      // The sane thing *seems* to be to set the inverse of M to the GT pose we read,
+	      // since that *seems* to be the convention InfiniTAM is using.
 
-//    for(int i=0;i<3;i++)
-//    {
-//        for(int j=0;j<3;j++)
-//        {
-//            inversePose.m[4*j+i] = transPose.m[4*i+j];
-//        }
-//    }
-//
-//    for(int i=0;i<3;i++)
-//    {
-//        inversePose.m[4*i+3] = 0.0;
-//        for(int j=0;j<3;j++)
-//        {
-//            inversePose.m[4*i+3] = inversePose.m[4*i+3] - transPose.m[4*i+3]*inversePose.m[4*i+j];
-//        }
-//    }
-//    inversePose.m[12] = 0.0;
-//    inversePose.m[13] = 0.0;
-//    inversePose.m[14] = 0.0;
-//    inversePose.m[15] = 1.0;
-//
+	      trackingState->pose_d->SetM(invM);
+//	      trackingState->pose_d->Coerce();
 
-	      transPose.inv(invPose);
-	      std::cout<<invPose<<std::endl;
-	      for(int i=0;i<4;i++)
-	      {
-		      for(int j=0;j<4;j++)
-		      {
-			      transInvPose.m[4*i+j] = invPose.m[4*j+i];
-		      }
-	      }
-	      trackingState->pose_d->SetM(transInvPose);
+	      cout << "New pose in trackingState:" << endl;
+	      prettyPrint(cout, trackingState->pose_d->GetM());
+	      cout << endl;
+
+	      this->currentFrame++;
       }
 
       // Note: this doesn't seem to get used much in InfiniTAM. It's just

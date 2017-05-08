@@ -211,12 +211,5 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 			if (HasConverged(step)) break;
 		}
 	}
-
-	// TODO(andrei): Remove this debug code.
-	std::cout << "New pose (in KITTI format):" << std::endl;
-	std::cout << trackingState->pose_d->GetInvM() << std::endl;
-//	Matrix3f R = getRot(trackingState->pose_d->GetM());
-//	std::cout << "Rotation: " << std::endl << R << std::endl;
-//	std::cout << "Rot. det: " << R.det() << std::endl;
 }
 
