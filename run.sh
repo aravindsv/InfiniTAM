@@ -6,6 +6,6 @@ dir=$1
 echo "Using dataset directory: ${dir}"
 
 cd build
-make -j4 && \
+make -j6 && \
 ./InfiniTAM "${dir}/calib.txt" "${dir}/Frames/%04i.ppm" "${dir}/Frames/%04i.pgm"
 

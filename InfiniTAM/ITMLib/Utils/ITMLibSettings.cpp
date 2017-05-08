@@ -7,7 +7,15 @@
 using namespace ITMLib::Objects;
 
 ITMLibSettings::ITMLibSettings(void)
-	: sceneParams(0.02f, 100, 0.005f, 0.2f, 3.0f, false)
+//	: sceneParams(mu, maxW, voxSize, vFrust_min, vFrust_max, stopIntAtMaxW)
+// maxW = max # of observations to average, per voxel, before a running average starts getting
+//        computed.
+// voxSize = voxel size, in meters. Can have a HUGE impact on quality, but making it too small
+//           leads to HUGE memory consumption. Moreover, making it extremely small prevents fusion
+//           from occurring properly.
+// Defaults:
+//	: sceneParams(0.02f, 100, 0.0050f, 0.2f, 3.0f, false)
+	: sceneParams(0.02f, 5, 0.0040f, 0.1f, 30.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
@@ -31,13 +39,17 @@ ITMLibSettings::ITMLibSettings(void)
 	//deviceType = DEVICE_CPU;
 
 	/// enables or disables swapping. HERE BE DRAGONS: It should work, but requires more testing
+	/// Enabling the swapping interferes with the free-roam visualization.
 	useSwapping = false;
+//	useSwapping = true;
 
 	/// enables or disables approximate raycast
 	useApproximateRaycast = false;
 
 	/// enable or disable bilateral depth filtering;
-	useBilateralFilter = false;
+	/// When used with stereo depth maps, it seems to increase reconstruction quality.
+//	useBilateralFilter = false;
+	useBilateralFilter = true;
 
 	// TODO(andrei): Original was just 'TRACKER_ICP'. Should be able to set
 	// this using a command line flag. If we were to add support for tracking
@@ -90,8 +102,9 @@ ITMLibSettings::ITMLibSettings(void)
 	}
 
   // TODO(andrei): Consider setting this via the command line.
-	groundTruthPostFpath = "/home/andrei/datasets/kitti/2011_09_26"
-			"/2011_09_26_drive_0019_sync/oxts/";
+//	groundTruthPoseFpath = "/home/andrei/datasets/kitti/2011_09_26"
+//			"/2011_09_26_drive_0019_sync/oxts/";
+	groundTruthPoseFpath = "/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt";
 }
 
 ITMLibSettings::~ITMLibSettings()

@@ -75,7 +75,7 @@ namespace ITMLib
 			// information folder. Currently, only the OxTS format is supported (the
 			// one in which the KITTI dataset ground truth pose information is
 			// provided).
-      std::string groundTruthPostFpath;
+      std::string groundTruthPoseFpath;
 
 			ITMLibSettings(void);
 			~ITMLibSettings(void);

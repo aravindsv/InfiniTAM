@@ -16,6 +16,14 @@ namespace ITMLib {
 
     /**
      * Dummy tracker which relays pose information from a file.
+     * The currently supported file format is the ground truth odometry information from
+     * the KITTI odometry dataset.
+     *
+     * Note that this information is not a 100% "cheaty" ground truth computed using, e.g.,
+     * manual annotation or beacons, but the one recorded by the vehicle's IMG/GPS module.
+     *
+     * In the future, nevertheless, it would be much cooler to just do this using sparse-to-dense
+     * odometry from stereo (and maybe lidar) data.
      */
     class ITMGroundTruthTracker : public ITMTracker {
 
@@ -23,10 +31,9 @@ namespace ITMLib {
       int currentFrame = 0;
       vector<Matrix4f> groundTruthPoses;
 
-      vector<Vector3f> groundTruthTrans;
-      vector<Matrix3f> groundTruthRots;
-
-      // TODO(andrei): Move this shit out of here.
+      // TODO(andrei): Move this helper out of here.
+	    /// \brief Loads a KITTI-odometry ground truth pose file.
+	    /// \return A list of absolute vehicle poses expressed as 4x4 matrices.
       vector<Matrix4f> readKittiOdometryPoses(const std::string &fpath) {
         ifstream fin(fpath.c_str());
 	      if (! fin.is_open()) {
@@ -34,23 +41,15 @@ namespace ITMLib {
         }
 
 	      cout << "Loading odometry ground truth from file: " << fpath << endl;
-
         vector<Matrix4f> poses;
         while (! fin.eof()) {
 	        // This matrix takes a point in the ith coordinate system, and projects it
 	        // into the first (=0th, or world) coordinate system.
-	        // Confirmed: in sequence with car moving forward, Z+ is forward (see ground
-	        // truth for Kitti odometry sequence 6).
 	        //
-	        // When using built-in InfiniTAM ICP-based odometry, displaying the M matrix
-	        // shows a constantly-decreasing Z when moving forward. Positive X seems associated
-	        // with right.
 	        // The M matrix in InfiniTAM is a modelview matrix, so it transforms points from
 	        // the world coordinates, to camera coordinates.
-
-	        // Sequence 06: When reading the pose matrix ground truth and setting the
-	        // value of M to its value, the camera seems to be moving backwards and to the
-	        // right, instead of forwards, and to the right.
+	        //
+	        // One therefore needs to set this pose as 'InvM' in the InfiniTAM tracker state.
 
           Matrix4f pose;
           fin >> pose.m00 >> pose.m10 >> pose.m20 >> pose.m30
@@ -65,6 +64,7 @@ namespace ITMLib {
       }
 
 	    // Taken from 'ITMPose' to aid with debugging.
+	    // TODO(andrei): Move to common utility. Can make math-intense code much cleaner.
 	    Matrix3f getRot(const Matrix4f M) {
 		    Matrix3f R;
 		    R.m[0 + 3*0] = M.m[0 + 4*0]; R.m[1 + 3*0] = M.m[1 + 4*0]; R.m[2 + 3*0] = M.m[2 + 4*0];
@@ -77,55 +77,34 @@ namespace ITMLib {
 
     public:
       ITMGroundTruthTracker(const string &groundTruthFpath) {
-        cout << "Created experimental ground truth-based tracker." << endl;
-//        cout << "Will read data from: " << groundTruthFpath << endl;
+        cout << "Created ground truth-based tracker. Will read data from: "
+             << groundTruthFpath << endl;
 
-        // TODO read OxTS dump using KITTI toolkit and look at pose info.
-
+	      groundTruthPoses = readKittiOdometryPoses(groundTruthFpath);
+	      // TODO(andrei): This code, although untested, should provide a skeleton for
+	      // reading OxTS data, such that ground truth from the full KITTI dataset can
+	      // be read.
 //        vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
-        // TODO(andrei): We probably only care about relative poses, right?
 //        groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames, groundTruthTrans, groundTruthRots);
-	      groundTruthPoses = readKittiOdometryPoses("/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt");
       }
 
-	    // Andrei's shitty slav version.
       void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
-
+		    this->currentFrame++;
 				Matrix4f M = groundTruthPoses[currentFrame];
-	      Matrix3f R = getRot(M);
-	      cout << "Ground truth pose matrix: " << endl;
-	      prettyPrint(cout, M);
-	      cout << "Rotation of the pose matrix: " << endl << R << endl;
 
-	      if (fabs(R.det() - 1.0f) > 0.001) {
-		      cerr << "WARNING: Detected left-handed rotation matrix!!!" << endl;
-		      cout << "det(R) = " << R.det() << endl;
-	      }
+	      // Mini-hack to ensure translation magnitude is "calibrated" to the
+	      // range of the depth map.
+		    M.m30 *= 0.10;
+		    M.m31 *= 0.10;
+		    M.m32 *= 0.10;
 
-	      Matrix4f invM;
-	      M.inv(invM);
-	      cout << "Tracking normalization coef: " << invM.m33 << endl;
-
-	      // TODO(andrei): Figure out how to correct the pose for proper integration.
-
-	      // The sane thing *seems* to be to set the inverse of M to the GT pose we read,
-	      // since that *seems* to be the convention InfiniTAM is using.
-
-	      trackingState->pose_d->SetM(invM);
-//	      trackingState->pose_d->Coerce();
-
-	      cout << "New pose in trackingState:" << endl;
-	      prettyPrint(cout, trackingState->pose_d->GetM());
-	      cout << endl;
-
-	      this->currentFrame++;
+	      trackingState->pose_d->SetInvM(M);
       }
 
       // Note: this doesn't seem to get used much in InfiniTAM. It's just
       // called from 'ITMMainEngine', but none of its implementations
       // currently do anything.
-      void UpdateInitialPose(ITMTrackingState *trackingState) {
-      }
+      void UpdateInitialPose(ITMTrackingState *trackingState) {}
 
       virtual ~ITMGroundTruthTracker() {}
 

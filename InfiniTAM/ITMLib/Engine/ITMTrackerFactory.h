@@ -9,6 +9,7 @@
 #include "ITMIMUTracker.h"
 #include "ITMLowLevelEngine.h"
 #include "ITMTracker.h"
+#include "ITMGroundTruthTracker.h"
 
 #include "DeviceSpecific/CPU/ITMColorTracker_CPU.h"
 #include "DeviceSpecific/CPU/ITMDepthTracker_CPU.h"
@@ -21,8 +22,6 @@
 #include "DeviceSpecific/CUDA/ITMDepthTracker_CUDA.h"
 #include "DeviceSpecific/CUDA/ITMWeightedICPTracker_CUDA.h"
 #include "DeviceSpecific/CUDA/ITMRenTracker_CUDA.h"
-#include "ITMGroundTruthTracker.h"
-
 #endif
 
 #ifdef COMPILE_WITH_METAL
@@ -382,7 +381,7 @@ namespace ITMLib
         ITMIMUCalibrator *imuCalibrator,
         ITMScene<TVoxel, TIndex> *scene
       ) {
-        return new ITMGroundTruthTracker(settings->groundTruthPostFpath);
+        return new ITMGroundTruthTracker(settings->groundTruthPoseFpath);
       }
     };
   }

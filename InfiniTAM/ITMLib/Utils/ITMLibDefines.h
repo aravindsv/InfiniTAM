@@ -38,6 +38,11 @@
 //#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks, currently 2^17
 // XXX: lowered by Andrei for my crappy GPU. It *did* help me get rid of some
 // of my out of memory errors.
+// TODO(andrei): This value does seem to impose a map size limit, as long as swapping is not enabled.
+// Enabling swapping drastically increases the available range, but the map generation STILL stops after
+// the map gets really big.
+// If swapping is enabled, then the entire-map visualization is no longer available.
+// However, if this limit is hit, and swapping is disabled, NO error messages are shown. Hmmm.
 #define SDF_LOCAL_BLOCK_NUM 0x10000
 
 #define SDF_GLOBAL_BLOCK_NUM 0x120000	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
@@ -46,6 +51,10 @@
 #define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, should be 2^n and bigger than SDF_LOCAL_BLOCK_NUM, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
 #define SDF_HASH_MASK 0xfffff			// Used for get hashing value of the bucket index,  SDF_HASH_MASK = SDF_BUCKET_NUM - 1
 #define SDF_EXCESS_LIST_SIZE 0x20000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
+
+//#define SDF_BUCKET_NUM 0x800000
+//#define SDF_HASH_MASK (SDF_BUCKET_NUM - 1)
+//#define SDF_EXCESS_LIST_SIZE 0x20000
 
 //////////////////////////////////////////////////////////////////////////
 // Voxel Hashing data structures
@@ -193,7 +202,9 @@ struct ITMVoxel_f
 */
 //typedef ITMVoxel_s ITMVoxel;
 //typedef ITMVoxel_f ITMVoxel;
+// Float-based representations seem to be noisier and have more holes than the short ones.
 typedef ITMVoxel_s_rgb ITMVoxel;
+//typedef ITMVoxel_f_rgb ITMVoxel;
 // TODO(andrei): Would it be nontrivial to compile all the options and
 // have a commandline argument pick the voxel representation?
 
