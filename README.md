@@ -119,7 +119,8 @@ The arguments are essentially masks for sprintf and the %04i will be replaced by
    since the system then ends up doing more swapping, but if you're on
    a desktop computer this shouln't be an issue (e.g., I did this on an ancient
    GeForce GTX 580 with 1.5 gigs of RAM and the system could still run WAY
-   faster than real-time).
+   faster than real-time). Be warned: doing this but leaving swapping OFF will
+   drastically limit the size of the maps you can create.
  * For even more tweaks, check out `ITMLibSettings.h`. Here, you can change
    things such as which tracker the system uses (the default is the ICP-based
    one).
