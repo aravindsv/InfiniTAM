@@ -2,6 +2,10 @@
 
 #pragma once
 
+#ifdef WITH_BACKWARDS_CPP
+#include "third_party/backward-cpp/backward.hpp"
+#endif
+
 #ifndef COMPILE_WITHOUT_CUDA
 
 #if (!defined USING_CMAKE) && (defined _MSC_VER)
@@ -31,15 +35,30 @@ namespace ORUtils {
 inline void __cudaSafeCall( cudaError err, const char *file, const int line )
 {
     if( cudaSuccess != err) {
-		printf("%s(%i) : cudaSafeCall() Runtime API error : %s.\n",
-                file, line, cudaGetErrorString(err) );
-        exit(-1);
+
+#ifdef WITH_BACKWARDS_CPP
+	    using namespace backward;
+	    fprintf(stderr, "\nCUDA error. See stacktrace and details below:\n\n");
+	    // Display a helpful backtrace (with code snippets, if available).
+	    StackTrace st;
+	    st.load_here(32);
+	    // Disable printing out boilerplate stack frames from the stack trace
+	    // processing code.
+	    st.skip_n_firsts(3);
+			Printer p;
+			p.address = true;
+	    p.print(st);
+#endif
+
+	    fprintf(stderr, "%s(%i) : cudaSafeCall() Runtime API error : %s.\n",
+	           file, line, cudaGetErrorString(err) );
+
+			exit(-1);
     }
 }
 
 }
 
-#endif
-
-#endif
+#endif    // ifndef ORcudaSafeCall
+#endif    // ifndef COMPILE_WITHOUT_CUDA
 

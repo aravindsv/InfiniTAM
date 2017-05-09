@@ -9,13 +9,14 @@ using namespace ITMLib::Objects;
 ITMLibSettings::ITMLibSettings(void)
 //	: sceneParams(mu, maxW, voxSize, vFrust_min, vFrust_max, stopIntAtMaxW)
 // maxW = max # of observations to average, per voxel, before a running average starts getting
-//        computed.
+//        computed. Decreasing this can seriously lower the memory footprint, but at the cost of quality.
+//        Going down to ~25 or 10 should still be quite OK given our fast motion.
 // voxSize = voxel size, in meters. Can have a HUGE impact on quality, but making it too small
 //           leads to HUGE memory consumption. Moreover, making it extremely small prevents fusion
 //           from occurring properly.
 // Defaults:
 //	: sceneParams(0.02f, 100, 0.0050f, 0.2f, 3.0f, false)
-	: sceneParams(0.02f, 5, 0.0100f, 0.1f, 30.0f, false)
+	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;

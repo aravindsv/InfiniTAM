@@ -25,6 +25,14 @@ Dummy.cpp
 ${ORUTILS_HEADERS}
 )
 
+
+IF(WITH_BACKWARDS_CPP)
+  # Support 'backward-cpp,' a lean stacktrace printing library for Linux.
+  add_subdirectory(third_party/backward-cpp)
+ENDIF()
+
+add_library(ORUtils ${ORUTILS_OBJECTS})
+
 #############################
 # Specify the source groups #
 #############################
@@ -34,8 +42,6 @@ SOURCE_GROUP("" FILES ${ORUTILS_HEADERS})
 ##############################################################
 # Specify the include directories, target and link libraries #
 ##############################################################
-
-add_library(ORUtils ${ORUTILS_OBJECTS})
 
 IF(WITH_CUDA)
 #  include_directories(${CUDA_INCLUDE_DIRS})

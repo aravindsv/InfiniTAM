@@ -43,7 +43,7 @@
 // the map gets really big.
 // If swapping is enabled, then the entire-map visualization is no longer available.
 // However, if this limit is hit, and swapping is disabled, NO error messages are shown. Hmmm.
-#define SDF_LOCAL_BLOCK_NUM 0x10000
+#define SDF_LOCAL_BLOCK_NUM 0x2A000
 
 #define SDF_GLOBAL_BLOCK_NUM 0x120000	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
 #define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
