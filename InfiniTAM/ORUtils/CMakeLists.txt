@@ -26,18 +26,26 @@ ${ORUTILS_HEADERS}
 )
 
 
-IF(WITH_BACKWARDS_CPP)
   # Support 'backward-cpp,' a lean stacktrace printing library for Linux.
   add_subdirectory(third_party/backward-cpp)
-ENDIF()
+#list(APPEND CMAKE_MODULE_PATH third_party/backward-cpp)
+#list(APPEND CMAKE_PREFIX_PATH ./third_party/backward-cpp)
+#message(${CMAKE_MODULE_PATH})
+#list(APPEND CMAKE_MODULE_PATH :/home/andrei/work/InfiniTAM/InfiniTAM/ORUtils/third_party/backward-cpp)
+#message(${CMAKE_MODULE_PATH})
+#message('wut')
 
-add_library(ORUtils ${ORUTILS_OBJECTS})
+#find_package(Backward)
 
 #############################
 # Specify the source groups #
 #############################
 
 SOURCE_GROUP("" FILES ${ORUTILS_HEADERS})
+
+add_library(ORUtils ${ORUTILS_OBJECTS})
+
+#target_link_libraries(ORUtils PUBLIC Backward::Backward)
 
 ##############################################################
 # Specify the include directories, target and link libraries #

@@ -152,11 +152,11 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
 	switch (key)
 	{
 	case 'n':
-		printf("processing one frame ...\n");
+		printf("\nprocessing one frame ...\n");
 		uiEngine->mainLoopAction = UIEngine::PROCESS_FRAME;
 		break;
 	case 'b':
-		printf("processing input source ...\n");
+		printf("\nprocessing input source ...\n");
 		uiEngine->mainLoopAction = UIEngine::PROCESS_VIDEO;
 		break;
 	case 's':

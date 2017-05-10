@@ -45,7 +45,12 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	}
 
 	mesh = NULL;
-	if (createMeshingEngine) mesh = new ITMMesh(settings->deviceType == ITMLibSettings::DEVICE_CUDA ? MEMORYDEVICE_CUDA : MEMORYDEVICE_CPU);
+	if (createMeshingEngine) {
+		MemoryDeviceType deviceType = (settings->deviceType == ITMLibSettings::DEVICE_CUDA
+		                               ? MEMORYDEVICE_CUDA
+		                               : MEMORYDEVICE_CPU);
+		mesh = new ITMMesh(deviceType);
+	}
 
 	Vector2i trackedImageSize = ITMTrackingController::GetTrackedImageSize(settings, imgSize_rgb, imgSize_d);
 
@@ -194,7 +199,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 	};
 }
 
-void ITMMainEngine::turnOnIntegration() { fusionActive = true; }
-void ITMMainEngine::turnOffIntegration() { fusionActive = false; }
+void ITMMainEngine::turnOnIntegration() { printf("Integration now on.\n\n"); fusionActive = true; }
+void ITMMainEngine::turnOffIntegration() { printf("Integration now off.\n\n");fusionActive = false; }
 void ITMMainEngine::turnOnMainProcessing() { mainProcessingActive = true; }
 void ITMMainEngine::turnOffMainProcessing() { mainProcessingActive = false; }

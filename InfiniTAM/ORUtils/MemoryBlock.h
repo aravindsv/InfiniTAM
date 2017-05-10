@@ -180,6 +180,7 @@ namespace ORUtils
 			{
 				int allocType = 0;
 
+
 #ifndef COMPILE_WITHOUT_CUDA
 				if (allocate_CUDA) allocType = 1;
 #endif
@@ -190,7 +191,13 @@ namespace ORUtils
 				{
 				case 0:
 					if (dataSize == 0) data_cpu = NULL;
-					else data_cpu = new T[dataSize];
+					else {
+						size_t dataBytes = dataSize * sizeof(T);
+						float dataMBytes = dataBytes / 1024.0f / 1024.0f;
+						printf("Allocating block of %.4fMb of data on the CPU.\n", dataMBytes);
+
+						data_cpu = new T[dataSize];
+					}
 					break;
 				case 1:
 #ifndef COMPILE_WITHOUT_CUDA
@@ -213,8 +220,15 @@ namespace ORUtils
 			if (allocate_CUDA)
 			{
 #ifndef COMPILE_WITHOUT_CUDA
-				if (dataSize == 0) data_cuda = NULL;
-				else ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataSize * sizeof(T)));
+				if (dataSize == 0) {
+					data_cuda = NULL;
+				}
+				else {
+					size_t dataBytes = dataSize * sizeof(T);
+					float dataMBytes = dataBytes / 1024.0f / 1024.0f;
+					printf("Allocating block of %.4fMb of data on the GPU.\n", dataMBytes);
+					ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataBytes));
+				}
 				this->isAllocated_CUDA = allocate_CUDA;
 #endif
 			}
@@ -235,7 +249,12 @@ namespace ORUtils
 				switch (allocType)
 				{
 				case 0:
-					if (data_cpu != NULL) delete[] data_cpu;
+					if (data_cpu != NULL) {
+						size_t dataBytes = dataSize * sizeof(T);
+						float dataMBytes = dataBytes / 1024.0f / 1024.0f;
+						printf("Freeing block of %.4fMb of data on the CPU.\n", dataMBytes);
+						delete[] data_cpu;
+					}
 					break;
 				case 1:
 #ifndef COMPILE_WITHOUT_CUDA
@@ -256,7 +275,13 @@ namespace ORUtils
 			if (isAllocated_CUDA)
 			{
 #ifndef COMPILE_WITHOUT_CUDA
-				if (data_cuda != NULL) ORcudaSafeCall(cudaFree(data_cuda));
+				if (data_cuda != NULL) {
+					size_t dataBytes = dataSize * sizeof(T);
+					float dataMBytes = dataBytes / 1024.0f / 1024.0f;
+					printf("Freeing block of %.4fMb of data on the GPU.\n", dataMBytes);
+
+					ORcudaSafeCall(cudaFree(data_cuda));
+				}
 #endif
 				isAllocated_CUDA = false;
 			}

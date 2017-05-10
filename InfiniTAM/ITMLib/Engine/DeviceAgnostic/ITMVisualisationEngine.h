@@ -21,7 +21,8 @@ struct RenderingBlock {
 static const CONSTPTR(int) renderingBlockSizeX = 16;
 static const CONSTPTR(int) renderingBlockSizeY = 16;
 
-static const CONSTPTR(int) MAX_RENDERING_BLOCKS = 65536*4;
+//static const CONSTPTR(int) MAX_RENDERING_BLOCKS = 65536*4;
+static const CONSTPTR(int) MAX_RENDERING_BLOCKS = 65536 * 4;
 //static const int MAX_RENDERING_BLOCKS = 16384;
 static const CONSTPTR(int) minmaximg_subsample = 8;
 
@@ -141,6 +142,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 
 	if (sdfValue <= 0.0f)
 	{
+		// We found the zero-crossing. Read the interpolated depth, perform the final update, and return.
 		stepLength = sdfValue * stepScale;
 		pt_result += stepLength * rayDirection;
 

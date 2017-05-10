@@ -92,6 +92,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	Vector2i depthImgSize = view->depth->noDims;
 	float voxelSize = scene->sceneParams->voxelSize;
 
+	printf("AllocateSceneFromDepth\n");
+
 	Matrix4f M_d, invM_d;
 	Vector4f projParams_d, invProjParams_d;
 
@@ -113,7 +115,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	ITMHashSwapState *swapStates = scene->useSwapping ? scene->globalCache->GetSwapStates(true) : 0;
 
 	int noTotalEntries = scene->index.noTotalEntries;
-
 	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
 	uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 
@@ -136,9 +137,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
 
-	if (gridSizeVS.x > 0) setToType3 << <gridSizeVS, cudaBlockSizeVS >> > (entriesVisibleType, visibleEntryIDs, renderState_vh->noVisibleEntries);
+	if (gridSizeVS.x > 0) {
+		setToType3 <<<gridSizeVS, cudaBlockSizeVS>>>(entriesVisibleType, visibleEntryIDs, renderState_vh->noVisibleEntries);
+	}
 
-	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType, 
+	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType,
 		blockCoords_device, depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max);
 
@@ -168,6 +171,25 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
 	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
+
+//	printf("Total supported visible entries:  %d\n", noTotalEntries);
+	printf("Visible entries: %d\n", tempData->noVisibleEntries);
+	printf("Allocated voxel entries: %d\n", tempData->noAllocatedVoxelEntries);
+	printf("Allocated excess entries: %d\n", tempData->noAllocatedExcessEntries);
+	printf("Allocated voxel blocks in local GPU buffer: %d\n", scene->index.getNumAllocatedVoxelBlocks());
+	printf("Last free block ID:     %d\n", scene->localVBA.lastFreeBlockId);
+	printf("Allocated size:         %d\n", scene->localVBA.allocatedSize);
+	printf("\n");
+
+	ITMHashEntry *entries = scene->index.GetEntries();
+	if (scene->localVBA.lastFreeBlockId == 0) {
+		fprintf(stderr, "WARNING: lastFreeBlockId == 0. We can no longer accommodate new blocks.");
+	}
+	if (scene->localVBA.lastFreeBlockId < 0) {
+		fprintf(stderr, "ERROR: Last free block ID was negative (%d). This may indicate an "
+				"allocation failure, causing your map to stop being able to grow.\n", scene->localVBA.lastFreeBlockId);
+		throw std::runtime_error("Invalid free voxel block ID.");
+	}
 }
 
 template<class TVoxel>
@@ -262,6 +284,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::IntegrateInt
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	const ITMPlainVoxelArray::ITMVoxelArrayInfo *arrayInfo = scene->index.getIndexData();
 
+	// TODO(andrei): Won't this be faster on devices which support larger block sizes?
 	dim3 cudaBlockSize(8, 8, 8);
 	dim3 gridSize(scene->index.getVolumeSize().x / cudaBlockSize.x, scene->index.getVolumeSize().y / cudaBlockSize.y, scene->index.getVolumeSize().z / cudaBlockSize.z);
 
@@ -372,6 +395,9 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 
 	switch (entriesAllocType[targetIdx])
 	{
+		case 0: // TODO(andrei): What exactly do these values mean? Could we please use constants/enums/defines?
+		break;
+
 	case 1: //needs allocation, fits in the ordered list
 		vbaIdx = atomicSub(&allocData->noAllocatedVoxelEntries, 1);
 
@@ -409,6 +435,10 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 
 			entriesVisibleType[SDF_BUCKET_NUM + exlOffset] = 1; //make child visible
 		}
+		break;
+
+		default:
+			printf("Unexpected alloc type: %d\n", static_cast<int>(entriesAllocType[targetIdx]));
 
 		break;
 	}
@@ -471,7 +501,8 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 
 	if (shouldPrefix)
 	{
-		int offset = computePrefixSum_device<int>(hashVisibleType > 0, &allocData->noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
+		int offset = computePrefixSum_device<int>(hashVisibleType > 0, &allocData->noVisibleEntries,
+		                                          blockDim.x * blockDim.y, threadIdx.x);
 		if (offset != -1) visibleEntryIDs[offset] = targetIdx;
 	}
 

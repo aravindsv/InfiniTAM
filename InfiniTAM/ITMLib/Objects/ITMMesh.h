@@ -19,15 +19,16 @@ namespace ITMLib
 			MemoryDeviceType memoryType;
 
 			uint noTotalTriangles;
+//			static const uint noMaxTriangles = SDF_LOCAL_BLOCK_NUM * 32;
 			static const uint noMaxTriangles = SDF_LOCAL_BLOCK_NUM * 32;
 
 			ORUtils::MemoryBlock<Triangle> *triangles;
 
-			explicit ITMMesh(MemoryDeviceType memoryType)
-			{
+			explicit ITMMesh(MemoryDeviceType memoryType) {
 				this->memoryType = memoryType;
 				this->noTotalTriangles = 0;
 
+				printf("Allocating memory block for mesh triangles. noMaxTriangles=%d.\n", noMaxTriangles);
 				triangles = new ORUtils::MemoryBlock<Triangle>(noMaxTriangles, memoryType);
 			}
 

@@ -43,6 +43,8 @@ namespace ITMLib
 
 				allocatedSize = noBlocks * blockSize;
 
+				printf("Building local VBA for storing the active map. noBlocks = %d, blockSize = %d\n",
+					noBlocks, blockSize);
 				voxelBlocks = new ORUtils::MemoryBlock<TVoxel>(allocatedSize, memoryType);
 				allocationList = new ORUtils::MemoryBlock<int>(noBlocks, memoryType);
 			}

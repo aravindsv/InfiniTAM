@@ -57,10 +57,12 @@ void ITMDenseMapper<TVoxel,TIndex>::ProcessFrame(const ITMView *view, const ITMT
 	sceneRecoEngine->IntegrateIntoScene(scene, view, trackingState, renderState);
 
 	if (swappingEngine != NULL) {
+		printf("Swap phase.\n");
 		// swapping: CPU -> GPU
 		swappingEngine->IntegrateGlobalIntoLocal(scene, renderState);
 		// swapping: GPU -> CPU
 		swappingEngine->SaveToGlobalMemory(scene, renderState);
+		printf("Swap phase done.\n");
 	}
 }
 

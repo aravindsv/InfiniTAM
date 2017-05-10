@@ -81,6 +81,7 @@ namespace ITMLib {
              << groundTruthFpath << endl;
 
 	      groundTruthPoses = readKittiOdometryPoses(groundTruthFpath);
+
 	      // TODO(andrei): This code, although untested, should provide a skeleton for
 	      // reading OxTS data, such that ground truth from the full KITTI dataset can
 	      // be read.

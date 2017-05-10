@@ -177,8 +177,6 @@ static FormatType pnm_readheader(FILE *f, int *xsize, int *ysize, bool *binary)
 	if (ysize) *ysize = ys;
 	if (binary) *binary = isBinary;
 
-	fprintf(stderr, "Read PNM type: %d\n", type);
-
 	return type;
 }
 

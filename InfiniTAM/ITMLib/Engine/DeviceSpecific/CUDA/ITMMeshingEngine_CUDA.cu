@@ -56,6 +56,7 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 			visibleBlockGlobalPos_device, localVBA, hashTable);
 
 		ITMSafeCall(cudaMemcpy(&mesh->noTotalTriangles, noTriangles_device, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+		printf("%d/%d triangles in mesh.\n", mesh->noTotalTriangles, mesh->noMaxTriangles);
 	}
 }
 

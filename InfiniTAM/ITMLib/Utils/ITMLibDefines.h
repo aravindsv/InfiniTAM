@@ -35,15 +35,15 @@
 
 #define SDF_BLOCK_SIZE 8				// SDF block size
 #define SDF_BLOCK_SIZE3 512				// SDF_BLOCK_SIZE3 = SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE
-//#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks, currently 2^17
-// XXX: lowered by Andrei for my crappy GPU. It *did* help me get rid of some
-// of my out of memory errors.
+
 // TODO(andrei): This value does seem to impose a map size limit, as long as swapping is not enabled.
 // Enabling swapping drastically increases the available range, but the map generation STILL stops after
 // the map gets really big.
 // If swapping is enabled, then the entire-map visualization is no longer available.
 // However, if this limit is hit, and swapping is disabled, NO error messages are shown. Hmmm.
-#define SDF_LOCAL_BLOCK_NUM 0x2A000
+//#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks, currently 2^17
+#define SDF_LOCAL_BLOCK_NUM 0x27000
+//#define SDF_LOCAL_BLOCK_NUM 0xF0000
 
 #define SDF_GLOBAL_BLOCK_NUM 0x120000	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
 #define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
@@ -77,6 +77,7 @@ struct ITMHashEntry
 	int ptr;
 };
 
+// TODO(andrei): make this an enum. Does it not play well with CUDA?
 struct ITMHashSwapState
 {
 	/// 0 - most recent data is on host, data not currently in active
