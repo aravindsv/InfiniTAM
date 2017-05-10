@@ -93,11 +93,9 @@ set(EXTRA_EXECUTABLE_FLAGS "")
 ENDIF()
 
 add_executable(InfiniTAM_cli InfiniTAM_cli.cpp ${EXTRA_EXECUTABLE_FLAGS})
-target_link_libraries(InfiniTAM_cli InstRecLib)
 target_link_libraries(InfiniTAM_cli Engine)
 target_link_libraries(InfiniTAM_cli Utils)
 add_executable(InfiniTAM InfiniTAM.cpp ${EXTRA_EXECUTABLE_FLAGS})
-target_link_libraries(InfiniTAM InstRecLib)
 target_link_libraries(InfiniTAM Engine)
 target_link_libraries(InfiniTAM Utils)
 

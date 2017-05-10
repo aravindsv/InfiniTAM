@@ -224,3 +224,5 @@ else()
 endif()
 
 target_link_libraries(ITMLib Utils)
+target_link_libraries(ITMLib InstRecLib)
+

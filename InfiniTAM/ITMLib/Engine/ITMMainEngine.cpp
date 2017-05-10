@@ -1,6 +1,7 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
 #include "ITMMainEngine.h"
+#include "../../InstRecLib/PrecomputedSegmentationProvider.h"
 
 using namespace ITMLib::Engine;
 
@@ -71,6 +72,11 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 
 	fusionActive = true;
 	mainProcessingActive = true;
+
+	// Things specific to semantic instance-based reconstruction start here
+	// TODO(andrei): Pass root path of seg folder.
+	const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
+	segmentationProvider = new InstRecLib::PrecomputedSegmentationProvider(segFolder);
 }
 
 ITMMainEngine::~ITMMainEngine()
@@ -127,8 +133,13 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 	// tracking
 	trackingController->Track(trackingState, view);
 
+	// InstRec: semantic segmentation
+	segmentationProvider->SegmentFrame(view);
+
 	// fusion
-	if (fusionActive) denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
+	if (fusionActive) {
+		denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
+	}
 
 	// raycast to renderState_live for tracking and free visualisation
 	trackingController->Prepare(trackingState, view, renderState_live);
@@ -149,10 +160,14 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 	{
 	case ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_RGB:
 		out->ChangeDims(view->rgb->noDims);
-		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA) 
+		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA) {
 			out->SetFrom(view->rgb, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
-		else out->SetFrom(view->rgb, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		}
+		else {
+			out->SetFrom(view->rgb, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		}
 		break;
+
 	case ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH:
 		out->ChangeDims(view->depth->noDims);
 		if (settings->trackerType==ITMLib::Objects::ITMLibSettings::TRACKER_WICP)
@@ -167,6 +182,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		}
 
 		break;
+
 	case ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST:
 	{
 		ORUtils::Image<Vector4u> *srcImage = renderState_live->raycastImage;
@@ -176,6 +192,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		else out->SetFrom(srcImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);	
 		break;
 	}
+
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL:
@@ -198,12 +215,22 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		}
 		break;
 	}
+
+	case ITMMainEngine::InfiniTAM_IMAGE_SEGMENTATION_RESULT:
+		// Render a preview of the latest semantic segmentation's result.
+		out->SetFrom(segmentationProvider->GetSegResult(), ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		break;
+
+	case ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW:
+		// TODO(andrei): Preview once available!
+		break;
+
 	case ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN:
 		break;
 	};
 }
 
-void ITMMainEngine::turnOnIntegration() { printf("Integration now on.\n\n"); fusionActive = true; }
-void ITMMainEngine::turnOffIntegration() { printf("Integration now off.\n\n");fusionActive = false; }
+void ITMMainEngine::turnOnIntegration() { fusionActive = true; }
+void ITMMainEngine::turnOffIntegration() { fusionActive = false; }
 void ITMMainEngine::turnOnMainProcessing() { mainProcessingActive = true; }
 void ITMMainEngine::turnOffMainProcessing() { mainProcessingActive = false; }

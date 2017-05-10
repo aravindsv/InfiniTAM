@@ -90,9 +90,11 @@ static FormatType png_readheader(FILE *fp, int & width, int & height, PNGReaderD
 		if (bit_depth == 8) type = RGBA_8u;
 		// bit depth 16 is not accepted
 	}
-
-	fprintf(stderr, "Unknown color type. color_type=%d, bit_depth=%d.\n", color_type, bit_depth);
 	// other color types are not accepted
+
+	if (type == FORMAT_UNKNOWN) {
+		fprintf(stderr, "Unknown color type. color_type=%d, bit_depth=%d.\n", color_type, bit_depth);
+	}
 #endif
 
 	return type;

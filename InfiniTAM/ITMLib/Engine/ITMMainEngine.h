@@ -4,6 +4,7 @@
 
 #include "../ITMLib.h"
 #include "../Utils/ITMLibSettings.h"
+#include "../../InstRecLib/SegmentationProvider.h"
 
 /** \mainpage
     This is the API reference documentation for InfiniTAM. For a general
@@ -72,6 +73,8 @@ namespace ITMLib
 			ITMRenderState *renderState_live;
 			ITMRenderState *renderState_freeview;
 
+			InstRecLib::SegmentationProvider *segmentationProvider;
+
 		public:
 			enum GetImageType
 			{
@@ -110,6 +113,7 @@ namespace ITMLib
 			/// Get a result image as output
 			Vector2i GetImageSize(void) const;
 
+			/// \brief Returns a specific buffer from inside InfiniTAM, for visualization and debugging.
 			void GetImage(ITMUChar4Image *out, GetImageType getImageType, ITMPose *pose = NULL, ITMIntrinsics *intrinsics = NULL);
 
 			/// switch for turning intergration on/off

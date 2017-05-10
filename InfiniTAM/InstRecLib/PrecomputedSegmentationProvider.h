@@ -11,20 +11,26 @@ namespace InstRecLib {
 	class PrecomputedSegmentationProvider : public SegmentationProvider {
 
 	private:
-		std::string segFolder;
-		int frameIdx = 0;
+		std::string segFolder_;
+		int frameIdx_ = 0;
+		ITMUChar4Image *lastSegPreview_;
 
 	public:
 
-		PrecomputedSegmentationProvider() : SegmentationProvider() {
+		PrecomputedSegmentationProvider(const std::string &segFolder) : segFolder_(segFolder) {
 			printf("Initializing pre-computed segmentation provider.\n");
 
-			segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_02/mnc";
+			lastSegPreview_ = new ITMUChar4Image(true, false);
+		}
+
+		~PrecomputedSegmentationProvider() override {
+			delete lastSegPreview_;
 		}
 
 		void SegmentFrame(ITMLib::Objects::ITMView *view) override;
 
-
+		const ITMUChar4Image *GetSegResult() const override;
+		ITMUChar4Image *GetSegResult() override;
 	};
 }
 
