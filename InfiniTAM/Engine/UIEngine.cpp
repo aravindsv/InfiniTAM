@@ -363,26 +363,15 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 		strcpy(this->outFolder, outFolder);
 	}
 
-	//Vector2i winSize;
-	//int textHeight = 30; // Height of text area
-	//winSize.x = 2 * MAX(imageSource->getRGBImageSize().x, imageSource->getDepthImageSize().x);
-	//winSize.y = MAX(imageSource->getRGBImageSize().y, imageSource->getDepthImageSize().y) + textHeight;
-	//float h1 = textHeight / (float)winSize.y, h2 = (1.f + h1) / 2;
-	//winReg[0] = Vector4f(0, h1, 0.5, 1); // Main render
-	//winReg[1] = Vector4f(0.5, h2, 0.75, 1); // Side sub window 0
-	//winReg[2] = Vector4f(0.75, h2, 1, 1); // Side sub window 1
-	//winReg[3] = Vector4f(0.5, h1, 0.75, h2); // Side sub window 2
-	//winReg[4] = Vector4f(0.75, h1, 1, h2); // Side sub window 3
-
 	int textHeight = 30; // Height of text area
-	//winSize.x = (int)(1.5f * (float)MAX(imageSource->getImageSize().x, imageSource->getDepthImageSize().x));
-	//winSize.y = MAX(imageSource->getRGBImageSize().y, imageSource->getDepthImageSize().y) + textHeight;
 	winSize.x = (int)(1.5f * (float)(imageSource->getDepthImageSize().x));
 	winSize.y = imageSource->getDepthImageSize().y + textHeight;
 	float h1 = textHeight / (float)winSize.y, h2 = (1.f + h1) / 2;
-	winReg[0] = Vector4f(0.0f, h1, 0.665f, 1.0f);   // Main render
-	winReg[1] = Vector4f(0.665f, h2, 1.0f, 1.0f);   // Side sub window 0
-	winReg[2] = Vector4f(0.665f, h1, 1.0f, h2);     // Side sub window 2
+	winReg[0] = Vector4f(0, h1, 0.5, 1);      // Main render
+	winReg[1] = Vector4f(0.5, h2, 0.75, 1);   // Side sub window 0
+	winReg[2] = Vector4f(0.75, h2, 1, 1);     // Side sub window 1
+	winReg[3] = Vector4f(0.5, h1, 0.75, h2);  // Side sub window 2
+	winReg[4] = Vector4f(0.75, h1, 1, h2);    // Side sub window 3
 
 	this->isRecording = false;
 	this->currentFrameNo = 0;
@@ -419,9 +408,17 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 	outImageType[0] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
 	outImageType[1] = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH;
 	outImageType[2] = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_RGB;
-	if (inputRGBImage->noDims == Vector2i(0,0)) outImageType[2] = ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN;
-	//outImageType[3] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
-	//outImageType[4] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
+	if (inputRGBImage->noDims == Vector2i(0,0)) {
+		// This seems to be used for depth-only input.
+		outImageType[2] = ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN;
+	}
+	// TODO(andrei): Show segmentated frame here.
+	outImageType[3] = ITMMainEngine::InfiniTAM_IMAGE_SEGMENTATION_RESULT;
+	// TODO(andrei): Show cut-out car (say the first one we find in a frame).
+	// TODO(andrei): After basic reconstruction in place, show 3D reconstructed car.
+	// TODO-LOW(andrei): Make car spin, if possible.
+	// TODO-LOW(andrei): Also print some memory/swap usage stats.
+	outImageType[4] = ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW;
 
 	mainLoopAction = PROCESS_PAUSED;
 	mouseState = 0;
