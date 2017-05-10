@@ -130,12 +130,13 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 
 	if (!mainProcessingActive) return;
 
-	// tracking
-	trackingController->Track(trackingState, view);
-
 	// InstRec: semantic segmentation
 	segmentationProvider->SegmentFrame(view);
 
+	// TODO(andrei): Integrate semantic information in the tracking part, e.g., by having the
+	// (sparse/dense) VO computation ignore possibly unreliable pixels.
+	// tracking
+	trackingController->Track(trackingState, view);
 	// fusion
 	if (fusionActive) {
 		denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);

@@ -4,11 +4,15 @@
 
 SET(INSTRECLIB_SOURCES
 SegmentationProvider.cpp
-PrecomputedSegmentationProvider.cpp)
+PrecomputedSegmentationProvider.cpp
+SparseSFProvider.cpp
+VisoSparseSFProvider.cpp)
 
 SET(INSTRECLIB_HEADERS
 SegmentationProvider.h
-PrecomputedSegmentationProvider.h)
+PrecomputedSegmentationProvider.h
+SparseSFProvider.h
+VisoSparseSFProvider.h)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
