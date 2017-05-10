@@ -44,7 +44,7 @@ namespace InfiniTAM
 			StopWatchInterface *timer_average;
 
 		private: // For UI layout
-			static const int NUM_WIN = 3;
+			static const int NUM_WIN = 5;
 			Vector4f winReg[NUM_WIN]; // (x1, y1, x2, y2)
 			Vector2i winSize;
 			uint textureId[NUM_WIN];
