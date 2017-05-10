@@ -31,6 +31,10 @@ ITMMeshingEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMMeshingEngine_CUDA(void)
 template<class TVoxel>
 void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMVoxelBlockHash> *scene)
 {
+	// TODO(andrei): This doesn't seem to work well if swapping is enabled. That is, it only saves
+	// the active mesh, and doesn't attempt to somehow stream all the blocks which have been swapped
+	// out.
+
 	ITMMesh::Triangle *triangles = mesh->triangles->GetData(MEMORYDEVICE_CUDA);
 	const TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	const ITMHashEntry *hashTable = scene->index.GetEntries();

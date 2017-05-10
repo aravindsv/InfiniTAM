@@ -194,6 +194,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(DEVICEPTR(uchar) *
 
 			if (!isFound) //still not found
 			{
+				// TOOD(andrei): Could we detect allocation failures here?
 				entriesAllocType[hashIdx] = isExcess ? 2 : 1; //needs allocation 
 				if (!isExcess) entriesVisibleType[hashIdx] = 1; //new entry is visible
 

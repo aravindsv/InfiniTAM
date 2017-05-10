@@ -138,7 +138,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
 
 	if (gridSizeVS.x > 0) {
-		setToType3 <<<gridSizeVS, cudaBlockSizeVS>>>(entriesVisibleType, visibleEntryIDs, renderState_vh->noVisibleEntries);
+		// TODO(andrei): What does visibility type 3 mean?
+		setToType3<<<gridSizeVS, cudaBlockSizeVS>>>(entriesVisibleType, visibleEntryIDs, renderState_vh->noVisibleEntries);
 	}
 
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType,
@@ -163,7 +164,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	if (useSwapping)
 	{
-		reAllocateSwappedOutVoxelBlocks_device << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, hashTable, noTotalEntries, 
+		reAllocateSwappedOutVoxelBlocks_device << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, hashTable, noTotalEntries,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType);
 	}
 
@@ -172,14 +173,16 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
 	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
 
+	// Display some memory stats, useful for debugging mapping failures.
 //	printf("Total supported visible entries:  %d\n", noTotalEntries);
 	printf("Visible entries: %d\n", tempData->noVisibleEntries);
-	printf("Allocated voxel entries: %d\n", tempData->noAllocatedVoxelEntries);
-	printf("Allocated excess entries: %d\n", tempData->noAllocatedExcessEntries);
 	printf("Allocated voxel blocks in local GPU buffer: %d\n", scene->index.getNumAllocatedVoxelBlocks());
-	printf("Last free block ID:     %d\n", scene->localVBA.lastFreeBlockId);
+	printf("Last free block ID:       %d\n", scene->localVBA.lastFreeBlockId);
+	printf("Last free excess list ID: %d\n", scene->index.GetLastFreeExcessListId());
 	printf("Allocated size:         %d\n", scene->localVBA.allocatedSize);
 	printf("\n");
+	// TODO(andrei): Does the stereo infinitam followup use a crf to enforce smoothness of the model
+	// itself, or just for the segmentation and shiiet?
 
 	ITMHashEntry *entries = scene->index.GetEntries();
 	if (scene->localVBA.lastFreeBlockId == 0) {
@@ -395,10 +398,12 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 
 	switch (entriesAllocType[targetIdx])
 	{
-		case 0: // TODO(andrei): What exactly do these values mean? Could we please use constants/enums/defines?
+		case 0: // TODO(andrei): Could we please use constants/enums/defines for these values?
+			// 0 == Invisible block.
 		break;
 
-	case 1: //needs allocation, fits in the ordered list
+	case 1:
+		// 1 == block visible and needs allocation, fits in the ordered list.
 		vbaIdx = atomicSub(&allocData->noAllocatedVoxelEntries, 1);
 
 		if (vbaIdx >= 0) //there is room in the voxel block array
@@ -412,9 +417,16 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 
 			hashTable[targetIdx] = hashEntry;
 		}
+		else
+		{
+			// TODO(andrei): Handle this better.
+			printf("WARNING: No more room in VBA! vbaIdx became %d.\n", vbaIdx);
+			printf("exlIdx is %d.\n", allocData->noAllocatedExcessEntries);
+		}
 		break;
 
-	case 2: //needs allocation in the excess list
+	case 2:
+		// 2 == block visible and needs allocation in the excess list
 		vbaIdx = atomicSub(&allocData->noAllocatedVoxelEntries, 1);
 		exlIdx = atomicSub(&allocData->noAllocatedExcessEntries, 1);
 
@@ -434,6 +446,26 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 			hashTable[SDF_BUCKET_NUM + exlOffset] = hashEntry; //add child to the excess list
 
 			entriesVisibleType[SDF_BUCKET_NUM + exlOffset] = 1; //make child visible
+		}
+		else
+		{
+			// TODO(andrei): Handle this better.
+			if (vbaIdx >= 0)
+			{
+				printf("WARNING: Could not allocate in excess list! There was still room in the main VBA, "
+						   "but exlIdx = %d! Consider increasing the overall hash table size, or at least the "
+						   "bucket size.\n", exlIdx);
+			}
+			else if(exlIdx)
+			{
+				printf("WARNING: Tried to allocate in excess list, but failed because the main VBA is "
+							 "full. vbaIdx = %d\n", vbaIdx);
+			}
+			else
+			{
+				printf("WARNING: No more room in VBA or in the excess list! vbaIdx became %d.\n", vbaIdx);
+				printf("exlIdx is %d.\n", exlIdx);
+			}
 		}
 		break;
 

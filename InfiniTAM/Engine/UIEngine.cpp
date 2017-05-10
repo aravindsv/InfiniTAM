@@ -56,7 +56,7 @@ void UIEngine::glutDisplayFunction()
 		glPushMatrix();
 		{
 			glEnable(GL_TEXTURE_2D);
-			for (int w = 0; w < NUM_WIN; w++)	{// Draw each sub window
+			for (int w = 0; w < NUM_WIN; w++)	{ // Draw each sub window
 				if (uiEngine->outImageType[w] == ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN) continue;
 				glBindTexture(GL_TEXTURE_2D, uiEngine->textureId[w]);
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, showImgs[w]->noDims.x, showImgs[w]->noDims.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, showImgs[w]->GetData(MEMORYDEVICE_CPU));
@@ -85,11 +85,13 @@ void UIEngine::glutDisplayFunction()
 	glRasterPos2f(-0.95f, -0.95f);
 	if (uiEngine->freeviewActive)
 	{
-		sprintf(str, "n - next frame \t b - all frames \t e/esc - exit \t f - follow camera \t c - colours (currently %s) \t t - turn fusion %s", uiEngine->colourModes[uiEngine->currentColourMode].name, uiEngine->intergrationActive ? "off" : "on");
+		sprintf(str, "n - next frame \t b - all frames \t e/esc - exit \t f - follow camera \t"
+				" c - colours (currently %s) \t t - turn fusion %s", uiEngine->colourModes[uiEngine->currentColourMode].name, uiEngine->intergrationActive ? "off" : "on");
 	}
 	else
 	{
-		sprintf(str, "n - next frame \t b - all frames \t e/esc - exit \t f - free viewpoint \t t - turn fusion %s", uiEngine->intergrationActive ? "off" : "on");
+		sprintf(str, "n - next frame \t b - all frames \t e/esc - exit \t f - free viewpoint \t"
+				" t - turn fusion %s  \t w - write to disk", uiEngine->intergrationActive ? "off" : "on");
 	}
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, (const char*)str);
 
@@ -112,7 +114,8 @@ void UIEngine::glutIdleFunction()
 		uiEngine->ProcessFrame(); uiEngine->processedFrameNo++;
 		uiEngine->needsRefresh = true;
 		break;
-		//case SAVE_TO_DISK:
+	case SAVE_TO_DISK:
+//		printf("Will try to save to disk.\n");
 		//	if (!uiEngine->actionDone)
 		//	{
 		//		char outFile[255];
@@ -127,7 +130,7 @@ void UIEngine::glutIdleFunction()
 
 		//		uiEngine->actionDone = true;
 		//	}
-		//	break;
+	  break;
 	case EXIT:
 #ifdef FREEGLUT
 		glutLeaveMainLoop();
@@ -152,7 +155,7 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
 	switch (key)
 	{
 	case 'n':
-		printf("\nprocessing one frame ...\n");
+		printf("\nprocessing one frame (%d)...\n", uiEngine->currentFrameNo);
 		uiEngine->mainLoopAction = UIEngine::PROCESS_FRAME;
 		break;
 	case 'b':

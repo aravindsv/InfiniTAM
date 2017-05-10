@@ -95,9 +95,10 @@ namespace ITMLib {
 
 	      // Mini-hack to ensure translation magnitude is "calibrated" to the
 	      // range of the depth map.
-		    M.m30 *= 0.10;
-		    M.m31 *= 0.10;
-		    M.m32 *= 0.10;
+	      float translationScale = (1/10.0f);
+		    M.m30 *= translationScale;
+		    M.m31 *= translationScale;
+		    M.m32 *= translationScale;
 
 	      trackingState->pose_d->SetInvM(M);
       }

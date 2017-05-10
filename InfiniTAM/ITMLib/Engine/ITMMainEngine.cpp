@@ -185,13 +185,17 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL) type = IITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
 		if (renderState_freeview == NULL) renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
 
+		// This renders the free camera view. It uses raycasting.
 		visualisationEngine->FindVisibleBlocks(pose, intrinsics, renderState_freeview);
 		visualisationEngine->CreateExpectedDepths(pose, intrinsics, renderState_freeview);
 		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, renderState_freeview->raycastImage, type);
 
-		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA)
+		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA) {
 			out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
-		else out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		}
+		else {
+			out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		}
 		break;
 	}
 	case ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN:

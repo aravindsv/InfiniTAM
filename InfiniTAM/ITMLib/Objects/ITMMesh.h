@@ -14,12 +14,18 @@ namespace ITMLib
 		class ITMMesh
 		{
 		public:
-			struct Triangle { Vector3f p0, p1, p2; };
+			// TODO(andrei): Support also dumping colored maps.
+			struct Triangle {
+				// Position
+				Vector3f p0, p1, p2;
+				// Color
+//				Vector3f c0, c1, c2;
+				// TODO(andrei): Can even add more metadata here!
+			};
 		
 			MemoryDeviceType memoryType;
 
 			uint noTotalTriangles;
-//			static const uint noMaxTriangles = SDF_LOCAL_BLOCK_NUM * 32;
 			static const uint noMaxTriangles = SDF_LOCAL_BLOCK_NUM * 32;
 
 			ORUtils::MemoryBlock<Triangle> *triangles;
