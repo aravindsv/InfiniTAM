@@ -42,7 +42,8 @@
 // If swapping is enabled, then the entire-map visualization is no longer available.
 // However, if this limit is hit, and swapping is disabled, NO error messages are shown. Hmmm.
 //#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks, currently 2^17
-#define SDF_LOCAL_BLOCK_NUM 0x27000
+//#define SDF_LOCAL_BLOCK_NUM 0x27000
+#define SDF_LOCAL_BLOCK_NUM 0x20000
 //#define SDF_LOCAL_BLOCK_NUM 0xF0000
 
 #define SDF_GLOBAL_BLOCK_NUM 0x120000	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE

@@ -5,6 +5,7 @@
 
 #include "SegmentationDataset.h"
 
+#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -57,12 +58,45 @@ namespace InstRecLib {
 				}
 			}
 
+			void Set(const InstanceDetection& rhs) {
+				// TODO(andrei): Refactor duplicate code.
+				// TODO(andrei): Would be faster to wrap the mask properly in a shared ptr.
+				for(size_t i = 0; i < 4; ++i) {
+					this->bounding_box[i] = rhs.bounding_box[i];
+				}
+
+				this->class_probability = rhs.class_probability;
+				this->class_id = rhs.class_id;
+				this->parent_result = rhs.parent_result;
+
+				int height = bounding_box[3] - bounding_box[1] + 1;
+				int width = bounding_box[2] - bounding_box[0] + 1;
+				this->mask = new uint8_t*[height];
+				for(int i = 0; i < height; ++i) {
+					this->mask[i] = new uint8_t[width];
+					std::memcpy(this->mask[i], rhs.mask[i], width * sizeof(uint8_t));
+					// TODO(andrei): Actually copy stuff.
+				}
+
+			}
+
+			InstanceDetection(const InstanceDetection &rhs) {
+				this->Set(rhs);
+			}
+
+			InstanceDetection& operator=(const InstanceDetection& rhs) {
+				this->Set(rhs);
+				return *this;
+			}
+
 			virtual ~InstanceDetection() {
 				if (mask) {
 					// TODO(andrei): Handle the mask in a more modern way!
-					int height = bounding_box[3] - bounding_box[1];
+					int height = bounding_box[3] - bounding_box[1] + 1;
 					for (int row = 0; row < height; ++row) {
-						delete[] mask[row];
+						if (mask[row]) {
+							delete[] mask[row];
+						}
 					}
 					delete[] mask;
 				}

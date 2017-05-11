@@ -14,6 +14,55 @@ namespace InstRecLib {
 
 		using namespace std;
 
+		/// \brief Reads a numpy text dump of an object's 2D binary segmentation mask.
+		///
+		/// \param np_txt_in Input stream from the numpy text file containing the mask.
+		/// \param width The mask width, which is computed from its bounding box.
+		/// \param height The mask height, also computed from its bounding box.
+		/// \return A row-major array containing the mask info. The caller takes ownership.
+		///
+		/// \note The numpy file is already organized in 2D (as many lines as rows, etc.), so the given
+		/// width and height are simply used as an additional sanity check.
+		uint8_t** ReadMask(std::istream &np_txt_in, const int width, const int height) {
+			// TODO(andrei): Is this stupidly slow?
+			// TODO(andrei): Move to general utils or to IO library.
+			// TODO(andrei): We could probably YOLO and work with binary anyway.
+			int lines_read = 0;
+			string line_buf;
+			uint8_t **mask = new uint8_t*[height];
+			memset(mask, 0, sizeof(size_t) * height);
+
+			while(getline(np_txt_in, line_buf)) {
+				if (lines_read >= height) {
+					stringstream error_ss;
+					error_ss << "Image height mismatch. Went over the given limit of " << height << ".";
+					throw runtime_error(error_ss.str());
+				}
+
+				mask[lines_read] = new uint8_t[width];
+				istringstream line_ss(line_buf);
+				int col = 0;
+				while(! line_ss.eof()) {
+					if (col >= width) {
+						stringstream error_ss;
+						error_ss << "Image width mismatch. Went over the given limit of " << width << ".";
+						cerr << "Line was:" << endl << endl << line_buf << endl << endl << flush;
+						throw runtime_error(error_ss.str());
+					}
+
+					// TODO(andrei): Remove this once you update your dumping code to directly dump bytes.
+					double val;
+					line_ss >> val;
+					mask[lines_read][col] = static_cast<uint8_t>(val);
+					col++;
+				}
+
+				lines_read++;
+			}
+
+			return mask;
+		}
+
 		vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
 				const std::string &base_img_fpath
 		) {
@@ -42,9 +91,11 @@ namespace InstRecLib {
 				ifstream result_in(result_fpath.str());
 				ifstream mask_in(mask_fpath.str());
 				if (!(result_in.is_open() && mask_in.is_open())) {
+					// No more detections to process.
 					break;
 				}
 
+				// Process the result metadata file
 				string result;
 				getline(result_in, result);
 
@@ -55,10 +106,12 @@ namespace InstRecLib {
 				sscanf(result.c_str(), "[%d %d %d %d %*d], %f, %d",
 				       &bbox[0], &bbox[1], &bbox[2], &bbox[3], &class_probability, &class_id);
 
-//				cout << "Found: " << dataset_used.labels[class_id - 1] << " at ["
-//				     << bbox[0] << ", " << bbox[1] << ", " << bbox[2] << ", " << bbox[3] << "]." << endl;
+				// Process the mask file. The mask area covers the edges of the bounding box, too.
+				int width = bbox[2] - bbox[0] + 1;
+				int height = bbox[3] - bbox[1] + 1;
+				uint8_t **mask = ReadMask(mask_in, width, height);
 
-				detections.emplace_back(bbox, class_probability, class_id, nullptr, nullptr);
+				detections.emplace_back(bbox, class_probability, class_id, mask, nullptr);
 
 				instance_idx++;
 			}
