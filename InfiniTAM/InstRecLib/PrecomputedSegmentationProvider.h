@@ -15,6 +15,9 @@ namespace InstRecLib {
 		int frameIdx_ = 0;
 		ITMUChar4Image *lastSegPreview_;
 
+	protected:
+		void ReadInstanceInfo(const std::string& base_img_fpath);
+
 	public:
 
 		PrecomputedSegmentationProvider(const std::string &segFolder) : segFolder_(segFolder) {

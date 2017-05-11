@@ -137,9 +137,18 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 	// (sparse/dense) VO computation ignore possibly unreliable pixels.
 	// tracking
 	trackingController->Track(trackingState, view);
+
+	// TODO(andrei): Fork into multiple reconstructions here, maybe?
+	// instanceReconstruction->ProcessFrame(view, trackingState, scene, renderState_live,
+	//                                      segmentationResult, sparseSFResult);
+
 	// fusion
 	if (fusionActive) {
+		// TODO(andrei): Pass segmentation information, and only fuse background info, or simply have
+		// the segmentation provider (or some other component) mutate the static map, and "blank out"
+		// the non-static parts in 'view'.
 		denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
+
 	}
 
 	// raycast to renderState_live for tracking and free visualisation

@@ -40,9 +40,8 @@ namespace ORUtils
 			this->noDims = noDims;
 		}
 
-		/** Resize an image, loosing all old image data.
-		Essentially any previously allocated data is
-		released, new memory is allocated.
+		/** Resizes an image, discarding all old image data. Any previously
+		allocated data is released and new memory is allocated.
 		*/
 		void ChangeDims(Vector2<int> newDims)
 		{
