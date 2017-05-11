@@ -3,38 +3,46 @@
 #ifndef INFINITAM_PRECOMPUTEDSEGMENTATIONPROVIDER_H
 #define INFINITAM_PRECOMPUTEDSEGMENTATIONPROVIDER_H
 
+#include <memory>
+
 #include "SegmentationProvider.h"
+#include "InstanceSegmentationResult.h"
 
 namespace InstRecLib {
+	namespace Segmentation {
 
-	/// \brief Reads pre-existing frame segmentations from the disk, instead of computing them on-the-fly.
-	class PrecomputedSegmentationProvider : public SegmentationProvider {
+		/// \brief Reads pre-existing frame segmentations from the disk, instead of computing them on-the-fly.
+		class PrecomputedSegmentationProvider : public SegmentationProvider {
 
-	private:
-		std::string segFolder_;
-		int frameIdx_ = 0;
-		ITMUChar4Image *lastSegPreview_;
+		private:
+			std::string segFolder_;
+			int frameIdx_ = 0;
+			ITMUChar4Image *lastSegPreview_;
+			SegmentationDataset dataset_used;
 
-	protected:
-		void ReadInstanceInfo(const std::string& base_img_fpath);
+		protected:
+			std::vector<InstanceDetection> ReadInstanceInfo(const std::string &base_img_fpath);
 
-	public:
+		public:
 
-		PrecomputedSegmentationProvider(const std::string &segFolder) : segFolder_(segFolder) {
-			printf("Initializing pre-computed segmentation provider.\n");
+			PrecomputedSegmentationProvider(const std::string &segFolder)
+					: segFolder_(segFolder), dataset_used(kPascalVoc2012) {
+				printf("Initializing pre-computed segmentation provider.\n");
 
-			lastSegPreview_ = new ITMUChar4Image(true, false);
-		}
+				lastSegPreview_ = new ITMUChar4Image(true, false);
+			}
 
-		~PrecomputedSegmentationProvider() override {
-			delete lastSegPreview_;
-		}
+			~PrecomputedSegmentationProvider() override {
+				delete lastSegPreview_;
+			}
 
-		void SegmentFrame(ITMLib::Objects::ITMView *view) override;
+			std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMLib::Objects::ITMView *view) override;
 
-		const ITMUChar4Image *GetSegResult() const override;
-		ITMUChar4Image *GetSegResult() override;
-	};
+			const ITMUChar4Image *GetSegResult() const override;
+
+			ITMUChar4Image *GetSegResult() override;
+		};
+	}
 }
 
 

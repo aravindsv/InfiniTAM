@@ -2,11 +2,16 @@
 
 #include "SegmentationProvider.h"
 
-InstRecLib::SegmentationProvider::SegmentationProvider() {
+namespace InstRecLib {
+	namespace Segmentation {
 
-}
+		SegmentationProvider::SegmentationProvider() {
 
-InstRecLib::SegmentationProvider::~SegmentationProvider() {
+		}
 
+		SegmentationProvider::~SegmentationProvider() {
+
+		}
+	}
 }
 

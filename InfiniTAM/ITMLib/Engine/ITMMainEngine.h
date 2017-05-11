@@ -73,7 +73,7 @@ namespace ITMLib
 			ITMRenderState *renderState_live;
 			ITMRenderState *renderState_freeview;
 
-			InstRecLib::SegmentationProvider *segmentationProvider;
+			InstRecLib::Segmentation::SegmentationProvider *segmentationProvider;
 
 		public:
 			enum GetImageType

@@ -76,7 +76,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	// Things specific to semantic instance-based reconstruction start here
 	// TODO(andrei): Pass root path of seg folder.
 	const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
-	segmentationProvider = new InstRecLib::PrecomputedSegmentationProvider(segFolder);
+	segmentationProvider = new InstRecLib::Segmentation::PrecomputedSegmentationProvider(segFolder);
 }
 
 ITMMainEngine::~ITMMainEngine()
@@ -131,7 +131,17 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 	if (!mainProcessingActive) return;
 
 	// InstRec: semantic segmentation
-	segmentationProvider->SegmentFrame(view);
+	auto segmentationResult = segmentationProvider->SegmentFrame(view);
+	if (segmentationResult->instance_detections.size() > 0) {
+		std::cout << "Detected " << segmentationResult->instance_detections.size()
+		          << " objects in the frame." << std::endl;
+		for(const auto& instance : segmentationResult->instance_detections) {
+			std::cout << "\t " << instance << std::endl;
+		}
+	}
+	else {
+		std::cout << "Nothing detected in the frame." << std::endl;
+	}
 
 	// TODO(andrei): Integrate semantic information in the tracking part, e.g., by having the
 	// (sparse/dense) VO computation ignore possibly unreliable pixels.
