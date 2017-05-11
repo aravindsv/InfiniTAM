@@ -141,8 +141,10 @@ namespace InstRecLib {
 
 //		rgb_data += 150;
 
-			ORUtils::Vector4<unsigned char> *rgb_data_h = new ORUtils::Vector4<unsigned char>[10000];
-			ORcudaSafeCall(cudaMemcpy(rgb_data_h, rgb_data_d, 1000, cudaMemcpyDeviceToHost));
+			// TODO(andrei): Perform this slicing 100% on the GPU.
+			size_t rgb_buf_size = view->rgb->dataSize;
+			auto *rgb_data_h = new ORUtils::Vector4<unsigned char>[rgb_buf_size];
+			ORcudaSafeCall(cudaMemcpy(rgb_data_h, rgb_data_d, rgb_buf_size, cudaMemcpyDeviceToHost));
 
 			// TODO(andrei): Use this buffer to blank things out!
 
@@ -155,7 +157,10 @@ namespace InstRecLib {
 //			rgb_data_h_it++;
 //		}
 
+			cout << "RGB buffer size: " << rgb_buf_size << endl;
+
 			// TODO(andrei): Upload buffer back to GPU if needed (likely is).
+			ORcudaSafeCall(cudaMemcpy(rgb_data_d, rgb_data_h, rgb_buf_size, cudaMemcpyHostToDevice));
 
 			delete[] rgb_data_h;
 			this->frameIdx_++;
