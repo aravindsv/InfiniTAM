@@ -44,15 +44,18 @@ namespace InstRecLib {
 				for(int col = 0; col < box_width; ++col) {
 					int frame_row = row + bb_y0;
 					int frame_col = col + bb_x0;
-					auto rgb_data_h_it = sourceRGB + (frame_row * frame_width + frame_col);
+					// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
+					int frame_idx = frame_row * frame_width + frame_col;
 
 					int mask = detection.mask[row][col];
+					if (mask == 1) {
+						sourceRGB[frame_idx].r = 0;
+						sourceRGB[frame_idx].g = 0;
+						sourceRGB[frame_idx].b = 0;
 
-					rgb_data_h_it->r = 0;
-					rgb_data_h_it->g = 0;
-					rgb_data_h_it->b = 0;
+						sourceDepth[frame_idx] = 0.0f;
+					}
 
-					// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
 				}
 			}
 		}
@@ -84,9 +87,12 @@ namespace InstRecLib {
 			auto rgb_segment_h = chunk->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 			auto depth_segment_h = chunk->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 			if (segmentation_result.instance_detections.size() > 0) {
-				const InstanceDetection& instance_detection = segmentation_result.instance_detections[0];
-				processSihlouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h, depth_segment_h,
-				                      main_view->rgb->noDims, instance_detection);
+				for(const InstanceDetection& instance_detection : segmentation_result.instance_detections) {
+					if (instance_detection.class_id == kPascalVoc2012.label_to_id.at("car")) {
+						processSihlouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h, depth_segment_h,
+						                      main_view->rgb->noDims, instance_detection);
+					}
+				}
 			}
 
 			main_view->rgb->UpdateDeviceFromHost();

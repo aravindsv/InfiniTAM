@@ -31,7 +31,6 @@ namespace InstRecLib {
 		};
 
 		const SegmentationDataset kPascalVoc2012(kPascalVoc2012Classes);
-		//endregion
 	}
 }
 
