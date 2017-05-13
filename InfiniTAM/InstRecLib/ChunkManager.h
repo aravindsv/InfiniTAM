@@ -34,9 +34,7 @@ namespace InstRecLib {
 			std::map<Fingerprint, std::shared_ptr<SceneView>> chunks_;
 
 		public:
-			ChunkManager() : chunks_() {
-				std::cout << "Created chunk manager!" << std::endl << std::endl;
-			}
+			ChunkManager() : chunks_() { }
 
 			bool hasChunk(const Fingerprint &fingerprint) {
 				return chunks_.find(fingerprint) != chunks_.end();

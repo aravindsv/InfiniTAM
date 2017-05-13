@@ -18,10 +18,7 @@ namespace InstRecLib {
 			std::shared_ptr<ChunkManager> chunk_manager_;
 
 		public:
-			InstanceReconstructor() : chunk_manager_(new ChunkManager()){
-				using namespace std;
-				cout << endl << endl << "Created reconstructor. " << chunk_manager_.get() << endl << endl;
-			}
+			InstanceReconstructor() : chunk_manager_(new ChunkManager()){ }
 
 			/// \brief Uses the segmentation result to remove dynamic objects from the main view and save
 			/// them to separate buffers, which are then used for individual object reconstruction.
@@ -34,6 +31,14 @@ namespace InstRecLib {
 					ITMLib::Objects::ITMView* main_view,
 			    const Segmentation::InstanceSegmentationResult& segmentation_result
 			);
+
+			const ChunkManager& GetChunkManager() const {
+				return *chunk_manager_;
+			}
+
+			ChunkManager& GetChunkManager() {
+				return *chunk_manager_;
+			}
 		};
 	}
 }

@@ -28,7 +28,7 @@ namespace InstRecLib {
 			// e.g., 5-6 output buffers may end up using up way too much GPU memory.
 
 			int frame_width = sourceDims[0];
-//			auto sourceRGB_ptr_h = sourceRGB.GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+			int frame_height = sourceDims[1];
 			int bb_x0 = detection.bounding_box[0];
 			int bb_y0 = detection.bounding_box[1];
 			int bb_x1 = detection.bounding_box[2];
@@ -40,6 +40,10 @@ namespace InstRecLib {
 			std::cout << "Box (x0, y0) and (x1, y1): (" << bb_x0 << ", " << bb_y0 << ") and (" << bb_x1
 								<< ", " << bb_y1 << ")" << std::endl;
 
+//			ORcudaSafeCall(cuda)
+			memset(destRGB, 0, frame_width * frame_height * sizeof(Vector4u));
+			memset(destDepth, 0, frame_width * frame_height * sizeof(float));
+
 			for(int row = 0; row < box_height; ++row) {
 				for(int col = 0; col < box_width; ++col) {
 					int frame_row = row + bb_y0;
@@ -49,10 +53,14 @@ namespace InstRecLib {
 
 					int mask = detection.mask[row][col];
 					if (mask == 1) {
+						destRGB[frame_idx].r = sourceRGB[frame_idx].r;
+						destRGB[frame_idx].g = sourceRGB[frame_idx].g;
+						destRGB[frame_idx].b = sourceRGB[frame_idx].b;
 						sourceRGB[frame_idx].r = 0;
 						sourceRGB[frame_idx].g = 0;
 						sourceRGB[frame_idx].b = 0;
 
+						destDepth[frame_idx] = sourceDepth[frame_idx];
 						sourceDepth[frame_idx] = 0.0f;
 					}
 
@@ -64,15 +72,12 @@ namespace InstRecLib {
 				ITMLib::Objects::ITMView* main_view,
 				const Segmentation::InstanceSegmentationResult& segmentation_result
 		) {
-			std::cout << "Will cut things up and paste them to their own buffers!" << std::endl;
-
 			// For now, we pretend there's only one instance out there, and it has a silly ID.
 			const std::string fingerprint = "car";
 			if (! chunk_manager_->hasChunk(fingerprint)) {
 				Vector2i frame_size = main_view->rgb->noDims;
 				// bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
 				// check this.
-				std::cout << "Generating default experimental chunk..." << std::endl;
 				chunk_manager_->createChunk(fingerprint, main_view->calib, frame_size, true);
 			}
 
