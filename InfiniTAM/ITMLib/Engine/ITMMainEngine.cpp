@@ -143,14 +143,13 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 		std::cout << "Nothing detected in the frame." << std::endl;
 	}
 
-	// TODO(andrei): Integrate semantic information in the tracking part, e.g., by having the
+	// TODO-LOW(andrei): Integrate semantic information in the tracking part, e.g., by having the
 	// (sparse/dense) VO computation ignore possibly unreliable pixels.
 	// tracking
 	trackingController->Track(trackingState, view);
 
-	// TODO(andrei): Fork into multiple reconstructions here, maybe?
-	// instanceReconstruction->ProcessFrame(view, trackingState, scene, renderState_live,
-	//                                      segmentationResult, sparseSFResult);
+	// Split the scene up into instances, and fuse each instance independently.
+	instanceReconstructor->ProcessFrame(view, *segmentationResult);
 
 	// fusion
 	if (fusionActive) {

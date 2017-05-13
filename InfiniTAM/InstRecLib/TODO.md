@@ -13,4 +13,9 @@
  - [ ] Decide on InstRecLib-specific internal image/data representation. Should we really depend on OpenCV for this? OpenCV is a nasty dependency to have just for a little IO. But, then again, if we end up having to integrate tightly with Caffe, it requires OpenCV anyway...
  - [ ] View (ITMView) adapter class.
  - [ ] Image adapter class.
+ - [ ] Ensure headers are lean.
+ - [ ] clang-format or equivalent IDE-agnostic code formatter
+ - [ ] Ensure code formatter also enforces naming conventions.
+ - [ ] Maybe rename namespaces to be all-lowercase.
+ - [ ] Implement CUDA version of instance masking.
  

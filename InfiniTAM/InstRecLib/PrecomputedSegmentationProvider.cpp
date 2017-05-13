@@ -119,41 +119,6 @@ namespace InstRecLib {
 			return detections;
 		}
 
-		// TODO(andrei): Move this to its own component.
-		// TODO(andrei): Implement this in CUDA. It should be easy.
-		void processSihlouette_CPU(
-				ITMUChar4Image& sourceRGB,
-				ITMUCharImage& sourceDepth,
-				ITMUChar4Image& destRGB,
-				ITMUCharImage& destDepth,
-		    const InstanceDetection& detection
-		) {
-			// Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into
-			// the output frames.
-			// Initially, the dest frames will be the same size as the source ones, but this is wasteful
-			// in terms of memory: we should use bbox+1-sized buffers in the future, since most
-			// silhouettes are relatively small wrt the size of the whole frame.
-			//
-			// Moreover, we should be able to pass in several output buffer addresses and a list of
-			// detections to the CUDA kernel, and do all the ``splitting up'' work in one kernel call. We
-			// may need to add support for the adaptive-size output buffers, since otherwise writing to
-			// e.g., 5-6 output buffers may end up using up way too much GPU memory.
-
-			// TODO(andrei): implement.
-			for(int row = 10; row < 200; ++row) {
-				for(int col = 10; col < 550; ++col) {
-					auto rgb_data_h_it = rgb_data_h + (row * view->rgb->noDims[0] + col);
-					rgb_data_h_it->r = 0;
-					rgb_data_h_it->g = 0;
-					rgb_data_h_it->b = 0;
-
-					// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
-				}
-			}
-
-
-		}
-
 		shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(
 				ITMLib::Objects::ITMView *view
 		) {
@@ -170,27 +135,6 @@ namespace InstRecLib {
 			// We read data off the disk, so we assume this is 0.
 			long inference_time_ns = 0L;
 
-			// Experimental blanking-out code.
-			// TODO(andrei): Move to own component.
-
-			ORUtils::Vector4<unsigned char> *rgb_data_d = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CUDA);
-			float *depth_data_d = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CUDA);
-
-			// TODO(andrei): Perform this slicing 100% on the GPU.
-			size_t rgb_buf_size = view->rgb->dataSize;
-			size_t depth_buf_size = view->depth->dataSize;
-			auto *rgb_data_h = new ORUtils::Vector4<unsigned char>[rgb_buf_size];
-			auto *depth_data_h = new float[depth_buf_size];
-			ORcudaSafeCall(cudaMemcpy(rgb_data_h, rgb_data_d, rgb_buf_size, cudaMemcpyDeviceToHost));
-			ORcudaSafeCall(cudaMemcpy(depth_data_h, depth_data_d, depth_buf_size, cudaMemcpyDeviceToHost));
-
-
-			processSihlouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h, depth_segment_h);
-
-			// TODO(andrei): Upload buffer back to GPU if needed (likely is).
-			ORcudaSafeCall(cudaMemcpy(rgb_data_d, rgb_data_h, rgb_buf_size, cudaMemcpyHostToDevice));
-
-			delete[] rgb_data_h;
 			this->frameIdx_++;
 
 			return make_shared<InstanceSegmentationResult>(

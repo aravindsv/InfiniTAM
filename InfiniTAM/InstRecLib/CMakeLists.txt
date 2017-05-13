@@ -2,21 +2,8 @@
 # Specify the source files  #
 #############################
 
-SET(INSTRECLIB_SOURCES
-SegmentationProvider.cpp
-PrecomputedSegmentationProvider.cpp
-SparseSFProvider.cpp
-VisoSparseSFProvider.cpp
-SegmentationDataset.cpp
-InstanceSegmentationResult.cpp)
-
-SET(INSTRECLIB_HEADERS
-SegmentationProvider.h
-PrecomputedSegmentationProvider.h
-SparseSFProvider.h
-VisoSparseSFProvider.h
-InstanceSegmentationResult.h
-SegmentationDataset.h)
+FILE(GLOB INSTRECLIB_SOURCES *.cpp)
+FILE(GLOB INSTRECLIB_HEADERS *.h)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})

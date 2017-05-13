@@ -5,6 +5,7 @@
 #include "../ITMLib.h"
 #include "../Utils/ITMLibSettings.h"
 #include "../../InstRecLib/SegmentationProvider.h"
+#include "../../InstRecLib/InstanceReconstructor.h"
 
 /** \mainpage
     This is the API reference documentation for InfiniTAM. For a general
@@ -74,6 +75,7 @@ namespace ITMLib
 			ITMRenderState *renderState_freeview;
 
 			InstRecLib::Segmentation::SegmentationProvider *segmentationProvider;
+			InstRecLib::Reconstruction::InstanceReconstructor *instanceReconstructor;
 
 		public:
 			enum GetImageType
