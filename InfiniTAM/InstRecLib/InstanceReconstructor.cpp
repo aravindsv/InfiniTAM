@@ -46,7 +46,7 @@ namespace InstRecLib {
 					int frame_col = col + bb_x0;
 					auto rgb_data_h_it = sourceRGB + (frame_row * frame_width + frame_col);
 
-//					int mask = detection.mask[5][5];
+					int mask = detection.mask[row][col];
 
 					rgb_data_h_it->r = 0;
 					rgb_data_h_it->g = 0;
