@@ -119,6 +119,30 @@ namespace InstRecLib {
 			return detections;
 		}
 
+		// TODO(andrei): Move this to its own component.
+		// TODO(andrei): Implement this in CUDA. It should be easy.
+		void processSihlouette_CPU(
+				ITMUChar4Image& sourceRGB,
+				ITMUCharImage& sourceDepth,
+				ITMUChar4Image& destRGB,
+				ITMUCharImage& destDepth,
+		    const InstanceDetection& detection
+		) {
+			// Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into
+			// the output frames.
+			// Initially, the dest frames will be the same size as the source ones, but this is wasteful
+			// in terms of memory: we should use bbox+1-sized buffers in the future, since most
+			// silhouettes are relatively small wrt the size of the whole frame.
+			//
+			// Moreover, we should be able to pass in several output buffer addresses and a list of
+			// detections to the CUDA kernel, and do all the ``splitting up'' work in one kernel call. We
+			// may need to add support for the adaptive-size output buffers, since otherwise writing to
+			// e.g., 5-6 output buffers may end up using up way too much GPU memory.
+
+			// TODO(andrei): implement.
+
+		}
+
 		shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(
 				ITMLib::Objects::ITMView *view
 		) {
@@ -148,14 +172,16 @@ namespace InstRecLib {
 
 			// TODO(andrei): Use this buffer to blank things out!
 
-//		auto rgb_data_h_it = rgb_data_h;
-//		for(int i = 0; i < 1000; ++i) {
-//			if (rgb_data_h->x != 0) {
-//				printf("%d: %d %d %d\n", i, rgb_data_h_it->x, rgb_data_h_it->y, rgb_data_h_it->z);
-//			}
-//
-//			rgb_data_h_it++;
-//		}
+		for(int row = 10; row < 200; ++row) {
+			for(int col = 10; col < 550; ++col) {
+				auto rgb_data_h_it = rgb_data_h + (row * view->rgb->noDims[0] + col);
+				rgb_data_h_it->r = 0;
+				rgb_data_h_it->g = 0;
+				rgb_data_h_it->b = 0;
+
+				// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
+			}
+		}
 
 			cout << "RGB buffer size: " << rgb_buf_size << endl;
 

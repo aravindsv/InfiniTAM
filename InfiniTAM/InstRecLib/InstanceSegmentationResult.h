@@ -17,7 +17,35 @@ namespace InstRecLib {
 		// TODO(andrei): Consider storing an entire class-conditional distribution in each detection
 		// object.
 
+		// TODO(andrei): Should we add inter-frame association information to this class? Or should we
+		// pass an 'InstanceSegmentationResult' to another component which will then return instance
+		// detections associated with their own reconstruction volumes?
+		/*
+		 * Yeah, it does make more sense to have a SegmentationAssociationProvider which takes in an
+		 * InstanceSegmentationResult with its InstanceDetections, and outputs e.g., a list of
+		 * (InstanceDetection, InstanceReconstruction) pairs, which can then be used for volum. Fusion.
+		 *
+		 * The Association Provider can be just an interface, and it could have multiple implementations
+		 * under the hood, such as overlap-based (with configurable size/time/etc. thresholds),
+		 * object recognition-based, hybrid, etc.
+		 *
+		 * Its job is to be able to associate objects detected in a frame with their appropriate 3D
+		 * model, or to initialize new models as needed.
+		 *
+		 * Then, we could cut out the instance info from the current frame, and give these cut-out bits
+		 * to the instance rec engine, in their equivalent ProcessFrame method. The only extra necessary
+		 * thing is the approximate relative pose of the new frame, perhaps in the viewer's frame. Then
+		 * the instance rec would be able to initialize its alignment system, e.g., ICP, accordingly,
+		 * based on this initial estimate. We can get this estimate from scene flow.
+		 *
+		 * Such an instance reconstructor may also need to keep track of the instance's motion (either
+		 * in the global frame or the car's frame; we'll see which works best---probably the global
+		 * frame, since it seems neater), as well as other things, such as (maybe) the motion history,
+		 * allowing us to render nice tracks in the 3D map, etc.
+		 */
+
 		/// \brief Describes a single object instance detected semantically in an input frame.
+		/// This is a component of InstanceSegmentationResult.
 		class InstanceDetection {
 		public:
 			/// The detection's bounding box, expressed in pixels (x1, y1, x2, y2).
@@ -103,7 +131,7 @@ namespace InstRecLib {
 			}
 		};
 
-		/// \brief Supports pretty-printing segmentation results.
+		/// \brief Supports pretty-printing segmentation result objects.
 		std::ostream& operator<<(std::ostream& out, const InstanceDetection& detection);
 
 		/// \brief The result of performing instance-aware semantic segmentation on an input frame.
@@ -125,7 +153,7 @@ namespace InstRecLib {
 			    instance_detections(instance_detections),
 			    inference_time_ns(inference_time_ns)
 			{
-				// A little bit of plumbing: make sure instance detection objects know their parent.
+				// A little bit of plumbing: ensure instance detection objects know their parent.
 				for (InstanceDetection& detection : this->instance_detections) {
 					detection.parent_result = this;
 				}
