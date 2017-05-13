@@ -48,9 +48,10 @@ namespace InstRecLib {
 		/// This is a component of InstanceSegmentationResult.
 		class InstanceDetection {
 		public:
-			/// The detection's bounding box, expressed in pixels (x1, y1, x2, y2).
+			/// The detection's bounding box, expressed in pixels (x1, y1, x2, y2). Coordinates are
+			/// <i>inclusive</i>.
 			/// In order to compute, e.g., the box's width, one can simply use
-			/// `bounding_box[2] - bounding_box[0]`.
+			/// `bounding_box[2] - bounding_box[0] + 1`.
 			///
 			/// TODO(andrei): Where is (0, 0)?
 			int bounding_box[4];

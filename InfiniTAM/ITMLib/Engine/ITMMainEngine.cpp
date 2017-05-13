@@ -77,6 +77,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	// TODO(andrei): Pass root path of seg folder.
 	const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
 	segmentationProvider = new InstRecLib::Segmentation::PrecomputedSegmentationProvider(segFolder);
+	instanceReconstructor = new InstRecLib::Reconstruction::InstanceReconstructor();
 }
 
 ITMMainEngine::~ITMMainEngine()

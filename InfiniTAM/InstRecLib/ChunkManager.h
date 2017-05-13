@@ -31,13 +31,15 @@ namespace InstRecLib {
 			using Fingerprint = std::string;
 			using SceneView = ITMLib::Objects::ITMView;
 
-			std::map<Fingerprint, std::shared_ptr<SceneView>> reconstruction_views_;
+			std::map<Fingerprint, std::shared_ptr<SceneView>> chunks_;
 
 		public:
-			ChunkManager() { }
+			ChunkManager() : chunks_() {
+				std::cout << "Created chunk manager!" << std::endl << std::endl;
+			}
 
 			bool hasChunk(const Fingerprint &fingerprint) {
-				return reconstruction_views_.find(fingerprint) != reconstruction_views_.end();
+				return chunks_.find(fingerprint) != chunks_.end();
 			}
 
 			void createChunk(
@@ -46,7 +48,7 @@ namespace InstRecLib {
 					const Vector2i frame_size,
 					bool use_gpu
 			) {
-				reconstruction_views_[fingerprint] = std::make_shared<SceneView>(
+				chunks_[fingerprint] = std::make_shared<SceneView>(
 						calibration, frame_size, frame_size, use_gpu);
 			}
 
@@ -55,7 +57,7 @@ namespace InstRecLib {
 			// from someplace else which would decide when a view is no longer needed?
 
 			std::shared_ptr<SceneView> getChunk(const Fingerprint& fingerprint) {
-				return reconstruction_views_[fingerprint];
+				return chunks_[fingerprint];
 			}
 
 
