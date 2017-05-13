@@ -140,6 +140,17 @@ namespace InstRecLib {
 			// e.g., 5-6 output buffers may end up using up way too much GPU memory.
 
 			// TODO(andrei): implement.
+			for(int row = 10; row < 200; ++row) {
+				for(int col = 10; col < 550; ++col) {
+					auto rgb_data_h_it = rgb_data_h + (row * view->rgb->noDims[0] + col);
+					rgb_data_h_it->r = 0;
+					rgb_data_h_it->g = 0;
+					rgb_data_h_it->b = 0;
+
+					// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
+				}
+			}
+
 
 		}
 
@@ -159,31 +170,22 @@ namespace InstRecLib {
 			// We read data off the disk, so we assume this is 0.
 			long inference_time_ns = 0L;
 
-			// Experimental blanking-out code. # TODO(andrei): Move to own component.
-			ORUtils::Vector4<unsigned char> *rgb_data_d = view->rgb->GetData(
-					MemoryDeviceType::MEMORYDEVICE_CUDA);
+			// Experimental blanking-out code.
+			// TODO(andrei): Move to own component.
 
-//		rgb_data += 150;
+			ORUtils::Vector4<unsigned char> *rgb_data_d = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CUDA);
+			float *depth_data_d = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CUDA);
 
 			// TODO(andrei): Perform this slicing 100% on the GPU.
 			size_t rgb_buf_size = view->rgb->dataSize;
+			size_t depth_buf_size = view->depth->dataSize;
 			auto *rgb_data_h = new ORUtils::Vector4<unsigned char>[rgb_buf_size];
+			auto *depth_data_h = new float[depth_buf_size];
 			ORcudaSafeCall(cudaMemcpy(rgb_data_h, rgb_data_d, rgb_buf_size, cudaMemcpyDeviceToHost));
+			ORcudaSafeCall(cudaMemcpy(depth_data_h, depth_data_d, depth_buf_size, cudaMemcpyDeviceToHost));
 
-			// TODO(andrei): Use this buffer to blank things out!
 
-		for(int row = 10; row < 200; ++row) {
-			for(int col = 10; col < 550; ++col) {
-				auto rgb_data_h_it = rgb_data_h + (row * view->rgb->noDims[0] + col);
-				rgb_data_h_it->r = 0;
-				rgb_data_h_it->g = 0;
-				rgb_data_h_it->b = 0;
-
-				// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
-			}
-		}
-
-			cout << "RGB buffer size: " << rgb_buf_size << endl;
+			processSihlouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h, depth_segment_h);
 
 			// TODO(andrei): Upload buffer back to GPU if needed (likely is).
 			ORcudaSafeCall(cudaMemcpy(rgb_data_d, rgb_data_h, rgb_buf_size, cudaMemcpyHostToDevice));
