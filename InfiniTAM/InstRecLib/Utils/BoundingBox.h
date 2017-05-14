@@ -51,6 +51,14 @@ namespace InstRecLib {
 							 this->ContainsPoint(other.r.x1, other.r.y0) ||
 							 this->ContainsPoint(other.r.x1, other.r.y1);
 			}
+
+			/// \brief Computes the intersection between this and the other bounding box.
+			/// \return The resulting box, or a (0, 0, 0, 0)-sized (empty) bounding box otherwise.
+			BoundingBox IntersectWith(const BoundingBox& other) const;
+
+			int GetArea() const {
+				return GetWidth() * GetHeight();
+			}
 		};
 
 		std::ostream& operator<<(std::ostream& out, const BoundingBox& bounding_box);

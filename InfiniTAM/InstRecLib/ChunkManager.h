@@ -10,7 +10,7 @@
 namespace InstRecLib {
 	namespace Reconstruction {
 
-		/// \brief Keeps track of the object instance frame cutouts.
+		/// \brief Keeps track of views of individual objects, as produced by the semantic segmentation.
 		///
 		/// After the segmentation, the dynamic objects' pixels are ``cut out'' of the original RGB and
 		/// depth frames and put into individual buffers, which are then associated across frames and
@@ -57,8 +57,6 @@ namespace InstRecLib {
 			std::shared_ptr<SceneView> getChunk(const Fingerprint& fingerprint) {
 				return chunks_[fingerprint];
 			}
-
-
 		};
 	}
 }
