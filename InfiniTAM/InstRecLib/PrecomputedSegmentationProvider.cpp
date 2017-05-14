@@ -13,6 +13,7 @@ namespace InstRecLib {
 	namespace Segmentation {
 
 		using namespace std;
+		using namespace InstRecLib::Utils;
 
 		/// \brief Reads a numpy text dump of an object's 2D binary segmentation mask.
 		///
@@ -99,19 +100,17 @@ namespace InstRecLib {
 				string result;
 				getline(result_in, result);
 
-				// Because screw C++'s string IO. What were they thinking??
-				int bbox[4];
+				BoundingBox bounding_box;
 				float class_probability;
 				int class_id;
 				sscanf(result.c_str(), "[%d %d %d %d %*d], %f, %d",
-				       &bbox[0], &bbox[1], &bbox[2], &bbox[3], &class_probability, &class_id);
+				       &bounding_box.r.x0, &bounding_box.r.y0, &bounding_box.r.x1, &bounding_box.r.y1,
+				       &class_probability, &class_id);
 
 				// Process the mask file. The mask area covers the edges of the bounding box, too.
-				int width = bbox[2] - bbox[0] + 1;
-				int height = bbox[3] - bbox[1] + 1;
-				uint8_t **mask = ReadMask(mask_in, width, height);
-
-				detections.emplace_back(bbox, class_probability, class_id, mask, nullptr);
+				uint8_t **mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
+				auto mask = make_shared<Mask>(bounding_box, mask_pixels);
+				detections.emplace_back(class_probability, class_id, mask);
 
 				instance_idx++;
 			}

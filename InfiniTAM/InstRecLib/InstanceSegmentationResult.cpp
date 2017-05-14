@@ -12,10 +12,8 @@ namespace InstRecLib {
 		}
 
 		ostream& operator<<(ostream& out, const InstanceDetection& detection) {
-			out << detection.getClassName() << " at [" << detection.bounding_box[0] << ", "
-			    << detection.bounding_box[1] << ", " << detection.bounding_box[2] << ", "
-			    << detection.bounding_box[3] << "]. Probability: "
-			    << setprecision(4) << setw(6) << detection.class_probability << ".";
+			out << detection.getClassName() << " at " << detection.GetBoundingBox() << ". "
+			    << "Probability: " << setprecision(4) << setw(6) << detection.class_probability << ".";
 			return out;
 		}
 	}

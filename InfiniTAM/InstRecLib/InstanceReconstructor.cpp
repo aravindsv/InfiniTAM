@@ -5,6 +5,7 @@
 namespace InstRecLib {
 	namespace Reconstruction {
 		using namespace InstRecLib::Segmentation;
+		using namespace InstRecLib::Utils;
 		using namespace ITMLib::Objects;
 
 		// TODO(andrei): Implement this in CUDA. It should be easy.
@@ -29,18 +30,18 @@ namespace InstRecLib {
 
 			int frame_width = sourceDims[0];
 			int frame_height = sourceDims[1];
-			int bb_x0 = detection.bounding_box[0];
-			int bb_y0 = detection.bounding_box[1];
-			int bb_x1 = detection.bounding_box[2];
-			int bb_y1 = detection.bounding_box[3];
+			const BoundingBox& bbox = detection.GetBoundingBox();
+			int bb_x0 = bbox.r.x0;
+			int bb_y0 = bbox.r.y0;
+			int bb_x1 = bbox.r.x1;
+			int bb_y1 = bbox.r.y1;
 
-			int box_height = bb_y1 - bb_y0 + 1;
-			int box_width = bb_x1 - bb_x0 + 1;
+			int box_width = bbox.GetWidth();
+			int box_height = bbox.GetHeight();
 
 			std::cout << "Box (x0, y0) and (x1, y1): (" << bb_x0 << ", " << bb_y0 << ") and (" << bb_x1
 								<< ", " << bb_y1 << ")" << std::endl;
 
-//			ORcudaSafeCall(cuda)
 			memset(destRGB, 0, frame_width * frame_height * sizeof(Vector4u));
 			memset(destDepth, 0, frame_width * frame_height * sizeof(float));
 
@@ -51,7 +52,7 @@ namespace InstRecLib {
 					// TODO(andrei): Are the CPU-specific itam functions doing this in a nicer way?
 					int frame_idx = frame_row * frame_width + frame_col;
 
-					int mask = detection.mask[row][col];
+					int mask = detection.mask->GetMask()[row][col];
 					if (mask == 1) {
 						destRGB[frame_idx].r = sourceRGB[frame_idx].r;
 						destRGB[frame_idx].g = sourceRGB[frame_idx].g;
