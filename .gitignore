@@ -12,3 +12,4 @@ x64/
 /InfiniTAM/Files/Out/*.ppm
 /InfiniTAM/Files/Teddy/Frames
 build/
+doxygen-html/
