@@ -2,8 +2,11 @@
 
 #include "InstanceReconstructor.h"
 
+#include <vector>
+
 namespace InstRecLib {
 	namespace Reconstruction {
+		using namespace std;
 		using namespace InstRecLib::Segmentation;
 		using namespace InstRecLib::Utils;
 		using namespace ITMLib::Objects;
@@ -89,7 +92,7 @@ namespace InstRecLib {
 						// TODO(andrei): Maybe just produce a list of chunks and hand them to the chunktracker?
 						// I don't think we need a chunk manager and a chunk tracker.
 
-						const std::string fingerprint = "car" + std::to_string(idx++);
+						const string fingerprint = "car" + to_string(idx++);
 
 						// TODO(andrei): This is NOT GOOD. We don't care about fingerprinting and shit here...
 						if (! chunk_manager_->hasChunk(fingerprint)) {
@@ -108,8 +111,21 @@ namespace InstRecLib {
 				}
 			}
 
+			// TODO(andrei): Actuall pass ITMViews and shit to the instance tracker!
+			vector<InstanceDetection> new_detections;
+			new_detections.insert(
+					new_detections.end(),
+					segmentation_result.instance_detections.begin(),
+					segmentation_result.instance_detections.end()
+			);
+
+			// Associate this frame's detection(s) with those from previous frames.
+			this->instance_tracker_->ProcessChunks(frame_idx_, new_detections);
+
 			main_view->rgb->UpdateDeviceFromHost();
 			main_view->depth->UpdateDeviceFromHost();
+
+			frame_idx_++;
 		}
 	}
 }

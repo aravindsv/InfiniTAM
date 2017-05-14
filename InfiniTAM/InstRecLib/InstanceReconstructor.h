@@ -7,6 +7,7 @@
 
 #include "ChunkManager.h"
 #include "InstanceSegmentationResult.h"
+#include "InstanceTracker.h"
 
 namespace InstRecLib {
 	namespace Reconstruction {
@@ -16,9 +17,18 @@ namespace InstRecLib {
 
 		private:
 			std::shared_ptr<ChunkManager> chunk_manager_;
+			std::shared_ptr<InstanceTracker> instance_tracker_;
+
+			// TODO(andrei): Consider keeping track of this in centralized manner and not just in UIEngine.
+			/// \brief The current input frame number.
+			/// Useful for, e.g., keeping track of when we last saw a car, so we can better associate
+			/// detections through time, and dump old-enough reconstructions to the disk.
+			int frame_idx_;
 
 		public:
-			InstanceReconstructor() : chunk_manager_(new ChunkManager()){ }
+			InstanceReconstructor() : chunk_manager_(new ChunkManager()),
+			                          instance_tracker_(new InstanceTracker()),
+			                          frame_idx_(0) { }
 
 			/// \brief Uses the segmentation result to remove dynamic objects from the main view and save
 			/// them to separate buffers, which are then used for individual object reconstruction.
@@ -38,6 +48,14 @@ namespace InstRecLib {
 
 			ChunkManager& GetChunkManager() {
 				return *chunk_manager_;
+			}
+
+			const InstanceTracker& GetInstanceTracker() const {
+				return *instance_tracker_;
+			}
+
+			InstanceTracker& GetInstanceTracker() {
+				return *instance_tracker_;
 			}
 		};
 	}

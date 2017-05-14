@@ -8,7 +8,7 @@ namespace InstRecLib {
 		using namespace std;
 
 		ostream& operator<<(ostream& out, const BoundingBox& bounding_box) {
-			out << "[(" << bounding_box.r.x0 << ", " << bounding_box.r.y0 << "), "
+			out << "[(" << bounding_box.r.x0 << ", " << bounding_box.r.y0 << "), ("
 				          << bounding_box.r.x1 << ", " << bounding_box.r.y1 << ")]";
 			return out;
 		}
@@ -16,7 +16,8 @@ namespace InstRecLib {
 		BoundingBox BoundingBox::IntersectWith(const BoundingBox &other) const {
 			if (! this->Intersects(other)) {
 				// Return an empty bounding box.
-				return BoundingBox();
+				// TODO(andrei): Make this more rigorous.
+				return BoundingBox(0, 0, -1, -1);
 			}
 
 			int max_x0 = max(this->r.x0, other.r.x0);
@@ -28,10 +29,15 @@ namespace InstRecLib {
 		}
 
 		bool BoundingBox::Intersects(const BoundingBox &other) const {
-			return this->ContainsPoint(other.r.x0, other.r.y0) ||
-			       this->ContainsPoint(other.r.x0, other.r.y1) ||
-			       this->ContainsPoint(other.r.x1, other.r.y0) ||
-			       this->ContainsPoint(other.r.x1, other.r.y1);
+			if (other.r.x0 < this->r.x1 && this->r.x0 < other.r.x1 && other.r.y0 < this->r.y1) {
+				if (this->r.y0 < other.r.y1) {
+					return true;
+				}
+
+				return false;
+			}
+
+			return false;
 		}
 	}
 }
