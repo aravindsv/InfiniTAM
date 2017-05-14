@@ -66,14 +66,12 @@ namespace InstRecLib {
 				ITMLib::Objects::ITMView* main_view,
 				const Segmentation::InstanceSegmentationResult& segmentation_result
 		) {
-			// For now, we pretend there's only one instance out there, and it has a silly ID.
-			const std::string fingerprint = "car";
-			if (! chunk_manager_->hasChunk(fingerprint)) {
-				Vector2i frame_size = main_view->rgb->noDims;
-				// bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
-				// check this, since the field is private.
-				chunk_manager_->createChunk(fingerprint, main_view->calib, frame_size, true);
-			}
+//			if (! chunk_manager_->hasChunk(fingerprint)) {
+//				Vector2i frame_size = main_view->rgb->noDims;
+//				// bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
+//				// check this, since the field is private.
+//				chunk_manager_->createChunk(fingerprint, main_view->calib, frame_size, true);
+//			}
 
 			// TODO(andrei): Perform this slicing 100% on the GPU.
 			main_view->rgb->UpdateHostFromDevice();
@@ -91,7 +89,16 @@ namespace InstRecLib {
 						// TODO(andrei): Maybe just produce a list of chunks and hand them to the chunktracker?
 						// I don't think we need a chunk manager and a chunk tracker.
 
-						auto chunk = chunk_manager_->getChunk(fingerprint + std::to_string(idx++));
+						const std::string fingerprint = "car" + std::to_string(idx++);
+
+						// TODO(andrei): This is NOT GOOD. We don't care about fingerprinting and shit here...
+						if (! chunk_manager_->hasChunk(fingerprint)) {
+							// TODO(andrei): If it's not too much of a PITA, consider always allocating chunks
+							// the exact size of the detection's bounding box.
+							chunk_manager_->createChunk(fingerprint, main_view->calib, main_view->rgb->noDims, true);
+						}
+
+						auto chunk = chunk_manager_->getChunk(fingerprint);
 						auto rgb_segment_h = chunk->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 						auto depth_segment_h = chunk->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 

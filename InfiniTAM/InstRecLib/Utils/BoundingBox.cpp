@@ -26,6 +26,13 @@ namespace InstRecLib {
 
 			return BoundingBox(max_x0, max_y0, min_x1, min_y1);
 		}
+
+		bool BoundingBox::Intersects(const BoundingBox &other) const {
+			return this->ContainsPoint(other.r.x0, other.r.y0) ||
+			       this->ContainsPoint(other.r.x0, other.r.y1) ||
+			       this->ContainsPoint(other.r.x1, other.r.y0) ||
+			       this->ContainsPoint(other.r.x1, other.r.y1);
+		}
 	}
 }
 

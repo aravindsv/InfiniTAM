@@ -15,9 +15,9 @@ namespace InstRecLib {
 	namespace Reconstruction {
 
 		/// \brief One frame of an instance track.
-		class TrackFrame {
-			int frame_idx_;
-			InstRecLib::Segmentation::InstanceDetection detection_;
+		struct TrackFrame {
+			int frame_idx;
+			InstRecLib::Segmentation::InstanceDetection detection;
 
 			// Only active if inside a Track. TODO(andrei): Implement.
 			TrackFrame* previous;
@@ -25,12 +25,12 @@ namespace InstRecLib {
 
 		public:
 			TrackFrame(int frame_idx, const InstRecLib::Segmentation::InstanceDetection &detection)
-					: frame_idx_(frame_idx), detection_(detection), previous(nullptr), next(nullptr) {}
+					: frame_idx(frame_idx), detection(detection), previous(nullptr), next(nullptr) {}
 		};
 
 		class Track {
 		private:
-			std::vector<TrackFrame> detections;
+			std::vector<TrackFrame> frames;
 
 		public:
 			/// \brief Evaluates how well this new frame would fit the existing track.

@@ -243,7 +243,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 
 	case ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW:
 		// TODO(andrei): Less hard-coded preview.
-		out->SetFrom(instanceReconstructor->GetChunkManager().getChunk("car")->rgb, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		out->SetFrom(instanceReconstructor->GetChunkManager().getChunk("car0")->rgb, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
 		break;
 
 	case ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN:

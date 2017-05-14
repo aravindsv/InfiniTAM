@@ -45,12 +45,7 @@ namespace InstRecLib {
 				return (x >= this->r.x0 && x <= this->r.x1 && y >= this->r.y0 && y <= this->r.y1);
 			}
 
-			bool Intersects(const BoundingBox& other) const {
-				return this->ContainsPoint(other.r.x0, other.r.y0) ||
-			         this->ContainsPoint(other.r.x0, other.r.y1) ||
-							 this->ContainsPoint(other.r.x1, other.r.y0) ||
-							 this->ContainsPoint(other.r.x1, other.r.y1);
-			}
+			bool Intersects(const BoundingBox& other) const;
 
 			/// \brief Computes the intersection between this and the other bounding box.
 			/// \return The resulting box, or a (0, 0, 0, 0)-sized (empty) bounding box otherwise.
