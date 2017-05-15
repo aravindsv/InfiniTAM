@@ -125,6 +125,10 @@ namespace InstRecLib {
 			main_view->rgb->UpdateDeviceFromHost();
 			main_view->depth->UpdateDeviceFromHost();
 
+			for(const Track& track : this->instance_tracker_->GetTracks()) {
+				cout << "Track: " << track.GetAsciiArt() << endl;
+			}
+
 			frame_idx_++;
 		}
 	}

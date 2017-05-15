@@ -3,7 +3,6 @@
 #include "InstanceTracker.h"
 
 #include <cassert>
-#include <iostream>
 
 namespace InstRecLib {
 	namespace Reconstruction {
@@ -11,26 +10,10 @@ namespace InstRecLib {
 		using namespace std;
 		using namespace InstRecLib::Segmentation;
 
-		float Track::ScoreMatch(const TrackFrame &new_frame) const {
-			// TODO(andrei): Use fine mask, not just bounding box.
-			// TODO(andrei): Ensure this is modular enough to allow many different matching strategies.
-			// TODO(andrei): Take time into account---if I overlap perfectly with a very old track, the
-			// score should probably be discounted.
-
-			assert(!this->frames.empty() && "A track with no frames cannot exist.");
-			const TrackFrame& latest_frame = this->frames[this->frames.size() - 1];
-
-			int min_area = min(new_frame.detection.GetBoundingBox().GetArea(),
-			                   latest_frame.detection.GetBoundingBox().GetArea());
-			int overlap_area = latest_frame.detection.GetBoundingBox().IntersectWith(new_frame.detection.GetBoundingBox()).GetArea();
-
-			// If the overlap completely covers one of the frames, then it's considered perfect.
-			// Otherwise,	frames which only partially intersect get smaller scores, and frames which don't
-			// intersect at all get a score of 0.0.
-			return static_cast<float>(overlap_area) / min_area;
-		}
-
-		void InstanceTracker::ProcessChunks(int frame_idx, const DetectionVector &new_detections) {
+		void InstanceTracker::ProcessChunks(
+				int frame_idx,
+				const vector<InstanceDetection>& new_detections
+		) {
 			// TODO(andrei): also accept actual DATA!!
 			cout << "Frame [" << frame_idx << "]. Processing " << new_detections.size()
 			     << " new detections." << endl;
@@ -59,14 +42,53 @@ namespace InstRecLib {
 
 		void InstanceTracker::PruneTracks(int current_frame_idx) {
 			for(auto it = active_tracks_.begin(); it != active_tracks_.end(); ++it) {
-				int last_active = it->GetLastFrame().frame_idx;
+				int last_active = it->GetEndTime();
 				int frame_delta = current_frame_idx - last_active;
 
 				if (frame_delta > inactive_frame_threshold_) {
-					cout << "Should trim old track..." << endl;
-					// TODO(andrei): Actually trim it.
+					it = active_tracks_.erase(it);
 				}
+			}
+		}
 
+		std::pair<Track *, float> InstanceTracker::FindBestTrack(const TrackFrame &track_frame) {
+			if (active_tracks_.empty()) {
+				return kNoBestTrack;
+			}
+
+			float best_score = -1.0f;
+			Track *best_track = nullptr;
+
+			for (Track& track : active_tracks_) {
+				float score = track.ScoreMatch(track_frame);
+				if (score > best_score) {
+					best_score = score;
+					best_track = &track;
+				}
+			}
+
+			assert(best_score >= 0.0f);
+			assert(best_track != nullptr);
+			return std::pair<Track*, float>(best_track, best_score);
+		}
+
+		void InstanceTracker::AssignToTracks(std::list<TrackFrame> &new_detections) {
+			for(auto it = new_detections.begin(); it != new_detections.end(); ++it) {
+				pair<Track*, float> match = FindBestTrack(*it);
+				Track* track = match.first;
+				float score = match.second;
+
+				if (score > kTrackScoreThreshold) {
+					cout << "Found a match based on overlap with score " << score << "." << endl;
+					cout << "Adding it to track of length " << track->GetSize() << "." << endl;
+
+					track->AddFrame(*it);
+					it = new_detections.erase(it);
+				}
+//				else {
+//					cout << "Best score was: " << score << ", below the threshold. Will create new track."
+//					     << endl;
+//				}
 			}
 		}
 	}
