@@ -241,9 +241,16 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		out->SetFrom(segmentationProvider->GetSegResult(), ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
 		break;
 
-	case ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW:
-		out->SetFrom(instanceReconstructor->GetInstancePreviewRGB(), ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+	case ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW: {
+		ITMUChar4Image *preview = instanceReconstructor->GetInstancePreviewRGB();
+		if (nullptr == preview) {
+			// This happens when there's no instances to preview.
+			out->Clear();
+		} else {
+			out->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		}
 		break;
+	}
 
 	case ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN:
 		break;
