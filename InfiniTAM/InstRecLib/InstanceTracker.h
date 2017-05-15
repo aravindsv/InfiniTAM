@@ -18,7 +18,7 @@ namespace InstRecLib {
 
 		/// \brief Minimum overlap score required to add a new frame to an existing feature track.
 		/// Between 0.0 and 1.0.
-		const float kTrackScoreThreshold = 0.25f;
+		const float kTrackScoreThreshold = 0.15f;
 
 		/// \brief Default age of the last frame in an object track after which we discard it.
 		const int kDefaultInactiveFrameThreshold = 5;
@@ -33,6 +33,9 @@ namespace InstRecLib {
 			/// \brief The maximum age of the latest frame in a track, before it is discarded.
 			/// The higher this is, the more tracks are held in memory.
 			int inactive_frame_threshold_;
+
+			/// \brief The total number of tracks seen, including both active and pruned tracks.
+			int track_count_;
 
 		protected:
 			static constexpr std::pair<Track*, float> kNoBestTrack = std::pair<Track*, float>(nullptr, 0.0f);
@@ -51,7 +54,8 @@ namespace InstRecLib {
 
 		public:
 			InstanceTracker() : active_tracks_(std::vector<Track>()),
-			                    inactive_frame_threshold_(kDefaultInactiveFrameThreshold) { }
+			                    inactive_frame_threshold_(kDefaultInactiveFrameThreshold),
+													track_count_(0) { }
 
 			/// \brief Associates the new detections with existing tracks, or creates new ones.
 			/// \param new_detections The instances detected in the current frame.
@@ -63,6 +67,11 @@ namespace InstRecLib {
 
 			const std::vector<Track>& GetTracks() const {
 				return active_tracks_;
+			}
+
+			/// \see track_count_
+			int GetTotalTrackCount() const {
+				return track_count_;
 			}
 		};
 

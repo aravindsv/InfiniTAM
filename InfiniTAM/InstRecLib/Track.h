@@ -29,8 +29,13 @@ namespace InstRecLib {
 		/// Modeled as a series of detections, contained in the 'frames' field. Note that there can
 		/// be gaps in this list, due to frames where this particular object was not detected.
 		class Track {
+		private:
+			/// \brief A unique identifier for this particular track.
+			int id_;
+			std::vector<TrackFrame> frames_;
+
 		public:
-			Track() {}
+			Track(int id) : id_(id) {}
 			virtual ~Track() { }
 
 			/// \brief Evaluates how well this new frame would fit the existing track.
@@ -62,14 +67,15 @@ namespace InstRecLib {
 				return frames_.back().frame_idx;
 			}
 
+			int GetId() const {
+				return id_;
+			}
+
 			/// \brief Draws a visual representation of this feature track.
 			/// \example For an object first seen in frame 11, then in frames 12, 13, and 16, this
 			/// representation would look as follows:
 			///    [                                 11 12 13      16]
 			std::string GetAsciiArt() const;
-
-		private:
-			std::vector<TrackFrame> frames_;
 		};
 	}
 }

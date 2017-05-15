@@ -100,6 +100,11 @@ namespace ITMLib
 			/// Gives access to the internal world representation
 			ITMScene<ITMVoxel, ITMVoxelIndex>* GetScene(void) { return scene; }
 
+			/// Give asccess to the component tasked with reconstructing dynamic object instances.
+			InstRecLib::Reconstruction::InstanceReconstructor* GetInstanceReconstructor() {
+				return instanceReconstructor;
+			}
+
 			/// Process a frame with rgb and depth images and optionally a corresponding imu measurement
 			void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement = NULL);
 
@@ -118,7 +123,7 @@ namespace ITMLib
 			/// \brief Returns a specific buffer from inside InfiniTAM, for visualization and debugging.
 			void GetImage(ITMUChar4Image *out, GetImageType getImageType, ITMPose *pose = NULL, ITMIntrinsics *intrinsics = NULL);
 
-			/// switch for turning intergration on/off
+			/// switch for turning integration on/off
 			void turnOnIntegration();
 			void turnOffIntegration();
 

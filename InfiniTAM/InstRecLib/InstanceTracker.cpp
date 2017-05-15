@@ -25,7 +25,7 @@ namespace InstRecLib {
 			// 2. For leftover detections, put them into new, single-frame, tracks.
 			cout << new_track_frames.size() << " new unassigned frames." << endl;
 			for (const TrackFrame &track_frame : new_track_frames) {
-				Track new_track;
+				Track new_track(track_count_++);
 				new_track.AddFrame(track_frame);
 				this->active_tracks_.push_back(new_track);
 			}

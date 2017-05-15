@@ -24,6 +24,9 @@ namespace ITMLib
 				float fx, fy, px, py;
 			} projectionParamsSimple;
 
+			float sizeX;
+			float sizeY;
+
 			/** Setup all the internal members of this class from
 			    the given parameters. Everything is in pixel
 			    coordinates.
@@ -40,6 +43,8 @@ namespace ITMLib
 				projectionParamsSimple.px = cx; projectionParamsSimple.py = cy;
 				projectionParamsSimple.all.x = fx; projectionParamsSimple.all.y = fy;
 				projectionParamsSimple.all.z = cx; projectionParamsSimple.all.w = cy;
+				this->sizeX = sizeX;
+				this->sizeY = sizeY;
 			}
 
 			ITMIntrinsics(void)

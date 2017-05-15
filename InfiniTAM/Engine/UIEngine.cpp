@@ -95,6 +95,37 @@ void UIEngine::glutDisplayFunction()
 	}
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, (const char*)str);
 
+	// Overlay numbers onto the object detections associated through time, for visualization purposes.
+	const auto& instanceTracker = uiEngine->mainEngine->GetInstanceReconstructor()->GetInstanceTracker();
+	for(const auto& track : instanceTracker.GetTracks()) {
+		if (track.GetLastFrame().frame_idx !=  uiEngine->currentFrameNo - 1) {
+			continue;
+		}
+
+		float gl_x = 0.0f;
+		float gl_y = -0.0f;
+		const auto& bbox = track.GetLastFrame().instance_view.GetInstanceDetection().mask->GetBoundingBox();
+
+		float width_px = uiEngine->imageSource->calib.intrinsics_rgb.sizeX;
+		float height_px = uiEngine->imageSource->calib.intrinsics_rgb.sizeY;
+		float view_scale_x = width_px * 2.0f;
+		float view_scale_y = height_px * 1.0f;
+
+		float bbox_x = bbox.r.x0 + 25;
+		float bbox_y = bbox.r.y0 - 15;
+
+		float bbox_x_scaled = bbox_x / view_scale_x;
+		float bbox_y_scaled = bbox_y / view_scale_y;
+
+		gl_x += bbox_x_scaled;
+		gl_y -= bbox_y_scaled;
+
+		string idMsg = "#" + std::to_string(track.GetId());
+		glColor3f(1.0f, 0.0f, 0.0f);
+		glRasterPos2f(gl_x, gl_y);
+		safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, idMsg.c_str());
+	}
+
 	glutSwapBuffers();
 	uiEngine->needsRefresh = false;
 }
