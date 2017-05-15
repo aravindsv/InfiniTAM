@@ -13,12 +13,8 @@ namespace InstRecLib {
 
 		/// \brief Performs semantic segmentation on input frames.
 		class SegmentationProvider {
-		private:
-
 		public:
-			SegmentationProvider();
-
-			virtual ~SegmentationProvider();
+			virtual ~SegmentationProvider() { };
 
 			/// \brief Performs semantic segmentation of the given frame.
 			/// Usually uses only RGB data, but some segmentation pipelines may leverage e.g., depth as well.

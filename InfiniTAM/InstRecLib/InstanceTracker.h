@@ -10,6 +10,7 @@
 
 #include "InstanceSegmentationResult.h"
 #include "Track.h"
+#include "InstanceView.h"
 
 // TODO(andrei): Consider splitting this file up into multiple class files.
 namespace InstRecLib {
@@ -54,9 +55,7 @@ namespace InstRecLib {
 
 			/// \brief Associates the new detections with existing tracks, or creates new ones.
 			/// \param new_detections The instances detected in the current frame).
-			void ProcessChunks(
-				int frame_idx,
-				const std::vector<InstRecLib::Segmentation::InstanceDetection>& new_detections);
+			void ProcessChunks(int frame_idx, const std::vector<InstanceView>& new_detections);
 
 			std::vector<Track>& GetTracks() {
 				return active_tracks_;
@@ -65,7 +64,6 @@ namespace InstRecLib {
 			const std::vector<Track>& GetTracks() const {
 				return active_tracks_;
 			}
-
 		};
 
 	}

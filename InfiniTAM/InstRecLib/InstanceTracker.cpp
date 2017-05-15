@@ -10,17 +10,13 @@ namespace InstRecLib {
 		using namespace std;
 		using namespace InstRecLib::Segmentation;
 
-		void InstanceTracker::ProcessChunks(
-				int frame_idx,
-				const vector<InstanceDetection>& new_detections
-		) {
-			// TODO(andrei): also accept actual DATA!!
-			cout << "Frame [" << frame_idx << "]. Processing " << new_detections.size()
+		void InstanceTracker::ProcessChunks(int frame_idx, const vector<InstanceView>& new_views) {
+			cout << "Frame [" << frame_idx << "]. Processing " << new_views.size()
 			     << " new detections." << endl;
 
 			list<TrackFrame> new_track_frames;
-			for(const InstanceDetection& detection : new_detections) {
-				new_track_frames.emplace_back(frame_idx, detection);
+			for(const InstanceView& view : new_views) {
+				new_track_frames.emplace_back(frame_idx, view.GetInstanceDetection());
 			}
 
 			// 1. Find a matching track.

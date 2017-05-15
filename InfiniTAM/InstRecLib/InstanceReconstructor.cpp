@@ -1,6 +1,7 @@
 
 
 #include "InstanceReconstructor.h"
+#include "InstanceView.h"
 
 #include <vector>
 
@@ -83,6 +84,7 @@ namespace InstRecLib {
 			ORUtils::Vector4<unsigned char> *rgb_data_h = main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 			float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
+			vector<InstanceView> new_instance_views;
 			if (segmentation_result.instance_detections.size() > 0) {
 				int idx = 0;
 				for(const InstanceDetection& instance_detection : segmentation_result.instance_detections) {
@@ -111,20 +113,13 @@ namespace InstRecLib {
 				}
 			}
 
-			// TODO(andrei): Actuall pass ITMViews and shit to the instance tracker!
-			vector<InstanceDetection> new_detections;
-			new_detections.insert(
-					new_detections.end(),
-					segmentation_result.instance_detections.begin(),
-					segmentation_result.instance_detections.end()
-			);
-
 			// Associate this frame's detection(s) with those from previous frames.
-			this->instance_tracker_->ProcessChunks(frame_idx_, new_detections);
+			this->instance_tracker_->ProcessChunks(frame_idx_, new_instance_views);
 
 			main_view->rgb->UpdateDeviceFromHost();
 			main_view->depth->UpdateDeviceFromHost();
 
+			// ``Graphically'' display the object tracks for debugging.
 			for(const Track& track : this->instance_tracker_->GetTracks()) {
 				cout << "Track: " << track.GetAsciiArt() << endl;
 			}
