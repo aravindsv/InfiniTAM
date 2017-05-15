@@ -25,6 +25,7 @@ namespace InstRecLib {
 			// 2. For leftover detections, put them into new, single-frame, tracks.
 			cout << new_track_frames.size() << " new unassigned frames." << endl;
 			for (const TrackFrame &track_frame : new_track_frames) {
+				cout << "New track created. ID = " << track_count_ << "." << endl;
 				Track new_track(track_count_++);
 				new_track.AddFrame(track_frame);
 				this->active_tracks_.push_back(new_track);
@@ -37,14 +38,18 @@ namespace InstRecLib {
 		}
 
 		void InstanceTracker::PruneTracks(int current_frame_idx) {
-			for(auto it = active_tracks_.begin(); it != active_tracks_.end(); ++it) {
+			auto it = active_tracks_.begin();
+			while(it != active_tracks_.end()) {
 				int last_active = it->GetEndTime();
 				int frame_delta = current_frame_idx - last_active;
 
 				if (frame_delta > inactive_frame_threshold_) {
-					cout << "Erasing track of size " << it->GetSize() << "." << endl;
+//					cout << "Erasing track of size " << it->GetSize() << "." << endl;
 					it = active_tracks_.erase(it);
-					cout << "Done." << endl;
+//					cout << "Done." << endl;
+				}
+				else {
+					++it;
 				}
 			}
 		}
@@ -71,22 +76,24 @@ namespace InstRecLib {
 		}
 
 		void InstanceTracker::AssignToTracks(std::list<TrackFrame> &new_detections) {
-			for(auto it = new_detections.begin(); it != new_detections.end(); ++it) {
+			auto it = new_detections.begin();
+			while(it != new_detections.end()) {
 				pair<Track*, float> match = FindBestTrack(*it);
 				Track* track = match.first;
 				float score = match.second;
 
 				if (score > kTrackScoreThreshold) {
 					cout << "Found a match based on overlap with score " << score << "." << endl;
-					cout << "Adding it to track of length " << track->GetSize() << "." << endl;
+					cout << "Adding it to track #" << track->GetId() << " of length " << track->GetSize() << "." << endl;
 
 					track->AddFrame(*it);
 					it = new_detections.erase(it);
 				}
-//				else {
+				else {
 //					cout << "Best score was: " << score << ", below the threshold. Will create new track."
 //					     << endl;
-//				}
+					++it;
+				}
 			}
 		}
 	}

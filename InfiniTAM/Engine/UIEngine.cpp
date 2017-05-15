@@ -11,6 +11,8 @@
 
 #ifdef FREEGLUT
 #include <GL/freeglut.h>
+#include <sstream>
+
 #else
 #if (!defined USING_CMAKE) && (defined _MSC_VER)
 #pragma comment(lib, "glut64")
@@ -120,10 +122,12 @@ void UIEngine::glutDisplayFunction()
 		gl_x += bbox_x_scaled;
 		gl_y -= bbox_y_scaled;
 
-		string idMsg = "#" + std::to_string(track.GetId());
+		stringstream idMsg;
+		idMsg << "#" << track.GetId() << "@" << setprecision(2)
+		      << track.GetLastFrame().instance_view.GetInstanceDetection().class_probability;
 		glColor3f(1.0f, 0.0f, 0.0f);
 		glRasterPos2f(gl_x, gl_y);
-		safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, idMsg.c_str());
+		safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, idMsg.str().c_str());
 	}
 
 	glutSwapBuffers();
