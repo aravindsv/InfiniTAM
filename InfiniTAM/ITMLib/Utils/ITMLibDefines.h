@@ -55,7 +55,8 @@
 //#define SDF_HASH_MASK 0xfffff			// Used for get hashing value of the bucket index,  SDF_HASH_MASK = SDF_BUCKET_NUM - 1
 #define SDF_HASH_MASK (SDF_BUCKET_NUM - 1)
 //#define SDF_EXCESS_LIST_SIZE 0x20000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
-#define SDF_EXCESS_LIST_SIZE 0x40000
+//#define SDF_EXCESS_LIST_SIZE 0x10000
+#define SDF_EXCESS_LIST_SIZE 0x4000
 
 //#define SDF_BUCKET_NUM 0x800000
 //#define SDF_HASH_MASK (SDF_BUCKET_NUM - 1)

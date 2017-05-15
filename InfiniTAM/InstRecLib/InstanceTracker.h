@@ -20,8 +20,11 @@ namespace InstRecLib {
 		/// Between 0.0 and 1.0.
 		const float kTrackScoreThreshold = 0.15f;
 
+		// TODO(andrei): Adapt this to allow bigger gaps in longer track, maybe.
 		/// \brief Default age of the last frame in an object track after which we discard it.
-		const int kDefaultInactiveFrameThreshold = 5;
+		/// The smaller this is, the less memory the system uses, but the likelier it is to fragment
+		/// object reconstructions into multiple volumes.
+		const int kDefaultInactiveFrameThreshold = 3;
 
 		/// \brief Tracks instances over time by associating multiple isolated detections.
 		// TODO(andrei): Once complete, refactor this into an interface + MaxOverlapTracker.
