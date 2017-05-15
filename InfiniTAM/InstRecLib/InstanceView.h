@@ -16,6 +16,11 @@ namespace InstRecLib {
 									 const std::shared_ptr<ITMLib::Objects::ITMView> &view_)
 					: instance_detection_(instance_detection_), view_(view_) {}
 
+			virtual ~InstanceView() {
+				std::cout << "Deleting instance view. References to ITMView object:"
+			            << view_.use_count() << "." << std::endl;
+			}
+
 			ITMLib::Objects::ITMView* GetView() {
 				return view_.get();
 			}

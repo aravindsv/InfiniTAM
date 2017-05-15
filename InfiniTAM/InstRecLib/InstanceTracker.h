@@ -54,8 +54,8 @@ namespace InstRecLib {
 			                    inactive_frame_threshold_(kDefaultInactiveFrameThreshold) { }
 
 			/// \brief Associates the new detections with existing tracks, or creates new ones.
-			/// \param new_detections The instances detected in the current frame).
-			void ProcessChunks(int frame_idx, const std::vector<InstanceView>& new_detections);
+			/// \param new_detections The instances detected in the current frame.
+			void ProcessInstanceViews(int frame_idx, const std::vector<InstanceView>& new_detections);
 
 			std::vector<Track>& GetTracks() {
 				return active_tracks_;

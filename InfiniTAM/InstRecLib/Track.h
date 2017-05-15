@@ -6,6 +6,7 @@
 
 #include <vector>
 #include "InstanceSegmentationResult.h"
+#include "InstanceView.h"
 
 namespace InstRecLib {
 	namespace Reconstruction {
@@ -13,15 +14,15 @@ namespace InstRecLib {
 		/// \brief One frame of an instance track (InstRecLib::Reconstruction::Track).
 		struct TrackFrame {
 			int frame_idx;
-			InstRecLib::Segmentation::InstanceDetection detection;
+			InstanceView instance_view;
 
 			// Only active if inside a Track. TODO(andrei): Implement.
 			TrackFrame* previous;
 			TrackFrame* next;
 
 		public:
-			TrackFrame(int frame_idx, const InstRecLib::Segmentation::InstanceDetection &detection)
-					: frame_idx(frame_idx), detection(detection), previous(nullptr), next(nullptr) {}
+			TrackFrame(int frame_idx, const InstanceView& instance_view)
+					: frame_idx(frame_idx), instance_view(instance_view), previous(nullptr), next(nullptr) {}
 		};
 
 		/// \brief A detected object's track through multiple frames.
@@ -30,8 +31,7 @@ namespace InstRecLib {
 		class Track {
 		public:
 			Track() {}
-
-			virtual ~Track() {}
+			virtual ~Track() { }
 
 			/// \brief Evaluates how well this new frame would fit the existing track.
 			/// \returns A goodness score between 0 and 1, where 0 means the new frame would not match
@@ -63,6 +63,9 @@ namespace InstRecLib {
 			}
 
 			/// \brief Draws a visual representation of this feature track.
+			/// \example For an object first seen in frame 11, then in frames 12, 13, and 16, this
+			/// representation would look as follows:
+			///    [                                 11 12 13      16]
 			std::string GetAsciiArt() const;
 
 		private:

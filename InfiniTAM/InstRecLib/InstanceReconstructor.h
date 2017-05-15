@@ -57,6 +57,10 @@ namespace InstRecLib {
 			InstanceTracker& GetInstanceTracker() {
 				return *instance_tracker_;
 			}
+
+			/// \brief Returns a snapshot of one of the stored instance segments, if available.
+			/// This method is primarily designed for visualization purposes.
+			ITMUChar4Image* GetInstancePreviewRGB();
 		};
 	}
 }

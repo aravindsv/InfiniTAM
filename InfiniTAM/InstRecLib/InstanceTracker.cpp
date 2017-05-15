@@ -10,19 +10,19 @@ namespace InstRecLib {
 		using namespace std;
 		using namespace InstRecLib::Segmentation;
 
-		void InstanceTracker::ProcessChunks(int frame_idx, const vector<InstanceView>& new_views) {
+		void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceView>& new_views) {
 			cout << "Frame [" << frame_idx << "]. Processing " << new_views.size()
 			     << " new detections." << endl;
 
 			list<TrackFrame> new_track_frames;
 			for(const InstanceView& view : new_views) {
-				new_track_frames.emplace_back(frame_idx, view.GetInstanceDetection());
+				new_track_frames.emplace_back(frame_idx, view);
 			}
 
 			// 1. Find a matching track.
 			this->AssignToTracks(new_track_frames);
 
-			// 2. For leftover detections, put them into new, single-frame, trackes.
+			// 2. For leftover detections, put them into new, single-frame, tracks.
 			cout << new_track_frames.size() << " new unassigned frames." << endl;
 			for (const TrackFrame &track_frame : new_track_frames) {
 				Track new_track;
@@ -30,7 +30,7 @@ namespace InstRecLib {
 				this->active_tracks_.push_back(new_track);
 			}
 
-			cout << "We now have " << this->active_tracks_.size() << " active tracks." << endl;
+			cout << "We now have " << this->active_tracks_.size() << " active track(s)." << endl;
 
 			// 3. Iterate through tracks, find ``expired'' ones, and discard them.
 			this->PruneTracks(frame_idx);
@@ -42,7 +42,9 @@ namespace InstRecLib {
 				int frame_delta = current_frame_idx - last_active;
 
 				if (frame_delta > inactive_frame_threshold_) {
+					cout << "Erasing track of size " << it->GetSize() << "." << endl;
 					it = active_tracks_.erase(it);
+					cout << "Done." << endl;
 				}
 			}
 		}
