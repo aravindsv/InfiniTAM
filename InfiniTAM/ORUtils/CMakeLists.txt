@@ -27,7 +27,7 @@ ${ORUTILS_HEADERS}
 
 
   # Support 'backward-cpp,' a lean stacktrace printing library for Linux.
-  add_subdirectory(third_party/backward-cpp)
+#  add_subdirectory(third_party/backward-cpp)
 #list(APPEND CMAKE_MODULE_PATH third_party/backward-cpp)
 #list(APPEND CMAKE_PREFIX_PATH ./third_party/backward-cpp)
 #message(${CMAKE_MODULE_PATH})

@@ -7,6 +7,8 @@
 #include "../Utils/FileUtils.h"
 
 #include <cstdlib>
+#include <fstream>
+#include <iomanip>
 #include <sstream>
 
 namespace InstRecLib {

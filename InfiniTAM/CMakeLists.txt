@@ -1,7 +1,13 @@
 cmake_minimum_required(VERSION 3.1)
 project(InfiniTAM)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+# TODO(andrei): This CMakeLists.txt file is not 100% appropriate for allowing InfiniTAM to be used
+# as a library. InfiniTAM should provide an `infinitam-config.cmake` file to be used as a lib, as
+# described on the CMake wiki:
+# https://cmake.org/Wiki/CMake/Tutorials/How_to_create_a_ProjectConfig.cmake_file
+
+# Using PROJECT_SOURCE_DIR ensures we can use InfiniTAM as a library via CMake.
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/")
 
 macro(CANONIFY_BOOL var)
   if (${var})
@@ -44,8 +50,8 @@ INCLUDE(${PROJECT_SOURCE_DIR}/cmake/UseOpenMP.cmake)
 OPTION(WITH_REALSENSE "Build with Intel RealSense support?" ${REALSENSE_FOUND})
 OPTION(WITH_LIBROYALE "Build with LibRoyale support?" ${LibRoyale_FOUND})
 
-OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
-message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
+#OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
+#message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
 
 IF(MSVC_IDE)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
@@ -69,10 +75,10 @@ ENDIF()
 # Set some additional common compilation flags, like C++11 feature support.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-if(WITH_BACKWARDS_CPP)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lbfd")
-  add_definitions(-DWITH_BACKWARDS_CPP)
-ENDIF()
+#if(WITH_BACKWARDS_CPP)
+#  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lbfd")
+#  add_definitions(-DWITH_BACKWARDS_CPP)
+#ENDIF()
 
 add_subdirectory(ORUtils)
 add_subdirectory(ITMLib)
@@ -86,23 +92,24 @@ ELSE()
   add_definitions(-DCOMPILE_WITHOUT_CUDA)
 ENDIF()
 
-if(WITH_BACKWARDS_CPP)
-  set(EXTRA_EXECUTABLE_FLAGS ${BACKWARD_ENABLE})
-ELSE()
-set(EXTRA_EXECUTABLE_FLAGS "")
-ENDIF()
+#if(WITH_BACKWARDS_CPP)
+#  set(EXTRA_EXECUTABLE_FLAGS ${BACKWARD_ENABLE})
+#ELSE()
+#set(EXTRA_EXECUTABLE_FLAGS "")
+#ENDIF()
 
-add_executable(InfiniTAM_cli InfiniTAM_cli.cpp ${EXTRA_EXECUTABLE_FLAGS})
-target_link_libraries(InfiniTAM_cli Engine)
-target_link_libraries(InfiniTAM_cli Utils)
-add_executable(InfiniTAM InfiniTAM.cpp ${EXTRA_EXECUTABLE_FLAGS})
-target_link_libraries(InfiniTAM Engine)
-target_link_libraries(InfiniTAM Utils)
+#add_executable(InfiniTAM_cli InfiniTAM_cli.cpp ${EXTRA_EXECUTABLE_FLAGS})
+#target_link_libraries(InfiniTAM_cli Engine)
+#target_link_libraries(InfiniTAM_cli Utils)
+#add_executable(InfiniTAM InfiniTAM.cpp ${EXTRA_EXECUTABLE_FLAGS})
+#target_link_libraries(InfiniTAM Engine)
+#target_link_libraries(InfiniTAM Utils)
 
 IF(WITH_BACKWARDS_CPP)
   # This will add libraries, definitions and include directories needed by backward
   # by setting each property on the target.
-  add_backward(InfiniTAM)
-  add_backward(InfiniTAM_cli)
+#  add_backward(InfiniTAM)
+#  add_backward(InfiniTAM_cli)
+#    add_backward(ORUtils)
 ENDIF()
 

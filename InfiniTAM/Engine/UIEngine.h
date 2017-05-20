@@ -10,6 +10,7 @@
 #include "ImageSourceEngine.h"
 #include "IMUSourceEngine.h"
 
+#include <iomanip>
 #include <vector>
 
 namespace InfiniTAM
