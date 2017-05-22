@@ -48,7 +48,8 @@ set(ORUTILS_OBJECTS
 
 SOURCE_GROUP("" FILES ${ORUTILS_HEADERS} ${ORUTILS_SOURCES})
 
-add_library(ORUtils ${ORUTILS_OBJECTS} ${ORUTILS_SOURCES} ${BACKWARD_ENABLE})
+#add_library(ORUtils ${ORUTILS_OBJECTS} ${ORUTILS_SOURCES} ${BACKWARD_ENABLE})
+add_library(ORUtils ${ORUTILS_OBJECTS} ${ORUTILS_SOURCES})
 
 
 ##############################################################
@@ -61,8 +62,10 @@ ELSE()
   add_definitions(-DCOMPILE_WITHOUT_CUDA)
 ENDIF()
 
-# Link agains libbfd to ensure backward-cpp can extract additional information from the binary,
-# such as source code mappings.
-target_link_libraries(ORUtils PUBLIC -lbfd)
-target_link_libraries(ORUtils PUBLIC backward)
+if(WITH_BACKWARDS_CPP)
+  # Link agains libbfd to ensure backward-cpp can extract additional information from the binary,
+  # such as source code mappings.
+  target_link_libraries(ORUtils PUBLIC -lbfd)
+  target_link_libraries(ORUtils PUBLIC backward)
+endif()
 
