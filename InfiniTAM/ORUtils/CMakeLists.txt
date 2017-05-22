@@ -26,14 +26,13 @@ ${ORUTILS_HEADERS}
 )
 
 
-  # Support 'backward-cpp,' a lean stacktrace printing library for Linux.
-#  add_subdirectory(third_party/backward-cpp)
+# Support 'backward-cpp,' a lean stacktrace printing library for Linux.
+add_subdirectory(third_party/backward-cpp)
 #list(APPEND CMAKE_MODULE_PATH third_party/backward-cpp)
 #list(APPEND CMAKE_PREFIX_PATH ./third_party/backward-cpp)
 #message(${CMAKE_MODULE_PATH})
 #list(APPEND CMAKE_MODULE_PATH :/home/andrei/work/InfiniTAM/InfiniTAM/ORUtils/third_party/backward-cpp)
 #message(${CMAKE_MODULE_PATH})
-#message('wut')
 
 #find_package(Backward)
 
