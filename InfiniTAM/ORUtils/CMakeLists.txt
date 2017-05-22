@@ -15,15 +15,22 @@ MemoryBlockPersister.h
 PlatformIndependence.h
 )
 
-IF(WITH_CUDA)
-  include_directories(${CUDA_INCLUDE_DIRS})
-ELSE()
-  add_definitions(-DCOMPILE_WITHOUT_CUDA)
-ENDIF()
+SET(ORUTILS_SOURCES
+    CUDADefines.cpp
+)
 
-# Support 'backward-cpp,' a lean stacktrace printing library for Linux.
-add_subdirectory(third_party/backward-cpp)
-add_definitions(-DWITH_BACKWARDS_CPP)
+# If enabled, enables sensible stack traces on Linux, complete with corresponding source
+# code, where available. CUDA errors also produce complete stack traces when this is on.
+OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
+message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
+
+
+if(WITH_BACKWARDS_CPP)
+  # Support 'backward-cpp,' a lean stacktrace printing library for Linux.
+  add_subdirectory(third_party/backward-cpp)
+  add_definitions(-DWITH_BACKWARDS_CPP)
+endif()
+
 
 #################################################################
 # Collect the project files into common, CPU-only and CUDA-only #
@@ -39,38 +46,23 @@ set(ORUTILS_OBJECTS
 # Specify the source groups #
 #############################
 
-SOURCE_GROUP("" FILES ${ORUTILS_HEADERS} CUDADefines.cpp)
+SOURCE_GROUP("" FILES ${ORUTILS_HEADERS} ${ORUTILS_SOURCES})
 
-add_library(ORUtils ${ORUTILS_OBJECTS} CUDADefines.cpp ${BACKWARD_ENABLE})
+add_library(ORUtils ${ORUTILS_OBJECTS} ${ORUTILS_SOURCES} ${BACKWARD_ENABLE})
 
-# TODO(andrei): Clean this up if it works.
-
-#list(APPEND CMAKE_MODULE_PATH third_party/backward-cpp)
-
-#target_link_libraries(ORUtils PUBLIC backward)
-#target_link_libraries(ORUtils PUBLIC libbfd backward)
-#target_link_libraries(ORUtils libbfd)
-target_link_libraries(ORUtils PUBLIC -lbfd)
-#target_link_libraries(ORUtils PUBLIC lbfd)
-target_link_libraries(ORUtils PUBLIC bfd)
-#target_link_libraries(ORUtils PUBLIC libbfd)
-target_link_libraries(ORUtils PUBLIC backward)
 
 ##############################################################
 # Specify the include directories, target and link libraries #
 ##############################################################
 
 IF(WITH_CUDA)
-#  include_directories(${CUDA_INCLUDE_DIRS})
-#  cuda_add_library(ITMLib
-#	${ITMLIB_CPU_OBJECTS}
-#	${ITMLIB_CUDA_OBJECTS}
-#	${ITMLIB_COMMON_OBJECTS}
-#	OPTIONS -gencode arch=compute_11,code=compute_11 -gencode arch=compute_30,code=compute_30)
-#  target_link_libraries(ITMLib ${CUDA_LIBRARY})
+  include_directories(${CUDA_INCLUDE_DIRS})
 ELSE()
-#  add_definitions(-DCOMPILE_WITHOUT_CUDA)
-#  add_library(ITMLib ${ITMLIB_CPU_OBJECTS} ${ITMLIB_COMMON_OBJECTS})
+  add_definitions(-DCOMPILE_WITHOUT_CUDA)
 ENDIF()
 
-#target_link_libraries(ITMLib Utils)
+# Link agains libbfd to ensure backward-cpp can extract additional information from the binary,
+# such as source code mappings.
+target_link_libraries(ORUtils PUBLIC -lbfd)
+target_link_libraries(ORUtils PUBLIC backward)
+
