@@ -16,40 +16,29 @@ PlatformIndependence.h
 )
 
 SET(ORUTILS_SOURCES
-    CUDADefines.cpp
+CUDADefines.cpp
 )
 
 # If enabled, enables sensible stack traces on Linux, complete with corresponding source
 # code, where available. CUDA errors also produce complete stack traces when this is on.
+# If disabled, the error messages degrade gracefully to file/line information.
 OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
 message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
 
 
 if(WITH_BACKWARDS_CPP)
   # Support 'backward-cpp,' a lean stacktrace printing library for Linux.
-  add_subdirectory(third_party/backward-cpp)
   add_definitions(-DWITH_BACKWARDS_CPP)
+  add_subdirectory(third_party/backward-cpp)
 endif()
 
-
-#################################################################
-# Collect the project files into common, CPU-only and CUDA-only #
-#################################################################
-
-set(ORUTILS_OBJECTS
-    # TODO(andrei): Do we still need the dummy?
-    Dummy.cpp
-    ${ORUTILS_HEADERS}
-    )
 
 #############################
 # Specify the source groups #
 #############################
 
 SOURCE_GROUP("" FILES ${ORUTILS_HEADERS} ${ORUTILS_SOURCES})
-
-#add_library(ORUtils ${ORUTILS_OBJECTS} ${ORUTILS_SOURCES} ${BACKWARD_ENABLE})
-add_library(ORUtils ${ORUTILS_OBJECTS} ${ORUTILS_SOURCES})
+add_library(ORUtils ${ORUTILS_HEADERS} ${ORUTILS_SOURCES})
 
 
 ##############################################################
@@ -64,7 +53,9 @@ ENDIF()
 
 if(WITH_BACKWARDS_CPP)
   # Link agains libbfd to ensure backward-cpp can extract additional information from the binary,
-  # such as source code mappings.
+  # such as source code mappings. The '-lbfd' dependency is optional, and if it is disabled, the
+  # stack traces will still work, but won't show unmangled symbol names or source code snippets.
+  # You may need to set BACKWARD_USE_BFD to 0 in its `hpp` and `cpp` files to avoid linker errors.
   target_link_libraries(ORUtils PUBLIC -lbfd)
   target_link_libraries(ORUtils PUBLIC backward)
 endif()
