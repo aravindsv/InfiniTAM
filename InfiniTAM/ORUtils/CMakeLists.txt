@@ -2,7 +2,6 @@
 # Specify the project files #
 #############################
 
-##
 SET(ORUTILS_HEADERS
 Vector.h
 Matrix.h
@@ -16,35 +15,46 @@ MemoryBlockPersister.h
 PlatformIndependence.h
 )
 
+IF(WITH_CUDA)
+  include_directories(${CUDA_INCLUDE_DIRS})
+ELSE()
+  add_definitions(-DCOMPILE_WITHOUT_CUDA)
+ENDIF()
+
+# Support 'backward-cpp,' a lean stacktrace printing library for Linux.
+add_subdirectory(third_party/backward-cpp)
+add_definitions(-DWITH_BACKWARDS_CPP)
+
 #################################################################
 # Collect the project files into common, CPU-only and CUDA-only #
 #################################################################
 
 set(ORUTILS_OBJECTS
-Dummy.cpp
-${ORUTILS_HEADERS}
-)
-
-
-# Support 'backward-cpp,' a lean stacktrace printing library for Linux.
-add_subdirectory(third_party/backward-cpp)
-#list(APPEND CMAKE_MODULE_PATH third_party/backward-cpp)
-#list(APPEND CMAKE_PREFIX_PATH ./third_party/backward-cpp)
-#message(${CMAKE_MODULE_PATH})
-#list(APPEND CMAKE_MODULE_PATH :/home/andrei/work/InfiniTAM/InfiniTAM/ORUtils/third_party/backward-cpp)
-#message(${CMAKE_MODULE_PATH})
-
-#find_package(Backward)
+    # TODO(andrei): Do we still need the dummy?
+    Dummy.cpp
+    ${ORUTILS_HEADERS}
+    )
 
 #############################
 # Specify the source groups #
 #############################
 
-SOURCE_GROUP("" FILES ${ORUTILS_HEADERS})
+SOURCE_GROUP("" FILES ${ORUTILS_HEADERS} CUDADefines.cpp)
 
-add_library(ORUtils ${ORUTILS_OBJECTS})
+add_library(ORUtils ${ORUTILS_OBJECTS} CUDADefines.cpp ${BACKWARD_ENABLE})
 
-#target_link_libraries(ORUtils PUBLIC Backward::Backward)
+# TODO(andrei): Clean this up if it works.
+
+#list(APPEND CMAKE_MODULE_PATH third_party/backward-cpp)
+
+#target_link_libraries(ORUtils PUBLIC backward)
+#target_link_libraries(ORUtils PUBLIC libbfd backward)
+#target_link_libraries(ORUtils libbfd)
+target_link_libraries(ORUtils PUBLIC -lbfd)
+#target_link_libraries(ORUtils PUBLIC lbfd)
+target_link_libraries(ORUtils PUBLIC bfd)
+#target_link_libraries(ORUtils PUBLIC libbfd)
+target_link_libraries(ORUtils PUBLIC backward)
 
 ##############################################################
 # Specify the include directories, target and link libraries #

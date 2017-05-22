@@ -80,6 +80,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #  add_definitions(-DWITH_BACKWARDS_CPP)
 #ENDIF()
 
+# XXX: remove me TODO
+add_definitions(-DWITH_BACKWARDS_CPP)
+
 add_subdirectory(ORUtils)
 add_subdirectory(ITMLib)
 add_subdirectory(Utils)
@@ -102,15 +105,16 @@ ENDIF()
 #add_executable(InfiniTAM_cli InfiniTAM_cli.cpp ${EXTRA_EXECUTABLE_FLAGS})
 #target_link_libraries(InfiniTAM_cli Engine)
 #target_link_libraries(InfiniTAM_cli Utils)
+#target_link_libraries(InfiniTAM_cli ORUtils)
 #add_executable(InfiniTAM InfiniTAM.cpp ${EXTRA_EXECUTABLE_FLAGS})
 #target_link_libraries(InfiniTAM Engine)
 #target_link_libraries(InfiniTAM Utils)
+#target_link_libraries(InfiniTAM ORUtils)
 
-IF(WITH_BACKWARDS_CPP)
-  # This will add libraries, definitions and include directories needed by backward
-  # by setting each property on the target.
+#IF(WITH_BACKWARDS_CPP)
+#  # This will add libraries, definitions and include directories needed by backward
+#  # by setting each property on the target.
 #  add_backward(InfiniTAM)
 #  add_backward(InfiniTAM_cli)
-    add_backward(ORUtils)
-ENDIF()
+#ENDIF()
 
