@@ -18,7 +18,7 @@ namespace InstRecLib {
 			std::string segFolder_;
 			int frameIdx_ = 0;
 			ITMUChar4Image *lastSegPreview_;
-			SegmentationDataset dataset_used;
+			const SegmentationDataset* dataset_used;
 
 		protected:
 			std::vector<InstanceDetection> ReadInstanceInfo(const std::string &base_img_fpath);
@@ -26,7 +26,7 @@ namespace InstRecLib {
 		public:
 
 			PrecomputedSegmentationProvider(const std::string &segFolder)
-					: segFolder_(segFolder), dataset_used(kPascalVoc2012) {
+					: segFolder_(segFolder), dataset_used(&kPascalVoc2012) {
 				printf("Initializing pre-computed segmentation provider.\n");
 
 				lastSegPreview_ = new ITMUChar4Image(true, false);

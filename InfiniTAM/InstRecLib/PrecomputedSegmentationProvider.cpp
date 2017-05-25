@@ -112,7 +112,7 @@ namespace InstRecLib {
 				// Process the mask file. The mask area covers the edges of the bounding box, too.
 				uint8_t **mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
 				auto mask = make_shared<Mask>(bounding_box, mask_pixels);
-				detections.emplace_back(class_probability, class_id, mask);
+				detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 
 				instance_idx++;
 			}

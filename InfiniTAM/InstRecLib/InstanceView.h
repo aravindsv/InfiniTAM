@@ -6,6 +6,9 @@
 #include "../ITMLib/Objects/ITMView.h"
 #include "InstanceSegmentationResult.h"
 
+// TODO remove
+#include <iostream>
+
 namespace InstRecLib {
 	namespace Reconstruction {
 
@@ -14,7 +17,7 @@ namespace InstRecLib {
 		public:
 			InstanceView(const Segmentation::InstanceDetection &instance_detection_,
 									 const std::shared_ptr<ITMLib::Objects::ITMView> &view_)
-					: instance_detection_(instance_detection_), view_(view_) {}
+					: instance_detection_(instance_detection_), view_(view_) { }
 
 			virtual ~InstanceView() { }
 

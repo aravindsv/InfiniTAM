@@ -19,10 +19,9 @@ namespace InstRecLib {
 		// TODO(andrei): Consider storing an entire class-conditional distribution in each detection
 		// object.
 
-		// TODO(andrei): Should we add inter-frame association information to this class? Or should we
-		// pass an 'InstanceSegmentationResult' to another component which will then return instance
-		// detections associated with their own reconstruction volumes?
 		/*
+		 * TODO(andrei): Move these notes away from here.
+		 *
 		 * Yeah, it does make more sense to have a SegmentationAssociationProvider which takes in an
 		 * InstanceSegmentationResult with its InstanceDetections, and outputs e.g., a list of
 		 * (InstanceDetection, InstanceReconstruction) pairs, which can then be used for volum. Fusion.
@@ -56,16 +55,17 @@ namespace InstRecLib {
 			float class_probability;
 
 			/// Class identifier. Depends on the class labels used by the segmentation pipeline,
-			/// specified in the associated `InstanceSegmentationResult`.
+			/// specified in the associated `SegmentationDataset`.
 			int class_id;
 
 			/// \brief 2D mask of this detection in its source image frame.
 			std::shared_ptr<InstRecLib::Utils::Mask> mask;
 
-			/// The result object to which this instance detection belongs.
-			InstanceSegmentationResult* parent_result;
+			/// \brief The dataset associated with this instance's detection. Contains information such
+			/// as mappings from class IDs to class names.
+			const SegmentationDataset* segmentation_dataset;
 
-			std::string getClassName() const;
+			std::string GetClassName() const;
 
 			InstRecLib::Utils::BoundingBox& GetBoundingBox() {
 				return mask->GetBoundingBox();
@@ -78,8 +78,12 @@ namespace InstRecLib {
 			/// \brief Initializes the detection with bounding box, class, and mask information.
 			/// \note This object takes ownership of `mask`.
 			InstanceDetection(float class_probability, int class_id,
-												std::shared_ptr<InstRecLib::Utils::Mask> mask)
-					: class_probability(class_probability), class_id(class_id), mask(mask) { }
+												std::shared_ptr<InstRecLib::Utils::Mask> mask,
+												const SegmentationDataset* segmentation_dataset)
+					: class_probability(class_probability),
+						class_id(class_id),
+						mask(mask),
+						segmentation_dataset(segmentation_dataset) { }
 
 			virtual ~InstanceDetection() { }
 		};
@@ -91,26 +95,21 @@ namespace InstRecLib {
 		struct InstanceSegmentationResult {
 
 			/// \brief Specifies the dataset metadata, such as the labels, which are used by the segmentation.
-			SegmentationDataset segmentation_dataset;
+			const SegmentationDataset *segmentation_dataset;
 
-			/// \brief The instances detected in the frame.
+			/// \brief All object instances detected in a frame.
 			std::vector<InstanceDetection> instance_detections;
 
 			/// \brief The total time it took to produce this result.
 			long inference_time_ns;
 
-			InstanceSegmentationResult(const SegmentationDataset &segmentation_dataset,
+			InstanceSegmentationResult(const SegmentationDataset *segmentation_dataset,
 			                           const std::vector<InstanceDetection> &instance_detections,
 			                           long inference_time_ns
 			) : segmentation_dataset(segmentation_dataset),
 			    instance_detections(instance_detections),
 			    inference_time_ns(inference_time_ns)
-			{
-				// A little bit of plumbing: ensure instance detection objects know their parent.
-				for (InstanceDetection& detection : this->instance_detections) {
-					detection.parent_result = this;
-				}
-			}
+			{ }
 		};
 	}
 }

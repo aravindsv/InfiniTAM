@@ -158,7 +158,6 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 		// the segmentation provider (or some other component) mutate the static map, and "blank out"
 		// the non-static parts in 'view'.
 		denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
-
 	}
 
 	// raycast to renderState_live for tracking and free visualisation

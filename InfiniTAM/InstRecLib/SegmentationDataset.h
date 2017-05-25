@@ -14,12 +14,14 @@ namespace InstRecLib {
 		std::map<std::string, int> labels_to_id_map(const std::vector<std::string> labels);
 
 		/// \brief Describes a segmentation dataset, e.g., Pascal VOC, in terms such as supported labels.
+		/// Does not, at this time, handle anything beyond label management, such as IO.
 		struct SegmentationDataset {
+			const std::string name;
 			const std::vector<std::string> labels;
 			const std::map<std::string, int> label_to_id;
 
-			SegmentationDataset(const std::vector<std::string> labels)
-					: labels(labels), label_to_id(labels_to_id_map(labels)) {}
+			SegmentationDataset(const std::string name, const std::vector<std::string> labels)
+					: name(name), labels(labels), label_to_id(labels_to_id_map(labels)) {}
 		};
 
 		//region Dataset descriptions
@@ -30,7 +32,7 @@ namespace InstRecLib {
 		  "sheep", "sofa", "train", "tvmonitor"
 		};
 
-		const SegmentationDataset kPascalVoc2012(kPascalVoc2012Classes);
+		const SegmentationDataset kPascalVoc2012("Pascal VOC 2012", kPascalVoc2012Classes);
 	}
 }
 
