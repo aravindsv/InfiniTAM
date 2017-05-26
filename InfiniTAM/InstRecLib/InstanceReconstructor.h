@@ -16,7 +16,6 @@ namespace InstRecLib {
 		class InstanceReconstructor {
 
 		private:
-			std::shared_ptr<ChunkManager> chunk_manager_;
 			std::shared_ptr<InstanceTracker> instance_tracker_;
 
 			// TODO(andrei): Consider keeping track of this in centralized manner and not just in UIEngine.
@@ -26,8 +25,7 @@ namespace InstRecLib {
 			int frame_idx_;
 
 		public:
-			InstanceReconstructor() : chunk_manager_(new ChunkManager()),
-			                          instance_tracker_(new InstanceTracker()),
+			InstanceReconstructor() : instance_tracker_(new InstanceTracker()),
 			                          frame_idx_(0) { }
 
 			/// \brief Uses the segmentation result to remove dynamic objects from the main view and save
@@ -42,14 +40,6 @@ namespace InstRecLib {
 			    const Segmentation::InstanceSegmentationResult& segmentation_result
 			);
 
-			const ChunkManager& GetChunkManager() const {
-				return *chunk_manager_;
-			}
-
-			ChunkManager& GetChunkManager() {
-				return *chunk_manager_;
-			}
-
 			const InstanceTracker& GetInstanceTracker() const {
 				return *instance_tracker_;
 			}
@@ -58,9 +48,13 @@ namespace InstRecLib {
 				return *instance_tracker_;
 			}
 
+			int GetActiveTrackCount() const {
+				return instance_tracker_->GetActiveTrackCount();
+			}
+
 			/// \brief Returns a snapshot of one of the stored instance segments, if available.
 			/// This method is primarily designed for visualization purposes.
-			ITMUChar4Image* GetInstancePreviewRGB();
+			ITMUChar4Image *GetInstancePreviewRGB(size_t track_idx);
 		};
 	}
 }

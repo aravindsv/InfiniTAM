@@ -76,6 +76,10 @@ namespace InstRecLib {
 			int GetTotalTrackCount() const {
 				return track_count_;
 			}
+
+			int GetActiveTrackCount() const {
+				return static_cast<int>(active_tracks_.size());
+			}
 		};
 
 	}

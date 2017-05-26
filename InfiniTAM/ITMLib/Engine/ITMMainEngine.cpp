@@ -241,7 +241,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		break;
 
 	case ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW: {
-		ITMUChar4Image *preview = instanceReconstructor->GetInstancePreviewRGB();
+		ITMUChar4Image *preview = instanceReconstructor->GetInstancePreviewRGB(0);
 		if (nullptr == preview) {
 			// This happens when there's no instances to preview.
 			out->Clear();

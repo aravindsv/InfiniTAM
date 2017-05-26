@@ -124,14 +124,19 @@ namespace InstRecLib {
 			frame_idx_++;
 		}
 
-		ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB() {
-			const auto& tracks = instance_tracker_->GetTracks();
-			if (! tracks.empty()) {
-				return tracks.front().GetLastFrame().instance_view.GetView().rgb;
-			}
+    ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
+      const auto &tracks = instance_tracker_->GetTracks();
+      if (tracks.empty()) {
+        return nullptr;
+      }
 
-			// TODO(andrei): Return blank image or something that doesn't crash.
-			return nullptr;
-		}
+      size_t idx = track_idx;
+      if (idx >= tracks.size()) {
+        idx = tracks.size() - 1;
+      }
+
+      return tracks[idx].GetLastFrame().instance_view.GetView().rgb;
+    }
 	}
 }
+

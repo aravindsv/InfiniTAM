@@ -191,7 +191,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	if (scene->localVBA.lastFreeBlockId < 0) {
 		fprintf(stderr, "ERROR: Last free block ID was negative (%d). This may indicate an "
 				"allocation failure, causing your map to stop being able to grow.\n", scene->localVBA.lastFreeBlockId);
-		throw std::runtime_error("Invalid free voxel block ID.");
+		throw std::runtime_error("Invalid free voxel block ID. InfiniTAM has likely run out of GPU "
+															 "memory.");
 	}
 }
 
