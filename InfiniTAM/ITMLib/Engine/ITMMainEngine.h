@@ -4,8 +4,6 @@
 
 #include "../ITMLib.h"
 #include "../Utils/ITMLibSettings.h"
-#include "../../InstRecLib/SegmentationProvider.h"
-#include "../../InstRecLib/InstanceReconstructor.h"
 
 /** \mainpage
     This is the API reference documentation for InfiniTAM. For a general
@@ -49,7 +47,7 @@ namespace ITMLib
 		*/
 		class ITMMainEngine
 		{
-		private:
+		protected:
 			const ITMLibSettings *settings;
 
 			bool fusionActive, mainProcessingActive;
@@ -61,7 +59,7 @@ namespace ITMLib
 			ITMMesh *mesh;
 
 			ITMViewBuilder *viewBuilder;		
-			ITMDenseMapper<ITMVoxel,ITMVoxelIndex> *denseMapper;
+			ITMDenseMapper<ITMVoxel, ITMVoxelIndex> *denseMapper;
 			ITMTrackingController *trackingController;
 
 			ITMTracker *tracker;
@@ -74,9 +72,6 @@ namespace ITMLib
 			ITMRenderState *renderState_live;
 			ITMRenderState *renderState_freeview;
 
-			InstRecLib::Segmentation::SegmentationProvider *segmentationProvider;
-			InstRecLib::Reconstruction::InstanceReconstructor *instanceReconstructor;
-
 		public:
 			enum GetImageType
 			{
@@ -86,8 +81,6 @@ namespace ITMLib
 				InfiniTAM_IMAGE_FREECAMERA_SHADED,
 				InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
 				InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL,
-				InfiniTAM_IMAGE_SEGMENTATION_RESULT,
-				InfiniTAM_IMAGE_INSTANCE_PREVIEW,
 				InfiniTAM_IMAGE_UNKNOWN
 			};
 
@@ -100,13 +93,8 @@ namespace ITMLib
 			/// Gives access to the internal world representation
 			ITMScene<ITMVoxel, ITMVoxelIndex>* GetScene(void) { return scene; }
 
-			/// Give asccess to the component tasked with reconstructing dynamic object instances.
-			InstRecLib::Reconstruction::InstanceReconstructor* GetInstanceReconstructor() {
-				return instanceReconstructor;
-			}
-
-			/// Process a frame with rgb and depth images and optionally a corresponding imu measurement
-			void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement = NULL);
+      /// Process a frame with rgb and depth images and optionally a corresponding imu measurement
+			virtual void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement = NULL);
 
 			// Gives access to the data structure used internally to store any created meshes
 			ITMMesh* GetMesh(void) { return mesh; }

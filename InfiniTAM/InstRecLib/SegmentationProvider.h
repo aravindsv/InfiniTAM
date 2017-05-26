@@ -17,9 +17,9 @@ namespace InstRecLib {
 			virtual ~SegmentationProvider() { };
 
 			/// \brief Performs semantic segmentation of the given frame.
-			/// Usually uses only RGB data, but some segmentation pipelines may leverage e.g., depth as well.
-			virtual std::shared_ptr<InstanceSegmentationResult> SegmentFrame(
-					ITMLib::Objects::ITMView *view) = 0;
+			/// Usually uses only RGB data, but some segmentation pipelines may leverage e.g., depth as
+			/// well.
+			virtual std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMUChar4Image *rgb) = 0;
 
 			virtual ITMUChar4Image *GetSegResult() = 0;
 

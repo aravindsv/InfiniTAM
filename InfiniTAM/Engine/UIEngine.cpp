@@ -414,12 +414,9 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 		// This seems to be used for depth-only input.
 		outImageType[2] = ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN;
 	}
-	outImageType[3] = ITMMainEngine::InfiniTAM_IMAGE_SEGMENTATION_RESULT;
-
-	// TODO(andrei): After basic reconstruction in place, show 3D reconstructed car.
-	// TODO-LOW(andrei): Make car spin, if possible.
-	// TODO-LOW(andrei): Also print some memory/swap usage stats.
-	outImageType[4] = ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW;
+	// Placeholders for when we want to display more info.
+	outImageType[3] = ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN;
+	outImageType[4] = ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN;
 
 	mainLoopAction = PROCESS_PAUSED;
 	mouseState = 0;

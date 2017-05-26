@@ -121,7 +121,7 @@ namespace InstRecLib {
 		}
 
 		shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(
-				ITMLib::Objects::ITMView *view
+      ITMUChar4Image *rgb
 		) {
 			stringstream img_ss;
 			img_ss << this->segFolder_ << "/" << "cls_" << setfill('0') << setw(6) << this->frameIdx_

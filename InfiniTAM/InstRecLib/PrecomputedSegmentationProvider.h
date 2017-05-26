@@ -36,7 +36,7 @@ namespace InstRecLib {
 				delete lastSegPreview_;
 			}
 
-			std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMLib::Objects::ITMView *view) override;
+			std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMUChar4Image *view) override;
 
 			const ITMUChar4Image *GetSegResult() const override;
 

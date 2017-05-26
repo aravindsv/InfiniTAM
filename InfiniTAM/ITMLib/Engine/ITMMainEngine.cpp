@@ -1,7 +1,6 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
 #include "ITMMainEngine.h"
-#include "../../InstRecLib/PrecomputedSegmentationProvider.h"
 
 using namespace ITMLib::Engine;
 
@@ -9,7 +8,8 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 {
 	// create all the things required for marching cubes and mesh extraction
 	// - uses additional memory (lots!)
-	static const bool createMeshingEngine = true;
+//	static const bool createMeshingEngine = true;
+	static const bool createMeshingEngine = false;
 
 	if ((imgSize_d.x == -1) || (imgSize_d.y == -1)) imgSize_d = imgSize_rgb;
 
@@ -72,12 +72,6 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 
 	fusionActive = true;
 	mainProcessingActive = true;
-
-	// Things specific to semantic instance-based reconstruction start here
-	// TODO(andrei): Pass root path of seg folder.
-	const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
-	segmentationProvider = new InstRecLib::Segmentation::PrecomputedSegmentationProvider(segFolder);
-	instanceReconstructor = new InstRecLib::Reconstruction::InstanceReconstructor();
 }
 
 ITMMainEngine::~ITMMainEngine()
@@ -131,26 +125,8 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 
 	if (!mainProcessingActive) return;
 
-	// InstRec: semantic segmentation
-	auto segmentationResult = segmentationProvider->SegmentFrame(view);
-	if (segmentationResult->instance_detections.size() > 0) {
-		std::cout << "Detected " << segmentationResult->instance_detections.size()
-		          << " objects in the frame." << std::endl;
-		for(const auto& instance : segmentationResult->instance_detections) {
-			std::cout << "\t " << instance << std::endl;
-		}
-	}
-	else {
-		std::cout << "Nothing detected in the frame." << std::endl;
-	}
-
-	// TODO-LOW(andrei): Integrate semantic information in the tracking part, e.g., by having the
-	// (sparse/dense) VO computation ignore possibly unreliable pixels.
 	// tracking
 	trackingController->Track(trackingState, view);
-
-	// Split the scene up into instances, and fuse each instance independently.
-	instanceReconstructor->ProcessFrame(view, *segmentationResult);
 
 	// fusion
 	if (fusionActive) {
@@ -231,22 +207,6 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		}
 		else {
 			out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
-		}
-		break;
-	}
-
-	case ITMMainEngine::InfiniTAM_IMAGE_SEGMENTATION_RESULT:
-		// Render a preview of the latest semantic segmentation's result.
-		out->SetFrom(segmentationProvider->GetSegResult(), ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
-		break;
-
-	case ITMMainEngine::InfiniTAM_IMAGE_INSTANCE_PREVIEW: {
-		ITMUChar4Image *preview = instanceReconstructor->GetInstancePreviewRGB(0);
-		if (nullptr == preview) {
-			// This happens when there's no instances to preview.
-			out->Clear();
-		} else {
-			out->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
 		}
 		break;
 	}
