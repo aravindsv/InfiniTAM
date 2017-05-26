@@ -67,6 +67,10 @@ namespace InstRecLib {
 				return frames_.back().frame_idx;
 			}
 
+      const std::vector<TrackFrame>& GetFrames() const {
+        return frames_;
+      }
+
 			int GetId() const {
 				return id_;
 			}

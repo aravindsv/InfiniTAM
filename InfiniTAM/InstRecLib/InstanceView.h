@@ -21,12 +21,12 @@ namespace InstRecLib {
 
 			virtual ~InstanceView() { }
 
-			ITMLib::Objects::ITMView* GetView() {
-				return view_.get();
+			ITMLib::Objects::ITMView& GetView() {
+				return *(view_.get());
 			}
 
-			const ITMLib::Objects::ITMView* GetView() const {
-				return view_.get();
+			const ITMLib::Objects::ITMView& GetView() const {
+				return *(view_.get());
 			}
 
 			InstRecLib::Segmentation::InstanceDetection& GetInstanceDetection() {
@@ -40,6 +40,7 @@ namespace InstRecLib {
 		private:
 			/// \brief Holds label, mask, and bounding box information.
 			InstRecLib::Segmentation::InstanceDetection instance_detection_;
+
 			/// \brief Holds the depth and RGB information about the object.
 			std::shared_ptr<ITMLib::Objects::ITMView> view_;
 		};

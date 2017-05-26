@@ -55,9 +55,11 @@ namespace InstRecLib {
 						destRGB[frame_idx].r = sourceRGB[frame_idx].r;
 						destRGB[frame_idx].g = sourceRGB[frame_idx].g;
 						destRGB[frame_idx].b = sourceRGB[frame_idx].b;
+						destRGB[frame_idx].a = sourceRGB[frame_idx].a;
 						sourceRGB[frame_idx].r = 0;
 						sourceRGB[frame_idx].g = 0;
 						sourceRGB[frame_idx].b = 0;
+						sourceRGB[frame_idx].a = 0;
 
 						destDepth[frame_idx] = sourceDepth[frame_idx];
 						sourceDepth[frame_idx] = 0.0f;
@@ -125,7 +127,7 @@ namespace InstRecLib {
 		ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB() {
 			const auto& tracks = instance_tracker_->GetTracks();
 			if (! tracks.empty()) {
-				return tracks.back().GetLastFrame().instance_view.GetView()->rgb;
+				return tracks.front().GetLastFrame().instance_view.GetView().rgb;
 			}
 
 			// TODO(andrei): Return blank image or something that doesn't crash.
