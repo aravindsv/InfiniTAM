@@ -76,7 +76,6 @@ add_subdirectory(ORUtils)
 add_subdirectory(ITMLib)
 add_subdirectory(Utils)
 add_subdirectory(Engine)
-add_subdirectory(InstRecLib)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
