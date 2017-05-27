@@ -22,12 +22,13 @@ namespace ITMLib
 		private:
 			int *noNeededEntries_device, *noAllocatedVoxelEntries_device;
 			int LoadFromGlobalMemory(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
+		  	long sdfLocalBlockNum;
 
 		public:
 			void IntegrateGlobalIntoLocal(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, ITMRenderState *renderState);
 			void SaveToGlobalMemory(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, ITMRenderState *renderState);
 
-			ITMSwappingEngine_CUDA(void);
+			ITMSwappingEngine_CUDA(long sdfLocalBlockNum);
 			~ITMSwappingEngine_CUDA(void);
 		};
 	}

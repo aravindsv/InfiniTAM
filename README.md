@@ -111,7 +111,7 @@ The arguments are essentially masks for sprintf and the %04i will be replaced by
  * To enable RGB support, or to swap from a short-based to a float-based SDF
    representation, change `ITMVoxel`'s typedef in `ITMLibDefines.h`.
  * On older GPUs with less GPU memory, InfiniTAM can often crash after running
-   out of memory. Lowering `SDF_LOCAL_BLOCK_NUM` to something like `0x10000` is
+   out of memory. Lowering `kDefaultSdfLocalBlockNum` to something like `0x10000` is
    a good starting point for preventing this. It limits the maximum number of
    memory blocks InfiniTAM keeps in memory, reducing its memory footprint.
    It also limits the memory used by the meshing engine (see the definition of

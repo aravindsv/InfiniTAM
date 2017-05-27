@@ -22,7 +22,9 @@ ITMDenseMapper<TVoxel, TIndex>::ITMDenseMapper(const ITMLibSettings *settings)
 	case ITMLibSettings::DEVICE_CUDA:
 #ifndef COMPILE_WITHOUT_CUDA
 		sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA<TVoxel,TIndex>();
-		if (settings->useSwapping) swappingEngine = new ITMSwappingEngine_CUDA<TVoxel,TIndex>();
+		if (settings->useSwapping) {
+			swappingEngine = new ITMSwappingEngine_CUDA<TVoxel,TIndex>(settings->sdfLocalBlockNum);
+		}
 #endif
 		break;
 	case ITMLibSettings::DEVICE_METAL:

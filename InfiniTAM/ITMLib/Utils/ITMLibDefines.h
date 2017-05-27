@@ -43,21 +43,24 @@
 // the map gets really big.
 // If swapping is enabled, then the entire-map visualization is no longer available.
 // However, if this limit is hit, and swapping is disabled, NO error messages are shown. Hmmm.
-//#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks, currently 2^17
-//#define SDF_LOCAL_BLOCK_NUM 0x20000
-const long SDF_LOCAL_BLOCK_NUM = 0x08000;
+//#define kDefaultSdfLocalBlockNum 0x40000		// Number of locally stored blocks, currently 2^17
+//#define kDefaultSdfLocalBlockNum 0x20000
+const long kDefaultSdfLocalBlockNum = 0x08000;
 
 #define SDF_GLOBAL_BLOCK_NUM 0x120000	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
-#define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
+//#define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
+const long SDF_TRANSFER_BLOCK_NUM = 0x1000;
 
-//#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, should be 2^n and bigger than SDF_LOCAL_BLOCK_NUM, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
-#define SDF_BUCKET_NUM 0x200000
+//#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, should be 2^n and bigger than kDefaultSdfLocalBlockNum, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
+//#define SDF_BUCKET_NUM 0x200000
+const long SDF_BUCKET_NUM = 0x200000;
 
 //#define SDF_HASH_MASK 0xfffff			// Used for get hashing value of the bucket index,  SDF_HASH_MASK = SDF_BUCKET_NUM - 1
-#define SDF_HASH_MASK (SDF_BUCKET_NUM - 1)
+const long SDF_HASH_MASK = SDF_BUCKET_NUM - 1;
+
 //#define SDF_EXCESS_LIST_SIZE 0x20000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
 //#define SDF_EXCESS_LIST_SIZE 0x10000
-#define SDF_EXCESS_LIST_SIZE 0x4000
+const long SDF_EXCESS_LIST_SIZE = 0x4000;
 
 //#define SDF_BUCKET_NUM 0x800000
 //#define SDF_HASH_MASK (SDF_BUCKET_NUM - 1)

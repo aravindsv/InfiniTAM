@@ -18,14 +18,16 @@ __global__ void buildListToSwapOut_device(int *neededEntryIDs, int *noNeededEntr
 
 template<class TVoxel>
 __global__ void cleanMemory_device(int *voxelAllocationList, int *noAllocatedVoxelEntries, ITMHashSwapState *swapStates,
-	ITMHashEntry *hashTable, TVoxel *localVBA, int *neededEntryIDs_local, int noNeededEntries);
+	ITMHashEntry *hashTable, TVoxel *localVBA, int *neededEntryIDs_local, int noNeededEntries,
+	long sdfLocalBlockNum);
 
 template<class TVoxel>
 __global__ void moveActiveDataToTransferBuffer_device(TVoxel *syncedVoxelBlocks_local, bool *hasSyncedData_local,
 	int *neededEntryIDs_local, ITMHashEntry *hashTable, TVoxel *localVBA);
 
 template<class TVoxel>
-ITMSwappingEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSwappingEngine_CUDA(void)
+ITMSwappingEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSwappingEngine_CUDA(long sdfLocalBlockNum)
+: sdfLocalBlockNum(sdfLocalBlockNum)
 {
 	ITMSafeCall(cudaMalloc((void**)&noAllocatedVoxelEntries_device, sizeof(int)));
 	ITMSafeCall(cudaMalloc((void**)&noNeededEntries_device, sizeof(int)));
@@ -173,11 +175,13 @@ void ITMSwappingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSc
 			ITMSafeCall(cudaMemcpy(noAllocatedVoxelEntries_device, &scene->localVBA.lastFreeBlockId, sizeof(int), cudaMemcpyHostToDevice));
 
 			cleanMemory_device << <gridSize, blockSize >> >(voxelAllocationList, noAllocatedVoxelEntries_device, swapStates, hashTable, localVBA,
-				neededEntryIDs_local, noNeededEntries);
+				neededEntryIDs_local, noNeededEntries, sdfLocalBlockNum);
 
 			ITMSafeCall(cudaMemcpy(&scene->localVBA.lastFreeBlockId, noAllocatedVoxelEntries_device, sizeof(int), cudaMemcpyDeviceToHost));
 			scene->localVBA.lastFreeBlockId = MAX(scene->localVBA.lastFreeBlockId, 0);
-			scene->localVBA.lastFreeBlockId = MIN(scene->localVBA.lastFreeBlockId, SDF_LOCAL_BLOCK_NUM);
+			scene->localVBA.lastFreeBlockId = MIN(
+					scene->localVBA.lastFreeBlockId,
+					sdfLocalBlockNum);
 		}
 
 		ITMSafeCall(cudaMemcpy(neededEntryIDs_global, neededEntryIDs_local, sizeof(int) * noNeededEntries, cudaMemcpyDeviceToHost));
@@ -241,8 +245,16 @@ __global__ void buildListToSwapOut_device(int *neededEntryIDs, int *noNeededEntr
 }
 
 template<class TVoxel>
-__global__ void cleanMemory_device(int *voxelAllocationList, int *noAllocatedVoxelEntries, ITMHashSwapState *swapStates,
-	ITMHashEntry *hashTable, TVoxel *localVBA, int *neededEntryIDs_local, int noNeededEntries)
+__global__ void cleanMemory_device(
+		int *voxelAllocationList,
+		int *noAllocatedVoxelEntries,
+		ITMHashSwapState *swapStates,
+		ITMHashEntry *hashTable,
+		TVoxel *localVBA,
+		int *neededEntryIDs_local,
+		int noNeededEntries,
+		long sdfLocalBlockNum
+)
 {
 	int locId = threadIdx.x + blockIdx.x * blockDim.x;
 	
@@ -253,7 +265,7 @@ __global__ void cleanMemory_device(int *voxelAllocationList, int *noAllocatedVox
 	swapStates[entryDestId].state = 0;
 
 	int vbaIdx = atomicAdd(&noAllocatedVoxelEntries[0], 1);
-	if (vbaIdx < SDF_LOCAL_BLOCK_NUM - 1)
+	if (vbaIdx < sdfLocalBlockNum - 1)
 	{
 		voxelAllocationList[vbaIdx + 1] = hashTable[entryDestId].ptr;
 		hashTable[entryDestId].ptr = -1;

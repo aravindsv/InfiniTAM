@@ -75,7 +75,10 @@ namespace ITMLib
 			// information folder. Currently, only the OxTS format is supported (the
 			// one in which the KITTI dataset ground truth pose information is
 			// provided).
-      std::string groundTruthPoseFpath;
+			std::string groundTruthPoseFpath;
+
+          /// \brief The number of voxel blocks stored on the GPU.
+			long sdfLocalBlockNum = kDefaultSdfLocalBlockNum;
 
 			ITMLibSettings(void);
 			~ITMLibSettings(void);

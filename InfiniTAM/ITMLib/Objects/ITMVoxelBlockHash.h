@@ -88,7 +88,7 @@ namespace ITMLib
 #endif
 
 			/** Maximum number of total entries. */
-			int getNumAllocatedVoxelBlocks(void) { return SDF_LOCAL_BLOCK_NUM; }
+			int getNumAllocatedVoxelBlocks(void) { return kDefaultSdfLocalBlockNum; }
 			int getVoxelBlockSize(void) { return SDF_BLOCK_SIZE3; }
 
 			// Suppress the default copy constructor and assignment operator

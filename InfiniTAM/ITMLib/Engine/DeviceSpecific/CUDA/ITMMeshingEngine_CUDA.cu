@@ -17,7 +17,7 @@ using namespace ITMLib::Engine;
 template<class TVoxel>
 ITMMeshingEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMMeshingEngine_CUDA(void) 
 {
-	ITMSafeCall(cudaMalloc((void**)&visibleBlockGlobalPos_device, SDF_LOCAL_BLOCK_NUM * sizeof(Vector4s)));
+	ITMSafeCall(cudaMalloc((void**)&visibleBlockGlobalPos_device, sdfLocalBlockNum * sizeof(Vector4s)));
 	ITMSafeCall(cudaMalloc((void**)&noTriangles_device, sizeof(unsigned int)));
 }
 
@@ -43,7 +43,7 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 	float factor = scene->sceneParams->voxelSize;
 
 	ITMSafeCall(cudaMemset(noTriangles_device, 0, sizeof(unsigned int)));
-	ITMSafeCall(cudaMemset(visibleBlockGlobalPos_device, 0, sizeof(Vector4s) * SDF_LOCAL_BLOCK_NUM));
+	ITMSafeCall(cudaMemset(visibleBlockGlobalPos_device, 0, sizeof(Vector4s) * sdfLocalBlockNum));
 
 	{ // identify used voxel blocks
 		dim3 cudaBlockSize(256); 
@@ -54,7 +54,7 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 
 	{ // mesh used voxel blocks
 		dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-		dim3 gridSize(SDF_LOCAL_BLOCK_NUM / 16, 16);
+		dim3 gridSize(sdfLocalBlockNum / 16, 16);
 
 		meshScene_device<TVoxel> << <gridSize, cudaBlockSize >> >(triangles, noTriangles_device, factor, noTotalEntries, noMaxTriangles,
 			visibleBlockGlobalPos_device, localVBA, hashTable);

@@ -18,8 +18,10 @@ namespace ITMLib
 		private:
 			unsigned int  *noTriangles_device;
 			Vector4s *visibleBlockGlobalPos_device;
+			long sdfLocalBlockNum;
 
 		public:
+		  	ITMMeshingEngine_CUDA(long sdfLocalBlockNum) : sdfLocalBlockNum(sdfLocalBlockNum) { }
 			void MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
 
 			ITMMeshingEngine_CUDA(void);
