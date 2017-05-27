@@ -45,7 +45,7 @@
 // However, if this limit is hit, and swapping is disabled, NO error messages are shown. Hmmm.
 //#define kDefaultSdfLocalBlockNum 0x40000		// Number of locally stored blocks, currently 2^17
 //#define kDefaultSdfLocalBlockNum 0x20000
-const long kDefaultSdfLocalBlockNum = 0x08000;
+const long kDefaultSdfLocalBlockNum = 0x10000;
 
 #define SDF_GLOBAL_BLOCK_NUM 0x120000	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
 //#define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation

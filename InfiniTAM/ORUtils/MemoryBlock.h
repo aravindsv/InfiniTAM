@@ -228,7 +228,7 @@ namespace ORUtils
 					float dataMBytes = dataBytes / 1024.0f / 1024.0f;
 					printf("Allocating block of %.4fMb of data on the GPU.\n", dataMBytes);
 //					if (dataMBytes > 100) {
-//						throw std::runtime_error("EYO BLAT BLAT NIGGA");
+//						throw std::runtime_error("EYO BLAT BLAT");
 //					}
 					ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataBytes));
 				}
