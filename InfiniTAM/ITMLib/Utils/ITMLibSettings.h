@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <memory>
 #include "../Objects/ITMSceneParams.h"
 #include "../Engine/ITMTracker.h"
 
@@ -51,6 +52,7 @@ namespace ITMLib
 			TrackerType trackerType;
 
 			/// The tracking regime used by the tracking controller
+			/// TODO(andrei): Handle this correctly on copy!
 			TrackerIterationType *trackingRegime;
 
 			/// The number of levels in the trackingRegime
@@ -77,15 +79,17 @@ namespace ITMLib
 			// provided).
 			std::string groundTruthPoseFpath;
 
-          /// \brief The number of voxel blocks stored on the GPU.
+		  /// \brief The number of voxel blocks stored on the GPU.
 			long sdfLocalBlockNum = kDefaultSdfLocalBlockNum;
 
 			ITMLibSettings(void);
 			~ITMLibSettings(void);
 
 			// Suppress the default copy constructor and assignment operator
-			ITMLibSettings(const ITMLibSettings&);
-			ITMLibSettings& operator=(const ITMLibSettings&);
+			// Re-enabled for DynSLAM, since we need to pass modified copies of the settings object
+			// from the static environment reconstructor to the object instance reconstructors.
+//			ITMLibSettings(const ITMLibSettings&);
+//			ITMLibSettings& operator=(const ITMLibSettings&);
 		};
 	}
 }

@@ -15,8 +15,11 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 
 	this->settings = settings;
 
-	this->scene = new ITMScene<ITMVoxel, ITMVoxelIndex>(&(settings->sceneParams), settings->useSwapping, 
-		settings->deviceType == ITMLibSettings::DEVICE_CUDA ? MEMORYDEVICE_CUDA : MEMORYDEVICE_CPU);
+	this->scene = new ITMScene<ITMVoxel, ITMVoxelIndex>(
+			&(settings->sceneParams),
+			settings->useSwapping,
+			settings->deviceType == ITMLibSettings::DEVICE_CUDA ? MEMORYDEVICE_CUDA : MEMORYDEVICE_CPU,
+			settings->sdfLocalBlockNum);
 
 	meshingEngine = NULL;
 	switch (settings->deviceType)

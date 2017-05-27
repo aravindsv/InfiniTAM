@@ -22,7 +22,7 @@
 #ifndef MEMORY_DEVICE_TYPE
 #define MEMORY_DEVICE_TYPE
 enum MemoryDeviceType { MEMORYDEVICE_CPU, MEMORYDEVICE_CUDA };
-#endif 
+#endif
 
 namespace ORUtils
 {
@@ -227,6 +227,9 @@ namespace ORUtils
 					size_t dataBytes = dataSize * sizeof(T);
 					float dataMBytes = dataBytes / 1024.0f / 1024.0f;
 					printf("Allocating block of %.4fMb of data on the GPU.\n", dataMBytes);
+//					if (dataMBytes > 100) {
+//						throw std::runtime_error("EYO BLAT BLAT NIGGA");
+//					}
 					ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataBytes));
 				}
 				this->isAllocated_CUDA = allocate_CUDA;

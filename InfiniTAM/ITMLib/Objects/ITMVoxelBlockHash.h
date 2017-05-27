@@ -49,11 +49,12 @@ namespace ITMLib
 			ORUtils::MemoryBlock<int> *excessAllocationList;
         
 			MemoryDeviceType memoryType;
+			int sdfLocalBlockNum;
 
 		public:
-			ITMVoxelBlockHash(MemoryDeviceType memoryType)
+			ITMVoxelBlockHash(MemoryDeviceType memoryType, int sdfLocalBlockNum)
+				: memoryType(memoryType), sdfLocalBlockNum(sdfLocalBlockNum)
 			{
-				this->memoryType = memoryType;
 				hashEntries = new ORUtils::MemoryBlock<ITMHashEntry>(noTotalEntries, memoryType);
 				excessAllocationList = new ORUtils::MemoryBlock<int>(SDF_EXCESS_LIST_SIZE, memoryType);
 			}
@@ -88,7 +89,7 @@ namespace ITMLib
 #endif
 
 			/** Maximum number of total entries. */
-			int getNumAllocatedVoxelBlocks(void) { return kDefaultSdfLocalBlockNum; }
+			int getNumAllocatedVoxelBlocks(void) { return sdfLocalBlockNum; }
 			int getVoxelBlockSize(void) { return SDF_BLOCK_SIZE3; }
 
 			// Suppress the default copy constructor and assignment operator
