@@ -120,6 +120,7 @@ void ITMMainEngine::SaveSceneToMesh(const char *objFileName)
 				objFileName);
       return;
     }
+	// TODO(andrei): This seems to be memory-intensive. One could maybe also do this in a streaming manner, instead of running marching cubes on everything at once.
 	meshingEngine->MeshScene(mesh, scene);
 	mesh->WriteSTL(objFileName);
 }
@@ -141,9 +142,6 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 
 	// fusion
 	if (fusionActive) {
-		// TODO(andrei): Pass segmentation information, and only fuse background info, or simply have
-		// the segmentation provider (or some other component) mutate the static map, and "blank out"
-		// the non-static parts in 'view'.
 		denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
 	}
 

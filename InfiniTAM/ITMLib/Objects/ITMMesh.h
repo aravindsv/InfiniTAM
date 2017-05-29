@@ -33,7 +33,7 @@ namespace ITMLib
 			explicit ITMMesh(MemoryDeviceType memoryType, long sdfLocalBlockNum)
 				: memoryType(memoryType),
 				  noTotalTriangles(0),
-				  noMaxTriangles(sdfLocalBlockNum * 32u)
+				  noMaxTriangles(sdfLocalBlockNum * 32)
 			{
 				printf("Allocating memory block for mesh triangles. noMaxTriangles=%d.\n", noMaxTriangles);
 				triangles = new ORUtils::MemoryBlock<Triangle>(noMaxTriangles, memoryType);

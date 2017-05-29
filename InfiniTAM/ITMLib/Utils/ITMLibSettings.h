@@ -52,7 +52,7 @@ namespace ITMLib
 			TrackerType trackerType;
 
 			/// The tracking regime used by the tracking controller
-			/// TODO(andrei): Handle this correctly on copy!
+			/// TODO(andrei): Handle this correctly on object copy.
 			TrackerIterationType *trackingRegime;
 
 			/// The number of levels in the trackingRegime
@@ -79,8 +79,9 @@ namespace ITMLib
 			// provided).
 			std::string groundTruthPoseFpath;
 
-		  /// \brief The number of voxel blocks stored on the GPU.
-			long sdfLocalBlockNum = kDefaultSdfLocalBlockNum;
+			/// \brief The number of voxel blocks stored on the GPU.
+			/// This imposes a hard limit on the maximum
+			long sdfLocalBlockNum = 0x07000; 		// Original: 0x40000
 
 			// Whether to create all the things required for marching cubes and mesh extraction.
 			// - uses additional memory (lots!)
