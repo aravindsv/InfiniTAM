@@ -7,9 +7,15 @@
 #include "ITMRepresentationAccess.h"
 
 template<class TVoxel>
-_CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(DEVICEPTR(TVoxel) &voxel, const THREADPTR(Vector4f) & pt_model, const CONSTPTR(Matrix4f) & M_d,
-	const CONSTPTR(Vector4f) & projParams_d, float mu, int maxW, const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize)
-{
+_CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
+		DEVICEPTR(TVoxel) &voxel,
+		const THREADPTR(Vector4f) &pt_model,
+		const CONSTPTR(Matrix4f) &M_d,
+		const CONSTPTR(Vector4f) & projParams_d,
+		float mu, int maxW,
+		const CONSTPTR(float) *depth,
+		const CONSTPTR(Vector2i) &imgSize
+) {
 	Vector4f pt_camera; Vector2f pt_image;
 	float depth_measure, eta, oldF, newF;
 	int oldW, newW;
@@ -20,15 +26,25 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(DEVICEPTR(TVoxel) &
 
 	pt_image.x = projParams_d.x * pt_camera.x / pt_camera.z + projParams_d.z;
 	pt_image.y = projParams_d.y * pt_camera.y / pt_camera.z + projParams_d.w;
-	if ((pt_image.x < 1) || (pt_image.x > imgSize.x - 2) || (pt_image.y < 1) || (pt_image.y > imgSize.y - 2)) return -1;
+	if ((pt_image.x < 1) || (pt_image.x > imgSize.x - 2) ||
+		(pt_image.y < 1) || (pt_image.y > imgSize.y - 2)) {
+		// Not in the image
+		return -1;
+	}
 
 	// get measured depth from image
 	depth_measure = depth[(int)(pt_image.x + 0.5f) + (int)(pt_image.y + 0.5f) * imgSize.x];
-	if (depth_measure <= 0.0) return -1;
+	if (depth_measure <= 0.0) {
+		// No depth information available at this position, so nothing to fuse.
+		return -1;
+	}
 
 	// check whether voxel needs updating
 	eta = depth_measure - pt_camera.z;
-	if (eta < -mu) return eta;
+	if (eta < -mu) {
+		// The measurement is too far away from existing surface, so we clamp it.
+		return eta;
+	}
 
 	// compute updated SDF value and reliability
 	oldF = TVoxel::SDF_valueToFloat(voxel.sdf); oldW = voxel.w_depth;
@@ -110,7 +126,10 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 		const CONSTPTR(Vector4u) *rgb, const THREADPTR(Vector2i) & imgSize_rgb)
 	{
 		float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
-		if ((eta > mu) || (fabs(eta / mu) > 0.25f)) return;
+		if ((eta > mu) || (fabs(eta / mu) > 0.25f)) {
+			return;
+		}
+
 		computeUpdatedVoxelColorInfo(voxel, pt_model, M_rgb, projParams_rgb, mu, maxW, eta, rgb, imgSize_rgb);
 	}
 };
@@ -125,11 +144,12 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(DEVICEPTR(uchar) *
 	depth_measure = depth[x + y * imgSize.x];
 	if (depth_measure <= 0 || (depth_measure - mu) < 0 || (depth_measure - mu) < viewFrustum_min || (depth_measure + mu) > viewFrustum_max) return;
 
+	// This triangulates the point's position from x, y, and depth.
 	pt_camera_f.z = depth_measure;
 	pt_camera_f.x = pt_camera_f.z * ((float(x) - projParams_d.z) * projParams_d.x);
 	pt_camera_f.y = pt_camera_f.z * ((float(y) - projParams_d.w) * projParams_d.y);
 
-	float norm = sqrt(pt_camera_f.x * pt_camera_f.x + pt_camera_f.y * pt_camera_f.y + pt_camera_f.z * pt_camera_f.z);
+	float norm = sqrt(pt_camera_f.x * pt_camera_f.x +pt_camera_f.y * pt_camera_f.y + pt_camera_f.z * pt_camera_f.z);
 
 	Vector4f tmp;
 	tmp.x = pt_camera_f.x * (1.0f - mu / norm);
@@ -215,12 +235,18 @@ _CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible, 
 
 	pt_buff = M_d * pt_image;
 
+	// The point is right next to the camera or behind it.
 	if (pt_buff.z < 1e-10f) return;
 
+	// Next, we check if it's inside the camera's viewport.
 	pt_buff.x = projParams_d.x * pt_buff.x / pt_buff.z + projParams_d.z;
 	pt_buff.y = projParams_d.y * pt_buff.y / pt_buff.z + projParams_d.w;
 
-	if (pt_buff.x >= 0 && pt_buff.x < imgSize.x && pt_buff.y >= 0 && pt_buff.y < imgSize.y) { isVisible = true; isVisibleEnlarged = true; }
+	if (pt_buff.x >= 0 && pt_buff.x < imgSize.x && pt_buff.y >= 0 && pt_buff.y < imgSize.y)
+	{
+		isVisible = true;
+		isVisibleEnlarged = true;
+	}
 	else if (useSwapping)
 	{
 		Vector4i lims;
@@ -231,6 +257,7 @@ _CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible, 
 	}
 }
 
+/// \brief Considers a block to be visible if any of its corners is visible.
 template<bool useSwapping>
 _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible, THREADPTR(bool) &isVisibleEnlarged,
 	const THREADPTR(Vector3s) &hashPos, const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) &projParams_d,
