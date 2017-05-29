@@ -27,7 +27,7 @@ template<class TVoxel>
 ITMRenderState_VH* ITMVisualisationEngine_CPU<TVoxel, ITMVoxelBlockHash>::CreateRenderState(const Vector2i & imgSize) const
 {
 	return new ITMRenderState_VH(
-		ITMVoxelBlockHash::noTotalEntries, imgSize, this->scene->sceneParams->viewFrustum_min, this->scene->sceneParams->viewFrustum_max, MEMORYDEVICE_CPU
+		ITMVoxelBlockHash::noTotalEntries, imgSize, this->scene->sceneParams->viewFrustum_min, this->scene->sceneParams->viewFrustum_max, this->settings->sdfLocalBlockNum, MEMORYDEVICE_CPU
 	);
 }
 

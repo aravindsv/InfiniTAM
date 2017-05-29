@@ -17,7 +17,8 @@ namespace ITMLib
 			uint *noTotalPoints_device;
 
 		public:
-			explicit ITMVisualisationEngine_CUDA(ITMScene<TVoxel, TIndex> *scene);
+			explicit ITMVisualisationEngine_CUDA(ITMScene<TVoxel, TIndex>* scene,
+                               const ITMLibSettings* settings);
 			~ITMVisualisationEngine_CUDA(void);
 
 			void FindVisibleBlocks(const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const;
@@ -41,7 +42,8 @@ namespace ITMLib
 			uint *noTotalBlocks_device;
 			int *noVisibleEntries_device;
 		public:
-			explicit ITMVisualisationEngine_CUDA(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
+			explicit ITMVisualisationEngine_CUDA(ITMScene<TVoxel, ITMVoxelBlockHash>* scene,
+                               const ITMLibSettings* settings);
 			~ITMVisualisationEngine_CUDA(void);
 
 			void FindVisibleBlocks(const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const;

@@ -8,6 +8,7 @@
 #include "../Objects/ITMView.h"
 #include "../Objects/ITMTrackingState.h"
 #include "../Objects/ITMRenderState_VH.h"
+#include "../Utils/ITMLibSettings.h"
 
 using namespace ITMLib::Objects;
 
@@ -78,6 +79,9 @@ namespace ITMLib
 			for the scene.
 			*/
 			virtual ITMRenderState* CreateRenderState(const Vector2i & imgSize) const = 0;
+
+		 protected:
+			const ITMLibSettings *settings;
 		};
 
 		template<class TIndex> struct IndexToRenderState { typedef ITMRenderState type; };
@@ -100,9 +104,12 @@ namespace ITMLib
 		{
 		protected:
 			const ITMScene<TVoxel, TIndex> *scene;
-			ITMVisualisationEngine(const ITMScene<TVoxel, TIndex> *scene)
+			ITMVisualisationEngine(
+					const ITMScene<TVoxel, TIndex> *scene,
+					const ITMLibSettings *settings)
 			{
 				this->scene = scene;
+				this->settings = settings;
 			}
 		public:
 			/** Override */

@@ -35,12 +35,12 @@ namespace ITMLib
 			/** Number of entries in the live list. */
 			int noVisibleEntries;
             
-			ITMRenderState_VH(int noTotalEntries, const Vector2i & imgSize, float vf_min, float vf_max, MemoryDeviceType memoryType = MEMORYDEVICE_CPU)
+			ITMRenderState_VH(int noTotalEntries, const Vector2i & imgSize, float vf_min, float vf_max, long sdfLocalBlockNum, MemoryDeviceType memoryType = MEMORYDEVICE_CPU)
 				: ITMRenderState(imgSize, vf_min, vf_max, memoryType)
             {
 				this->memoryType = memoryType;
 
-				visibleEntryIDs = new ORUtils::MemoryBlock<int>(kDefaultSdfLocalBlockNum, memoryType);
+				visibleEntryIDs = new ORUtils::MemoryBlock<int>(sdfLocalBlockNum, memoryType);
 				entriesVisibleType = new ORUtils::MemoryBlock<uchar>(noTotalEntries, memoryType);
 				
 				noVisibleEntries = 0;

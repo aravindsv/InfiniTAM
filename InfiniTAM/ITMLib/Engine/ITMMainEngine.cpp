@@ -6,10 +6,7 @@ using namespace ITMLib::Engine;
 
 ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
 {
-	// create all the things required for marching cubes and mesh extraction
-	// - uses additional memory (lots!)
-//	static const bool createMeshingEngine = true;
-	static const bool createMeshingEngine = false;
+  	bool createMeshingEngine = settings->createMeshingEngine;
 
 	if ((imgSize_d.x == -1) || (imgSize_d.y == -1)) imgSize_d = imgSize_rgb;
 
@@ -27,22 +24,28 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	case ITMLibSettings::DEVICE_CPU:
 		lowLevelEngine = new ITMLowLevelEngine_CPU();
 		viewBuilder = new ITMViewBuilder_CPU(calib);
-		visualisationEngine = new ITMVisualisationEngine_CPU<ITMVoxel, ITMVoxelIndex>(scene);
-		if (createMeshingEngine) meshingEngine = new ITMMeshingEngine_CPU<ITMVoxel, ITMVoxelIndex>();
+		visualisationEngine = new ITMVisualisationEngine_CPU<ITMVoxel, ITMVoxelIndex>(scene, settings);
+		if (createMeshingEngine) {
+			// TODO(andrei): Consider also passing the settings object here.
+			meshingEngine = new ITMMeshingEngine_CPU<ITMVoxel, ITMVoxelIndex>();
+		}
 		break;
 	case ITMLibSettings::DEVICE_CUDA:
 #ifndef COMPILE_WITHOUT_CUDA
 		lowLevelEngine = new ITMLowLevelEngine_CUDA();
 		viewBuilder = new ITMViewBuilder_CUDA(calib);
-		visualisationEngine = new ITMVisualisationEngine_CUDA<ITMVoxel, ITMVoxelIndex>(scene);
-		if (createMeshingEngine) meshingEngine = new ITMMeshingEngine_CUDA<ITMVoxel, ITMVoxelIndex>();
+		visualisationEngine =
+				new ITMVisualisationEngine_CUDA<ITMVoxel, ITMVoxelIndex>(scene, settings);
+		if (createMeshingEngine) {
+			meshingEngine = new ITMMeshingEngine_CUDA<ITMVoxel, ITMVoxelIndex>(settings->sdfLocalBlockNum);
+		}
 #endif
 		break;
 	case ITMLibSettings::DEVICE_METAL:
 #ifdef COMPILE_WITH_METAL
 		lowLevelEngine = new ITMLowLevelEngine_Metal();
 		viewBuilder = new ITMViewBuilder_Metal(calib);
-		visualisationEngine = new ITMVisualisationEngine_Metal<ITMVoxel, ITMVoxelIndex>(scene);
+		visualisationEngine = new ITMVisualisationEngine_Metal<ITMVoxel, ITMVoxelIndex>(scene, settings);
 		if (createMeshingEngine) meshingEngine = new ITMMeshingEngine_CPU<ITMVoxel, ITMVoxelIndex>();
 #endif
 		break;
@@ -53,7 +56,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 		MemoryDeviceType deviceType = (settings->deviceType == ITMLibSettings::DEVICE_CUDA
 		                               ? MEMORYDEVICE_CUDA
 		                               : MEMORYDEVICE_CPU);
-		mesh = new ITMMesh(deviceType);
+		mesh = new ITMMesh(deviceType, settings->sdfLocalBlockNum);
 	}
 
 	Vector2i trackedImageSize = ITMTrackingController::GetTrackedImageSize(settings, imgSize_rgb, imgSize_d);
@@ -111,7 +114,12 @@ ITMMesh* ITMMainEngine::UpdateMesh(void)
 
 void ITMMainEngine::SaveSceneToMesh(const char *objFileName)
 {
-	if (mesh == NULL) return;
+	if (mesh == NULL) {
+		fprintf(stderr,
+				"Warning: the mesh is NULL so it can't be saved to the file %s.",
+				objFileName);
+      return;
+    }
 	meshingEngine->MeshScene(mesh, scene);
 	mesh->WriteSTL(objFileName);
 }

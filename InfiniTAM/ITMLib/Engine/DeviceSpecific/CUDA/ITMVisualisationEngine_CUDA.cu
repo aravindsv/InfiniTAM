@@ -69,8 +69,10 @@ __global__ void renderColour_device(Vector4u *outRendering, const Vector4f *ptsR
 // class implementation
 
 template<class TVoxel, class TIndex>
-ITMVisualisationEngine_CUDA<TVoxel, TIndex>::ITMVisualisationEngine_CUDA(ITMScene<TVoxel, TIndex> *scene)
-	: ITMVisualisationEngine<TVoxel, TIndex>(scene)
+ITMVisualisationEngine_CUDA<TVoxel, TIndex>::ITMVisualisationEngine_CUDA(
+		ITMScene<TVoxel, TIndex>* scene,
+		const ITMLibSettings* settings)
+	: ITMVisualisationEngine<TVoxel, TIndex>(scene, settings)
 {
 	ITMSafeCall(cudaMalloc((void**)&noTotalPoints_device, sizeof(uint)));
 }
@@ -82,8 +84,10 @@ ITMVisualisationEngine_CUDA<TVoxel, TIndex>::~ITMVisualisationEngine_CUDA(void)
 }
 
 template<class TVoxel>
-ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::ITMVisualisationEngine_CUDA(ITMScene<TVoxel, ITMVoxelBlockHash> *scene)
-	: ITMVisualisationEngine<TVoxel, ITMVoxelBlockHash>(scene)
+ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::ITMVisualisationEngine_CUDA(
+		ITMScene<TVoxel, ITMVoxelBlockHash>* scene,
+		const ITMLibSettings* settings)
+	: ITMVisualisationEngine<TVoxel, ITMVoxelBlockHash>(scene, settings)
 {
 	ITMSafeCall(cudaMalloc((void**)&renderingBlockList_device, sizeof(RenderingBlock) * MAX_RENDERING_BLOCKS));
 	ITMSafeCall(cudaMalloc((void**)&noTotalBlocks_device, sizeof(uint)));
@@ -112,7 +116,7 @@ template<class TVoxel>
 ITMRenderState_VH* ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateRenderState(const Vector2i & imgSize) const
 {
 	return new ITMRenderState_VH(
-		ITMVoxelBlockHash::noTotalEntries, imgSize, this->scene->sceneParams->viewFrustum_min, this->scene->sceneParams->viewFrustum_max, MEMORYDEVICE_CUDA
+		ITMVoxelBlockHash::noTotalEntries, imgSize, this->scene->sceneParams->viewFrustum_min, this->scene->sceneParams->viewFrustum_max, this->settings->sdfLocalBlockNum, MEMORYDEVICE_CUDA
 	);
 }
 

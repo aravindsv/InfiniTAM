@@ -31,8 +31,10 @@ namespace ITMLib
 		class ITMVisualisationEngine_CPU<TVoxel, ITMVoxelBlockHash> : public ITMVisualisationEngine < TVoxel, ITMVoxelBlockHash >
 		{
 		public:
-			explicit ITMVisualisationEngine_CPU(ITMScene<TVoxel, ITMVoxelBlockHash> *scene) 
-				: ITMVisualisationEngine<TVoxel, ITMVoxelBlockHash>(scene) { }
+			explicit ITMVisualisationEngine_CPU(
+					ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+					const ITMLibSettings *settings)
+				: ITMVisualisationEngine<TVoxel, ITMVoxelBlockHash>(scene, settings) { }
 			~ITMVisualisationEngine_CPU(void) { }
 
 			void FindVisibleBlocks(const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const;

@@ -82,6 +82,10 @@ namespace ITMLib
 		  /// \brief The number of voxel blocks stored on the GPU.
 			long sdfLocalBlockNum = kDefaultSdfLocalBlockNum;
 
+			// Whether to create all the things required for marching cubes and mesh extraction.
+			// - uses additional memory (lots!)
+			bool createMeshingEngine = true;
+
 			ITMLibSettings(void);
 			~ITMLibSettings(void);
 
