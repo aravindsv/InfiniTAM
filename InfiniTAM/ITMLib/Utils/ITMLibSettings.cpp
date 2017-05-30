@@ -106,6 +106,8 @@ ITMLibSettings::ITMLibSettings(void)
 //	groundTruthPoseFpath = "/home/andrei/datasets/kitti/2011_09_26"
 //			"/2011_09_26_drive_0019_sync/oxts/";
 	groundTruthPoseFpath = "/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt";
+
+	groundTruthPoseOffset = 0;
 }
 
 ITMLibSettings::~ITMLibSettings()

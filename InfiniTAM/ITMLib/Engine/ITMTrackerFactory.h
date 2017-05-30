@@ -381,7 +381,9 @@ namespace ITMLib
         ITMIMUCalibrator *imuCalibrator,
         ITMScene<TVoxel, TIndex> *scene
       ) {
-        return new ITMGroundTruthTracker(settings->groundTruthPoseFpath);
+        return new ITMGroundTruthTracker(
+            settings->groundTruthPoseFpath,
+            settings->groundTruthPoseOffset);
       }
     };
   }

@@ -79,9 +79,14 @@ namespace ITMLib
 			// provided).
 			std::string groundTruthPoseFpath;
 
+			// Used for the instance reconstruction in conjunction with the ground truth
+			// tracker. Enables the object-specific InfiniTAM to start "tracking" from the
+			// correct frame.
+			int groundTruthPoseOffset;
+
 			/// \brief The number of voxel blocks stored on the GPU.
 			/// This imposes a hard limit on the maximum
-			long sdfLocalBlockNum = 0x07000; 		// Original: 0x40000
+			long sdfLocalBlockNum = 0x10000; 		// Original: 0x40000
 
 			// Whether to create all the things required for marching cubes and mesh extraction.
 			// - uses additional memory (lots!)

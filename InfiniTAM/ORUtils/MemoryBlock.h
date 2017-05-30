@@ -8,6 +8,9 @@
 #include "CUDADefines.h"
 #endif
 
+// Toggles printing of verbose allocation/deallocation messages.
+//#define MEMORY_BLOCK_DEBUG
+
 #ifndef __METALC__
 
 #ifdef COMPILE_WITH_METAL
@@ -192,10 +195,11 @@ namespace ORUtils
 				case 0:
 					if (dataSize == 0) data_cpu = NULL;
 					else {
+#ifdef MEMORY_BLOCK_DEBUG
 						size_t dataBytes = dataSize * sizeof(T);
 						float dataMBytes = dataBytes / 1024.0f / 1024.0f;
 						printf("Allocating block of %.4fMb of data on the CPU.\n", dataMBytes);
-
+#endif
 						data_cpu = new T[dataSize];
 					}
 					break;
@@ -225,11 +229,13 @@ namespace ORUtils
 				}
 				else {
 					size_t dataBytes = dataSize * sizeof(T);
+#ifdef MEMORY_BLOCK_DEBUG
 					float dataMBytes = dataBytes / 1024.0f / 1024.0f;
 					printf("Allocating block of %.4fMb of data on the GPU.\n", dataMBytes);
 //					if (dataMBytes > 100) {
 //						throw std::runtime_error("Large block allocated!");
 //					}
+#endif
 					ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataBytes));
 				}
 				this->isAllocated_CUDA = allocate_CUDA;
@@ -253,10 +259,12 @@ namespace ORUtils
 				{
 				case 0:
 					if (data_cpu != NULL) {
+#ifdef MEMORY_BLOCK_DEBUG
 						size_t dataBytes = dataSize * sizeof(T);
 						float dataMBytes = dataBytes / 1024.0f / 1024.0f;
 						printf("Freeing block of %.4fMb of data on the CPU.\n", dataMBytes);
 						delete[] data_cpu;
+#endif
 					}
 					break;
 				case 1:
@@ -279,10 +287,11 @@ namespace ORUtils
 			{
 #ifndef COMPILE_WITHOUT_CUDA
 				if (data_cuda != NULL) {
+#ifdef MEMORY_BLOCK_DEBUG
 					size_t dataBytes = dataSize * sizeof(T);
 					float dataMBytes = dataBytes / 1024.0f / 1024.0f;
 					printf("Freeing block of %.4fMb of data on the GPU.\n", dataMBytes);
-
+#endif
 					ORcudaSafeCall(cudaFree(data_cuda));
 				}
 #endif

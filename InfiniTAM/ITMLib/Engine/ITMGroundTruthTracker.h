@@ -76,11 +76,12 @@ namespace ITMLib {
     protected:
 
     public:
-      ITMGroundTruthTracker(const string &groundTruthFpath) {
+      ITMGroundTruthTracker(const string &groundTruthFpath, int frameOffset) {
         cout << "Created ground truth-based tracker. Will read data from: "
              << groundTruthFpath << endl;
 
 	      groundTruthPoses = readKittiOdometryPoses(groundTruthFpath);
+		  this->currentFrame = frameOffset;
 
 	      // TODO(andrei): This code, although untested, should provide a skeleton for
 	      // reading OxTS data, such that ground truth from the full KITTI dataset can

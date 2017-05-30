@@ -192,6 +192,18 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		throw std::runtime_error(
 				"Invalid free voxel block ID. InfiniTAM has likely run out of GPU memory.");
 	}
+
+  // TODO(andrei): Figure out how to find blocks which are actually populated.
+//	Vector4s *blockCoords_h = new Vector4s[noTotalEntries];
+//	ITMSafeCall(cudaMemcpy(blockCoords_h, blockCoords_device,
+//						   sizeof(Vector4s) * noTotalEntries, cudaMemcpyDeviceToHost));
+//
+//	for(int i = 0; i < noTotalEntries; ++i) {
+//      printf("%d, %d, %d\n", blockCoords_h[i].x, blockCoords_h[i].y, blockCoords_h[i].z);
+//
+//	}
+//
+//	delete[] blockCoords_h;
 }
 
 template<class TVoxel>
@@ -387,9 +399,13 @@ __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int 
 	entriesVisibleType[visibleEntryIDs[entryId]] = 3;
 }
 
-__global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *excessAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
-	AllocationTempData *allocData, uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
-{
+__global__ void allocateVoxelBlocksList_device(
+		int *voxelAllocationList, int *excessAllocationList,
+		ITMHashEntry *hashTable, int noTotalEntries,
+		AllocationTempData *allocData,
+		uchar *entriesAllocType, uchar *entriesVisibleType,
+		Vector4s *blockCoords
+) {
 	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
 	if (targetIdx > noTotalEntries - 1) return;
 
