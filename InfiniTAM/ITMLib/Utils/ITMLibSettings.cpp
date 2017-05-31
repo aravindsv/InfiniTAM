@@ -68,7 +68,6 @@ ITMLibSettings::ITMLibSettings(void)
 	modelSensorNoise = false;
 	if (trackerType == TRACKER_WICP) modelSensorNoise = true;
 
-
 	// builds the tracking regime. level 0 is full resolution
 	if (trackerType == TRACKER_IMU)
 	{
@@ -105,7 +104,7 @@ ITMLibSettings::ITMLibSettings(void)
   // TODO(andrei): Consider setting this via the command line.
 //	groundTruthPoseFpath = "/home/andrei/datasets/kitti/2011_09_26"
 //			"/2011_09_26_drive_0019_sync/oxts/";
-	groundTruthPoseFpath = "/home/andrei/datasets/kitti/odometry-dataset/poses/06.txt";
+	groundTruthPoseFpath = "/home/barsana/datasets/kitti/odometry-dataset/poses/06.txt";
 
 	groundTruthPoseOffset = 0;
 }
