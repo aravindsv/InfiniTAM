@@ -136,9 +136,6 @@ void ITMViewBuilder_CUDA::ConvertDepthAffineToFloat(ITMFloatImage *depth_out, co
 	dim3 blockSize(16, 16);
 	dim3 gridSize((int)ceil((float)imgSize.x / (float)blockSize.x), (int)ceil((float)imgSize.y / (float)blockSize.y));
 
-	// TODO(andrei): Remove debug code.
-	printf("Will convert depth to float using parameters: %.6f, %.6f\n", depthCalibParams[0], depthCalibParams[1]);
-
 	convertDepthAffineToFloat_device << <gridSize, blockSize >> >(d_out, d_in, imgSize, depthCalibParams);
 }
 

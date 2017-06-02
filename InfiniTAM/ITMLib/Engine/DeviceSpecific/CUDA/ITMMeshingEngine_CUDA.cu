@@ -1,5 +1,6 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
+#include <iostream>
 #include "ITMMeshingEngine_CUDA.h"
 #include "../../DeviceAgnostic/ITMMeshingEngine.h"
 #include "ITMCUDAUtils.h"
@@ -29,12 +30,18 @@ ITMMeshingEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMMeshingEngine_CUDA(void)
 	ITMSafeCall(cudaFree(noTriangles_device));
 }
 
+/// \brief Hacky operator for easily displaying CUDA dim3 objects.
+std::ostream& operator<<(std::ostream &out, dim3 dim) {
+	out << "[" << dim.x << ", " << dim.y << ", " << dim.z << "]";
+	return out;
+}
+
 template<class TVoxel>
 void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMVoxelBlockHash> *scene)
 {
 	// TODO(andrei): This doesn't seem to work well if swapping is enabled. That is, it only saves
 	// the active mesh, and doesn't attempt to somehow stream all the blocks which have been swapped
-	// out.
+	// out to RAM.
 
 	ITMMesh::Triangle *triangles = mesh->triangles->GetData(MEMORYDEVICE_CUDA);
 	const TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
@@ -50,12 +57,29 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 		dim3 cudaBlockSize(256); 
 		dim3 gridSize((int)ceil((float)noTotalEntries / (float)cudaBlockSize.x));
 
+		std::cout << "Sanity check for existing errors..." << std::endl;
+		ITMSafeCall(cudaGetLastError());
+		std::cout << "Sanity check passed..." << std::endl;
+
+      	std::cout << "Launching block allocation kernel..." << std::endl;
+		std::cout << "Using cuda grid size: " << gridSize << std::endl;
+		std::cout << "Using cuda block size: " << cudaBlockSize << std::endl;
+
 		findAllocateBlocks << <gridSize, cudaBlockSize >> >(visibleBlockGlobalPos_device, hashTable, noTotalEntries);
+		ITMSafeCall(cudaGetLastError());
 	}
 
 	{ // mesh used voxel blocks
 		dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 		dim3 gridSize(sdfLocalBlockNum / 16, 16);
+
+		std::cout << "Checking for existing errors (would be bad if we got here with a leftover "
+				  << "error from somewhere else)..." << std::endl << std::flush;
+		ITMSafeCall(cudaGetLastError());
+      	std::cout << "No existing error. Launching kernel..." << std::endl;
+
+		std::cout << "Using cuda grid size: " << gridSize << std::endl;
+		std::cout << "Using cuda block size: " << cudaBlockSize << std::endl;
 
 		// This call seems to fail with any map larger than a couple of frames...
 		meshScene_device<TVoxel> << <gridSize, cudaBlockSize >> >(triangles, noTriangles_device, factor, noTotalEntries, noMaxTriangles,
