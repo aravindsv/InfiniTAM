@@ -81,7 +81,6 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 		std::cout << "Using cuda grid size: " << gridSize << std::endl;
 		std::cout << "Using cuda block size: " << cudaBlockSize << std::endl;
 
-		// This call seems to fail with any map larger than a couple of frames...
 		meshScene_device<TVoxel> << <gridSize, cudaBlockSize >> >(triangles, noTriangles_device, factor, noTotalEntries, noMaxTriangles,
 			visibleBlockGlobalPos_device, localVBA, hashTable);
 		ITMSafeCall(cudaGetLastError());
@@ -155,31 +154,57 @@ __global__ void meshScene_device(ITMMesh::Triangle *triangles, unsigned int *noT
 
 		if (triangleId < noMaxTriangles - 1)
 		{
-			Vector3f p0 = vertList[triangleTable[cubeIndex][i]] * factor;
-			Vector3f p1 = vertList[triangleTable[cubeIndex][i + 1]] * factor;
-			Vector3f p2 = vertList[triangleTable[cubeIndex][i + 2]] * factor;
-			triangles[triangleId].p0 = p0;
-			triangles[triangleId].p1 = p1;
-			triangles[triangleId].p2 = p2;
+			Vector3f p0 = vertList[triangleTable[cubeIndex][i]];
+			Vector3f p1 = vertList[triangleTable[cubeIndex][i + 1]];
+			Vector3f p2 = vertList[triangleTable[cubeIndex][i + 2]];
+			triangles[triangleId].p0 = p0 * factor;
+			triangles[triangleId].p1 = p1 * factor;
+			triangles[triangleId].p2 = p2 * factor;
 
           	// TODO(andrei): Reduce code duplication...
+//			Vector4f c0 =
+//					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::interpolate(
+//							localVBA,
+//							hashTable,
+//                            Vector3f(p0.x, p0.y, p0.z));
+//			Vector4f c1 =
+//					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::interpolate(
+//							localVBA,
+//							hashTable,
+//							Vector3f(p1.x, p1.y, p1.z));
+//			Vector4f c2 =
+//					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::interpolate(
+//							localVBA,
+//							hashTable,
+//							Vector3f(p2.x, p2.y, p2.z));
+
+//          	triangles[triangleId].c0.r = c0.r;
+//			triangles[triangleId].c0.g = c0.g;
+//			triangles[triangleId].c0.b = c0.b;
+//			triangles[triangleId].c1.r = c1.r;
+//			triangles[triangleId].c1.g = c1.g;
+//			triangles[triangleId].c1.b = c1.b;
+//			triangles[triangleId].c2.r = c2.r;
+//			triangles[triangleId].c2.g = c2.g;
+//			triangles[triangleId].c2.b = c2.b;
+
 			Vector3f c0 =
 					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::uninterpolate(
 							localVBA,
 							hashTable,
-                            Vector3i(p0.x / factor, p0.y / factor, p0.z / factor));
+							Vector3i(p0.x, p0.y, p0.z));
 			Vector3f c1 =
 					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::uninterpolate(
 							localVBA,
 							hashTable,
-							Vector3i(p1.x / factor, p1.y / factor, p1.z / factor));
+							Vector3i(p1.x, p1.y, p1.z));
 			Vector3f c2 =
 					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::uninterpolate(
 							localVBA,
 							hashTable,
-							Vector3i(p2.x / factor, p2.y / factor, p2.z / factor));
+							Vector3i(p2.x, p2.y, p2.z));
 
-          	triangles[triangleId].c0 = c0;
+            triangles[triangleId].c0 = c0;
 			triangles[triangleId].c1 = c1;
 			triangles[triangleId].c2 = c2;
 		}

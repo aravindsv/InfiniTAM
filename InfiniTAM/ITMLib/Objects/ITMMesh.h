@@ -54,32 +54,36 @@ namespace ITMLib
 				if (f != NULL)
 				{
 					for (uint i = 0; i < noTotalTriangles; i++) {
-						// TODO(andrei): Suport color dumping in STL models as well!
-						const Vector3f color = triangleArray[i].c0;
+						// TODO(andrei): Suport color dumping in STL models as well, if possible (may
+						// be unsupported officialy by the format...).
+
+						const Vector3f &c0 = triangleArray[i].c0;
+						const Vector3f &c1 = triangleArray[i].c1;
+						const Vector3f &c2 = triangleArray[i].c2;
 						fprintf(f,
 								"v %f %f %f %f %f %f\n",
 								triangleArray[i].p0.x,
 								triangleArray[i].p0.y,
 								triangleArray[i].p0.z,
-								color.r,
-								color.g,
-								color.b);
+								c0.r,
+								c0.g,
+								c0.b);
 						fprintf(f,
 								"v %f %f %f %f %f %f\n",
 								triangleArray[i].p1.x,
 								triangleArray[i].p1.y,
 								triangleArray[i].p1.z,
-								color.r,
-								color.g,
-								color.b);
+								c1.r,
+								c1.g,
+								c1.b);
 						fprintf(f,
 								"v %f %f %f %f %f %f\n",
 								triangleArray[i].p2.x,
 								triangleArray[i].p2.y,
 								triangleArray[i].p2.z,
-								color.r,
-								color.g,
-								color.b);
+								c2.r,
+								c2.g,
+								c2.b);
 					}
 
 					for (uint i = 0; i<noTotalTriangles; i++) fprintf(f, "f %d %d %d\n", i * 3 + 2 + 1, i * 3 + 1 + 1, i * 3 + 0 + 1);
