@@ -50,7 +50,7 @@ void ITMMeshingEngine_CPU<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, c
 				triangles[noTriangles].p0 = vertList[triangleTable[cubeIndex][i]] * factor;
 				triangles[noTriangles].p1 = vertList[triangleTable[cubeIndex][i + 1]] * factor;
 				triangles[noTriangles].p2 = vertList[triangleTable[cubeIndex][i + 2]] * factor;
-				triangles[noTriangles].color = color;
+				triangles[noTriangles].c0 = color;
 
 				if (noTriangles < noMaxTriangles - 1) noTriangles++;
 			}

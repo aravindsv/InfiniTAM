@@ -14,12 +14,10 @@ namespace ITMLib
 		class ITMMesh
 		{
 		public:
+          	/// \brief Represents a 3D triangle with per-vertex color information.
 			struct Triangle {
-				// Position
 				Vector3f p0, p1, p2;
-
-              	// TODO(andrei): Per-vertex color, if useful.
-              	Vector3f color;
+              	Vector3f c0, c1, c2;
 			};
 		
 			MemoryDeviceType memoryType;
@@ -57,7 +55,7 @@ namespace ITMLib
 				{
 					for (uint i = 0; i < noTotalTriangles; i++) {
 						// TODO(andrei): Suport color dumping in STL models as well!
-						const Vector3f color = triangleArray[i].color;
+						const Vector3f color = triangleArray[i].c0;
 						fprintf(f,
 								"v %f %f %f %f %f %f\n",
 								triangleArray[i].p0.x,
