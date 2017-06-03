@@ -16,7 +16,9 @@ ITMLibSettings::ITMLibSettings(void)
 //           from occurring properly.
 // Defaults:
 //	: sceneParams(0.02f, 100, 0.0050f, 0.2f, 3.0f, false)
-	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
+// Work well in most KITTI cases:
+//	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
+	: sceneParams(0.05f, 10, 0.0035f, 0.1f, 30.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
