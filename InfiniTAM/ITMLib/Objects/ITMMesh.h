@@ -14,13 +14,12 @@ namespace ITMLib
 		class ITMMesh
 		{
 		public:
-			// TODO(andrei): Support also dumping colored maps.
 			struct Triangle {
 				// Position
 				Vector3f p0, p1, p2;
-				// Color
-//				Vector3f c0, c1, c2;
-				// TODO(andrei): Can even add more metadata here!
+
+              	// TODO(andrei): Per-vertex color, if useful.
+              	Vector3f color;
 			};
 		
 			MemoryDeviceType memoryType;
@@ -41,12 +40,13 @@ namespace ITMLib
 
 			void WriteOBJ(const char *fileName)
 			{
-				ORUtils::MemoryBlock<Triangle> *cpu_triangles; bool shoulDelete = false;
+				ORUtils::MemoryBlock<Triangle> *cpu_triangles;
+				bool shouldDelete = false;
 				if (memoryType == MEMORYDEVICE_CUDA)
 				{
 					cpu_triangles = new ORUtils::MemoryBlock<Triangle>(noMaxTriangles, MEMORYDEVICE_CPU);
 					cpu_triangles->SetFrom(triangles, ORUtils::MemoryBlock<Triangle>::CUDA_TO_CPU);
-					shoulDelete = true;
+					shouldDelete = true;
 				}
 				else cpu_triangles = triangles;
 
@@ -55,18 +55,40 @@ namespace ITMLib
 				FILE *f = fopen(fileName, "w+");
 				if (f != NULL)
 				{
-					for (uint i = 0; i < noTotalTriangles; i++)
-					{
-						fprintf(f, "v %f %f %f\n", triangleArray[i].p0.x, triangleArray[i].p0.y, triangleArray[i].p0.z);
-						fprintf(f, "v %f %f %f\n", triangleArray[i].p1.x, triangleArray[i].p1.y, triangleArray[i].p1.z);
-						fprintf(f, "v %f %f %f\n", triangleArray[i].p2.x, triangleArray[i].p2.y, triangleArray[i].p2.z);
+					for (uint i = 0; i < noTotalTriangles; i++) {
+						// TODO(andrei): Suport color dumping in STL models as well!
+						const Vector3f color = triangleArray[i].color;
+						fprintf(f,
+								"v %f %f %f %f %f %f\n",
+								triangleArray[i].p0.x,
+								triangleArray[i].p0.y,
+								triangleArray[i].p0.z,
+								color.r,
+								color.g,
+								color.b);
+						fprintf(f,
+								"v %f %f %f %f %f %f\n",
+								triangleArray[i].p1.x,
+								triangleArray[i].p1.y,
+								triangleArray[i].p1.z,
+								color.r,
+								color.g,
+								color.b);
+						fprintf(f,
+								"v %f %f %f %f %f %f\n",
+								triangleArray[i].p2.x,
+								triangleArray[i].p2.y,
+								triangleArray[i].p2.z,
+								color.r,
+								color.g,
+								color.b);
 					}
 
 					for (uint i = 0; i<noTotalTriangles; i++) fprintf(f, "f %d %d %d\n", i * 3 + 2 + 1, i * 3 + 1 + 1, i * 3 + 0 + 1);
 					fclose(f);
 				}
 
-				if (shoulDelete) delete cpu_triangles;
+				if (shouldDelete) delete cpu_triangles;
 			}
 
 			void WriteSTL(const char *fileName)

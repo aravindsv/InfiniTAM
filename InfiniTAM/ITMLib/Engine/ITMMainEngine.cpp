@@ -123,7 +123,8 @@ void ITMMainEngine::SaveSceneToMesh(const char *objFileName)
 	// TODO(andrei): This seems to be memory-intensive. One could maybe also do this in a
 	// streaming manner, instead of running marching cubes on everything at once.
 	meshingEngine->MeshScene(mesh, scene);
-	mesh->WriteSTL(objFileName);
+//	mesh->WriteSTL(objFileName);
+	mesh->WriteOBJ(objFileName);
 }
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement)

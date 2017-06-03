@@ -130,6 +130,13 @@ __global__ void meshScene_device(ITMMesh::Triangle *triangles, unsigned int *noT
 
 	if (cubeIndex < 0) return;
 
+  // TODO add to the CPU mesh builder as well.
+	Vector3f color =
+			VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::uninterpolate(
+					localVBA,
+					hashTable,
+					globalPos + Vector3i(threadIdx.x, threadIdx.y, threadIdx.z));
+
 	for (int i = 0; triangleTable[cubeIndex][i] != -1; i += 3)
 	{
 		int triangleId = atomicAdd(noTriangles_device, 1);
@@ -139,6 +146,7 @@ __global__ void meshScene_device(ITMMesh::Triangle *triangles, unsigned int *noT
 			triangles[triangleId].p0 = vertList[triangleTable[cubeIndex][i]] * factor;
 			triangles[triangleId].p1 = vertList[triangleTable[cubeIndex][i + 1]] * factor;
 			triangles[triangleId].p2 = vertList[triangleTable[cubeIndex][i + 2]] * factor;
+          	triangles[triangleId].color = color;
 		}
 	}
 }
