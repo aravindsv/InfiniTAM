@@ -162,31 +162,7 @@ __global__ void meshScene_device(ITMMesh::Triangle *triangles, unsigned int *noT
 			triangles[triangleId].p2 = p2 * factor;
 
           	// TODO(andrei): Reduce code duplication...
-//			Vector4f c0 =
-//					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::interpolate(
-//							localVBA,
-//							hashTable,
-//                            Vector3f(p0.x, p0.y, p0.z));
-//			Vector4f c1 =
-//					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::interpolate(
-//							localVBA,
-//							hashTable,
-//							Vector3f(p1.x, p1.y, p1.z));
-//			Vector4f c2 =
-//					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::interpolate(
-//							localVBA,
-//							hashTable,
-//							Vector3f(p2.x, p2.y, p2.z));
-
-//          	triangles[triangleId].c0.r = c0.r;
-//			triangles[triangleId].c0.g = c0.g;
-//			triangles[triangleId].c0.b = c0.b;
-//			triangles[triangleId].c1.r = c1.r;
-//			triangles[triangleId].c1.g = c1.g;
-//			triangles[triangleId].c1.b = c1.b;
-//			triangles[triangleId].c2.r = c2.r;
-//			triangles[triangleId].c2.g = c2.g;
-//			triangles[triangleId].c2.b = c2.b;
+            // TODO(andrei): Do we still need 'uninterpolate'?
 
 			Vector3f c0 =
 					VoxelColorReader<TVoxel::hasColorInformation, TVoxel, ITMVoxelBlockHash>::uninterpolate(
