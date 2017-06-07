@@ -202,20 +202,20 @@ namespace ITMLib {
     }
 
     /// \brief Reads a set of ground truth OxTS IMU/GPU unit from a directory.
-    /// \note This function, together with its related utilities, are based on
-    /// the kitti devkit authored by Prof. Andreas Geiger.
+    /// \note This function, together with its related utilities, are based on the KITTI devkit
+    /// authored by Prof. Andreas Geiger.
     vector<OxTSFrame> readOxtsliteData(const string& dir) {
       // TODO(andrei): In the future, consider using the C++14 filesystem API
       // to make this code cleaner and more portable.
       vector<OxTSFrame> res;
 
       auto timestamps = readTimestamps(dir);
-      cout << "Read " << timestamps.size() << " timestamps." << endl;
+//      cout << "Read " << timestamps.size() << " timestamps." << endl;
 
       for(size_t i = 0; i < timestamps.size(); ++i) {
         stringstream ss;
         ss << dir << "/data/" << setw(10) << setfill('0') << i << ".txt";
-        cout << ss.str() << endl;
+//        cout << ss.str() << endl;
 
         // TODO(andrei): Should we expect missing data? Does that occur in
         // KITTI?

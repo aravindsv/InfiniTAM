@@ -383,7 +383,9 @@ namespace ITMLib
       ) {
         return new ITMGroundTruthTracker(
             settings->groundTruthPoseFpath,
-            settings->groundTruthPoseOffset);
+            settings->groundTruthPoseOffset,
+            settings->groundTruthPoseUseOxts
+        );
       }
     };
   }

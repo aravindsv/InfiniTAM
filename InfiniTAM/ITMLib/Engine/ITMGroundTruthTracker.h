@@ -14,6 +14,7 @@ namespace ITMLib {
 	using namespace ITMLib::Objects;
 	using namespace std;
 
+	// TODO(andrei): Get rid of mixed tabs and spaces. Yuck!
 	/**
 	 * Dummy tracker which relays pose information from a file.
 	 * The currently supported file format is the ground truth odometry information from
@@ -94,18 +95,23 @@ namespace ITMLib {
 	protected:
 
 	public:
-		ITMGroundTruthTracker(const string &groundTruthFpath, int frameOffset) {
+		ITMGroundTruthTracker(const string &groundTruthFpath, int frameOffset, bool use_oxts = false) {
 			cout << "Created ground truth-based tracker. Will read data from: "
 				 << groundTruthFpath << endl;
 			groundTruthPoses = readKittiOdometryPoses(groundTruthFpath);
 			this->currentFrame = frameOffset;
 			this->currentPose.setIdentity();
 
-			// TODO(andrei): This code, although untested, should provide a skeleton for
-			// reading OxTS data, such that ground truth from the full KITTI dataset can
-			// be read.
-//        vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
-//        groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames, groundTruthTrans, groundTruthRots);
+			if (use_oxts) {
+				vector<OxTSFrame> groundTruthFrames = Objects::readOxtsliteData(groundTruthFpath);
+				vector<Vector3f> groundTruthTrans;	// unused it seems
+				vector<Matrix3f> groundTruthRots;	// unused it seems
+				groundTruthPoses = Objects::oxtsToPoses(groundTruthFrames, groundTruthTrans, groundTruthRots);
+			}
+			else
+			{
+				groundTruthPoses = readKittiOdometryPoses(groundTruthFpath);
+			}
 		}
 
 		void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
@@ -123,7 +129,6 @@ namespace ITMLib {
 	  void UpdateInitialPose(ITMTrackingState *trackingState) {}
 
 	  virtual ~ITMGroundTruthTracker() {}
-
 	};
 
   }

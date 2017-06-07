@@ -84,6 +84,10 @@ namespace ITMLib
 			// correct frame.
 			int groundTruthPoseOffset;
 
+			// Whether to read the ground truth from an OxTS dump (otherwise will try a raw pose
+			// text file).
+			bool groundTruthPoseUseOxts;
+
 			/// \brief The number of voxel blocks stored on the GPU.
 			/// This imposes a hard limit on the maximum
 			long sdfLocalBlockNum = 0xD0000; 		// Original: 0x40000
