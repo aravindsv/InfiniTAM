@@ -7,39 +7,13 @@
 #include <sstream>
 
 #include "ITMOxtsIO.h"
+#include "../../../../DynSLAM/Utils.h"
 
 using namespace std;
 
 namespace ITMLib {
   // TODO(andrei): Better namespace name?
   namespace Objects {
-
-    // TODO(andrei): Expose this function and put it in a more generic
-    // utility module.
-    /// \brief Convenient string formatting utility.
-    /// Originally from StackOverflow: https://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf
-    std::string format(const std::string& fmt, ...) {
-      // Keeps track of the resulting string size.
-      size_t out_size = fmt.size() * 2;
-      std::unique_ptr<char[]> formatted;
-      va_list ap;
-      while (true) {
-        formatted.reset(new char[out_size]);
-        std::strcpy(&formatted[0], fmt.c_str());
-        va_start(ap, fmt);
-        int final_n = vsnprintf(&formatted[0], out_size, fmt.c_str(), ap);
-        va_end(ap);
-        if (final_n < 0 || final_n >= out_size) {
-          int size_update = final_n - static_cast<int>(out_size) + 1;
-          out_size += abs(size_update);
-        }
-        else {
-          break;
-        }
-      }
-
-      return std::string(formatted.get());
-    }
 
     void readTimestampWithNanoseconds(
         const string &input,
@@ -107,10 +81,10 @@ namespace ITMLib {
     OxTSFrame readOxtslite(const string& fpath) {
       ifstream fin(fpath.c_str());
       if (! fin.is_open()) {
-        throw runtime_error(format("Could not open pose file [%s].", fpath.c_str()));
+        throw runtime_error(dynslam::utils::Format("Could not open pose file [%s].", fpath.c_str()));
       }
       if (fin.bad()) {
-        throw runtime_error(format("Could not read pose file [%s].", fpath.c_str()));
+        throw runtime_error(dynslam::utils::Format("Could not read pose file [%s].", fpath.c_str()));
       }
 
       OxTSFrame resultFrame;
@@ -200,10 +174,12 @@ namespace ITMLib {
           cout << "Initializing inv transform to first frame." << endl;
           tr_initialized = true;
           if (!transform.inv(tr_0_inv)) {
-            throw runtime_error(format("Ill-posed transform matrix inversion "
-                                       "in frame %d.", frameIdx));
+            throw runtime_error(dynslam::utils::Format(
+                "Ill-posed transform matrix inversion in frame %d.",
+                frameIdx)
+            );
           }
-          cout << "Here it is:" << endl << tr_0_inv << endl;
+//          cout << "Here it is:" << endl << tr_0_inv << endl;
         }
 
         Matrix4f newPose = tr_0_inv * transform;
