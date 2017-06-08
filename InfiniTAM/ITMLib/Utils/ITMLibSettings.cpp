@@ -8,6 +8,8 @@ using namespace ITMLib::Objects;
 
 ITMLibSettings::ITMLibSettings(void)
 //	: sceneParams(mu, maxW, voxSize, vFrust_min, vFrust_max, stopIntAtMaxW)
+//  It seems that larger mu values lead to denser maps in our case, at the cost of being somewhat
+// more sensitive to noise.
 // maxW = max # of observations to average, per voxel, before a running average starts getting
 //        computed. Decreasing this can seriously lower the memory footprint, but at the cost of quality.
 //        Going down to ~25 or 10 should still be quite OK given our fast motion.
@@ -19,9 +21,9 @@ ITMLibSettings::ITMLibSettings(void)
 // Work well in most KITTI cases:
 //	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
 // Current:
-//  It seems that larger mu values lead to denser maps in our case, at the cost of being somewhat
-// more sensitive to noise.
-	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
+// 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
+// 	to hack the translation scale when processing the ground truth.
+	: sceneParams(0.2f, 10, 0.035f, 0.1f, 300.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
@@ -57,11 +59,6 @@ ITMLibSettings::ITMLibSettings(void)
 //	useBilateralFilter = false;
 	useBilateralFilter = true;
 
-	// TODO(andrei): Original was just 'TRACKER_ICP'. Should be able to set
-	// this using a command line flag. If we were to add support for tracking
-	// using, e.g., FOVIS or libviso, or "ground truth data" (e.g., dumped by a
-	// tool running libviso into a txt file in advance), I'm guessing it would
-	// be an addition to this enum.
 //	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;
 //	trackerType = TRACKER_REN;
