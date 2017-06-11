@@ -23,7 +23,7 @@ ITMLibSettings::ITMLibSettings(void)
 // Current:
 // 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
 // 	to hack the translation scale when processing the ground truth.
-	: sceneParams(0.2f, 10, 0.035f, 0.1f, 300.0f, false)
+	: sceneParams(0.3f, 10, 0.035f, 0.1f, 300.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
