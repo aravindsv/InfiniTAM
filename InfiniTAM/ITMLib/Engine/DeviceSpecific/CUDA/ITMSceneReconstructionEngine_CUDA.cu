@@ -96,7 +96,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	Vector4f projParams_d, invProjParams_d;
 
 	ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)renderState;
-
 	M_d = trackingState->pose_d->GetM(); M_d.inv(invM_d);
 
 	projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
@@ -218,6 +217,13 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	Vector4f projParams_d, projParams_rgb;
 
 	ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)renderState;
+	if (renderState_vh->noVisibleEntries == 0) {
+		// Our view has no useful data, so there's nothing to allocate. This happens, e.g., when
+		// we fuse frames belonging to object instances, in which the actual instance is too far
+		// away. Its depth values are over the max depth threshold (and, likely too noisy) and
+		// they get ignored, leading to a blank ITMView with nothing new to integrate.
+		return;
+	}
 
 	M_d = trackingState->pose_d->GetM();
 	if (TVoxel::hasColorInformation) M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
@@ -237,20 +243,29 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	dim3 gridSize(renderState_vh->noVisibleEntries);
 
-	if (scene->sceneParams->stopIntegratingAtMaxW)
-		if (trackingState->requiresFullRendering)
-			integrateIntoScene_device<TVoxel, true, false> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
-		else
-			integrateIntoScene_device<TVoxel, true, true> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
-	else
-		if (trackingState->requiresFullRendering)
-			integrateIntoScene_device<TVoxel, false, false> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
-		else
-			integrateIntoScene_device<TVoxel, false, true> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+	if (scene->sceneParams->stopIntegratingAtMaxW) {
+		if (trackingState->requiresFullRendering) {
+			integrateIntoScene_device<TVoxel, true, false> << < gridSize, cudaBlockSize >> > (
+				localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+		} else {
+			integrateIntoScene_device<TVoxel, true, true> << < gridSize, cudaBlockSize >> > (
+				localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+		}
+	}
+	else {
+		if (trackingState->requiresFullRendering) {
+			integrateIntoScene_device<TVoxel, false, false> << < gridSize, cudaBlockSize >> > (
+					localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+		}
+		else {
+			integrateIntoScene_device<TVoxel, false, true> << < gridSize, cudaBlockSize >> > (
+				localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+		}
+	}
 }
 
 // plain voxel array

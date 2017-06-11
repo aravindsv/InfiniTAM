@@ -181,17 +181,21 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 
 	ITMRenderState_VH* renderState_vh = (ITMRenderState_VH*)renderState;
 
-	//go through list of visible 8x8x8 blocks
+	// go through list of visible 8x8x8 blocks, unless none are visible
 	{
 		const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
 		const int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
 		int noVisibleEntries = renderState_vh->noVisibleEntries;
 
-		dim3 blockSize(256);
-		dim3 gridSize((int)ceil((float)noVisibleEntries / (float)blockSize.x));
-		ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
-		projectAndSplitBlocks_device << <gridSize, blockSize >> >(hash_entries, visibleEntryIDs, noVisibleEntries, pose->GetM(),
-			intrinsics->projectionParamsSimple.all, imgSize, voxelSize, renderingBlockList_device, noTotalBlocks_device);
+		if (noVisibleEntries > 0) {
+			dim3 blockSize(256);
+			dim3 gridSize((int) ceil((float) noVisibleEntries / (float) blockSize.x));
+			ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
+			projectAndSplitBlocks_device << < gridSize, blockSize >> > (
+				hash_entries, visibleEntryIDs, noVisibleEntries, pose->GetM(),
+				intrinsics->projectionParamsSimple.all, imgSize, voxelSize,
+				renderingBlockList_device, noTotalBlocks_device);
+		}
 	}
 
 	uint noTotalBlocks;
@@ -200,10 +204,13 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 
 	// go through rendering blocks
 	{
-		// fill minmaxData
-		dim3 blockSize(16, 16);
-		dim3 gridSize((unsigned int)ceil((float)noTotalBlocks / 4.0f), 4);
-		fillBlocks_device << <gridSize, blockSize >> >(noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
+		if (noTotalBlocks > 0) {
+			// fill minmaxData
+			dim3 blockSize(16, 16);
+			dim3 gridSize((unsigned int) ceil((float) noTotalBlocks / 4.0f), 4);
+			fillBlocks_device << < gridSize, blockSize >> > (
+				noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
+		}
 	}
 }
 
