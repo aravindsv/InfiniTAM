@@ -98,7 +98,6 @@ namespace ITMLib {
 		ITMGroundTruthTracker(const string &groundTruthFpath, int frameOffset, bool use_oxts = false) {
 			cout << "Created ground truth-based tracker. Will read data from: "
 				 << groundTruthFpath << endl;
-			groundTruthPoses = readKittiOdometryPoses(groundTruthFpath);
 			this->currentFrame = frameOffset;
 			this->currentPose.setIdentity();
 
