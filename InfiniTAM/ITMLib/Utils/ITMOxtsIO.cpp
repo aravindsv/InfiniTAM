@@ -101,6 +101,56 @@ namespace ITMLib {
       return resultFrame;
     }
 
+    Matrix4f poseFromOxts(const OxTSFrame &frame, double scale) {
+      Vector2d translation2d = latLonToMercator(frame.lat, frame.lon, scale);
+      Vector3f translation(translation2d.x, translation2d.y, frame.alt);
+
+      // Extract the 3D rotation information from yaw, pitch, and roll.
+      // See the OxTS user manual, pg. 71, for more information.
+      float rollf = (float) frame.roll;
+      float pitchf = (float) frame.pitch;
+      float yawf = (float) frame.yaw;
+
+//      if (frameIdx < 10) {
+//        cout << rollf << " " << pitchf << " " << yawf << endl;
+//      }
+
+      Matrix3f rotX(          1,           0,            0,
+                              0,  cos(rollf),  -sin(rollf),
+                              0,  sin(rollf),   cos(rollf));
+      Matrix3f rotY( cos(pitchf),          0,   sin(pitchf),
+                     0,          1,             0,
+                     -sin(pitchf),          0,   cos(pitchf));
+      Matrix3f rotZ(   cos(yawf), -sin(yawf),             0,
+                       sin(yawf),  cos(yawf),             0,
+                       0,          0,             1);
+
+      Matrix3f rot = rotZ * rotY * rotX;
+
+//        rots.push_back(rot);
+//        trans.push_back(translation);
+
+      Matrix4f transform;
+      // TODO utility for this (setTransform(Matrix4f&, const Matrix3f&, const Vector3f&)
+      for (int x = 0; x < 3; ++x) {
+        for (int y = 0; y < 3; ++y) {
+          transform(y, x) = rot(x, y);
+        }
+      }
+
+      transform(3, 0) = (float) translation[0];
+      transform(3, 1) = (float) translation[1];
+      transform(3, 2) = (float) translation[2];
+      cout << "Translation: " << translation << endl;
+
+      transform(0, 3) = 0;
+      transform(1, 3) = 0;
+      transform(2, 3) = 0;
+      transform(3, 3) = 1;
+
+      return transform;
+    }
+
     vector<Matrix4f> oxtsToPoses(const vector<OxTSFrame>& oxtsFrames,
                                  vector<Vector3f>& trans,
                                  vector<Matrix3f>& rots
@@ -112,87 +162,32 @@ namespace ITMLib {
       // Matrix classes used here are COLUMN major!!
       // TODO(andrei): Ensure precision is consistent.
 
-      // TODO(andrei): Document this very clearly.
-      bool tr_initialized = false;
       // Keeps track of the inverse transform of the initial pose.
       Matrix4f tr_0_inv;
+      const OxTSFrame &first_frame = oxtsFrames[0];
+      Matrix4f first_pose = poseFromOxts(first_frame, scale);
+      if (!first_pose.inv(tr_0_inv)) {
+        throw runtime_error("Ill-posed transform matrix inversion");
+      }
 
-      for (size_t frameIdx = 0; frameIdx < oxtsFrames.size(); ++frameIdx) {
+      for (size_t frameIdx = 1; frameIdx < oxtsFrames.size(); ++frameIdx) {
         const OxTSFrame &frame = oxtsFrames[frameIdx];
+        Matrix4f pose = poseFromOxts(frame, scale);
         // Extract the 3D translation information
-        Vector2d translation2d = latLonToMercator(frame.lat, frame.lon, scale);
-        Vector3f translation(translation2d.x, translation2d.y, frame.alt);
-
-        // Extract the 3D rotation information from yaw, pitch, and roll.
-        // See the OxTS user manual, pg. 71, for more information.
-        float rollf = (float) frame.roll;
-        float pitchf = (float) frame.pitch;
-        float yawf = (float) frame.yaw;
-
         if (frameIdx < 10) {
-          cout << rollf << " " << pitchf << " " << yawf << endl;
+          cout << endl << "Transform [" << frameIdx << "]:" << endl;
+          prettyPrint(cout, pose);
         }
 
-        Matrix3f rotX(          1,           0,            0,
-                                0,  cos(rollf),  -sin(rollf),
-                                0,  sin(rollf),   cos(rollf));
-        Matrix3f rotY( cos(pitchf),          0,   sin(pitchf),
-                                 0,          1,             0,
-                      -sin(pitchf),          0,   cos(pitchf));
-        Matrix3f rotZ(   cos(yawf), -sin(yawf),             0,
-                         sin(yawf),  cos(yawf),             0,
-                                 0,          0,             1);
-
-        Matrix3f rot = rotZ * rotY * rotX;
-
-//        rots.push_back(rot);
-//        trans.push_back(translation);
-
-        Matrix4f transform;
-        // TODO utility for this (setTransform(Matrix4f&, const Matrix3f&, const Vector3f&)
-        for (int x = 0; x < 3; ++x) {
-          for (int y = 0; y < 3; ++y) {
-            transform(y, x) = rot(x, y);
-          }
-        }
-
-        transform(3, 0) = (float) translation[0];
-        transform(3, 1) = (float) translation[1];
-        transform(3, 2) = (float) translation[2];
-        cout << "Translation: " << translation << endl;
-
-        transform(0, 3) = 0;
-        transform(1, 3) = 0;
-        transform(2, 3) = 0;
-        transform(3, 3) = 1;
-
-//        cout << "Transform [" << frameIdx << "]:" << endl;
-//        prettyPrint(cout, transform);
-
-        // TODO make this more concise
-        if (! tr_initialized) {
-          cout << "Initializing inv transform to first frame." << endl;
-          tr_initialized = true;
-          if (!transform.inv(tr_0_inv)) {
-            throw runtime_error(dynslam::utils::Format(
-                "Ill-posed transform matrix inversion in frame %d.",
-                frameIdx)
-            );
-          }
-//          cout << "Here it is:" << endl << tr_0_inv << endl;
-        }
-
-        Matrix4f newPose = tr_0_inv * transform;
-//        cout << "Pose [" << frameIdx << "]: " << endl;
-//        prettyPrint(cout, newPose);
-//        poses.push_back(transform);
+        Matrix4f newPose = tr_0_inv * pose;
+        pose.inv(tr_0_inv);    // TODO(andrei): Rename this to make it clearer.
         poses.push_back(newPose);
 
-        if (frameIdx < 10) {
-          cout << "New transform:" << endl << transform << endl;
-          cout << "New transform (relative to first): " << endl << newPose
-               << endl;
-        }
+//        if (frameIdx < 10) {
+//          cout << "New transform:" << endl << transform << endl;
+//          cout << "New transform (relative to first): " << endl << newPose
+//               << endl;
+//        }
       }
 
       // TODO(andrei): We may actually just require incremental poses, not
