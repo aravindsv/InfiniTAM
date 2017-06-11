@@ -5,6 +5,7 @@
 #include "../Utils/ITMLibDefines.h"
 #include "../../ORUtils/Image.h"
 
+#include <sstream>
 #include <stdlib.h>
 
 namespace ITMLib
@@ -38,6 +39,9 @@ namespace ITMLib
 
 			void WriteOBJ(const char *fileName)
 			{
+				// TODO(andrei): The obj format doesn't support color officially. The best
+				// alternative is to use the ply format, which is easy to parse AND supports
+				// per-vertex color information officially.
 				ORUtils::MemoryBlock<Triangle> *cpu_triangles;
 				bool shouldDelete = false;
 				if (memoryType == MEMORYDEVICE_CUDA)
@@ -51,6 +55,13 @@ namespace ITMLib
 				Triangle *triangleArray = cpu_triangles->GetData(MEMORYDEVICE_CPU);
 
 				FILE *f = fopen(fileName, "w+");
+				if (noTotalTriangles > noMaxTriangles) {
+					std::stringstream ss;
+					ss << "Unable to save mesh to file [" << fileName << "]. Too many triangles: "
+					   << noTotalTriangles << " while the maximum is " << noMaxTriangles << ".";
+					throw std::runtime_error(ss.str());
+				}
+
 				if (f != NULL)
 				{
 					for (uint i = 0; i < noTotalTriangles; i++) {

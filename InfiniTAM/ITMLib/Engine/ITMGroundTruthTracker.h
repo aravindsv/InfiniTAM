@@ -28,7 +28,7 @@ namespace ITMLib {
 	class ITMGroundTruthTracker : public ITMTracker {
 
 	private:
-	  int currentFrame = 0;
+	  int currentFrame;
 	  vector<Matrix4f> groundTruthPoses;
 
 	  // TODO(andrei): Move this helper out of here.
@@ -90,9 +90,9 @@ namespace ITMLib {
 	  }
 
 		void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) {
-			this->currentFrame++;
 			Matrix4f M = groundTruthPoses[currentFrame];
 			trackingState->pose_d->SetInvM(M);
+			this->currentFrame++;
 	  }
 
 	  // Note: this doesn't seem to get used much in InfiniTAM. It's just
