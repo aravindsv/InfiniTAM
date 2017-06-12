@@ -267,7 +267,7 @@ namespace ORUtils {
 		// get values
 		_CPU_AND_GPU_CODE_ inline Vector3<T> getRow(int r) const { Vector3<T> v; for (int x = 0; x < 3; x++) v[x] = at(x, r); return v; }
 		_CPU_AND_GPU_CODE_ inline Vector3<T> getColumn(int c) const { Vector3<T> v; memcpy(v.v, this->m + 3 * c, sizeof(T) * 3); return v; }
-		_CPU_AND_GPU_CODE_ inline Matrix3 t() { // transpose
+		_CPU_AND_GPU_CODE_ inline Matrix3 t() const { // transpose
 			Matrix3 mtrans;
 			for (int x = 0; x < 3; x++)	for (int y = 0; y < 3; y++)
 				mtrans(x, y) = at(y, x);

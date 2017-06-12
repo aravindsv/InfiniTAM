@@ -65,7 +65,55 @@ namespace ITMLib {
       }
     }
 
-    /// \brief Compute the Mercator scale from the latitude.
+    Matrix3d RotFromYaw(double yaw) {
+      return Matrix3d(
+          cos(yaw), -sin(yaw),             0,
+          sin(yaw),  cos(yaw),             0,
+          0,                0,             1
+      ).t();
+    }
+
+    Matrix3d RotFromPitch(double pitch) {
+      return Matrix3d(
+          cos(pitch),          0,   sin(pitch),
+          0,        1,         0,
+          -sin(pitch),          0,   cos(pitch)
+      ).t();
+    }
+
+    Matrix3d RotFromRoll(double roll) {
+      return Matrix3d(
+          1,          0,           0,
+          0,  cos(roll),  -sin(roll),
+          0,  sin(roll),   cos(roll)
+      ).t();
+    }
+
+    Matrix3d RotFromEuler(double yaw, double pitch, double roll) {
+      return RotFromYaw(yaw) * RotFromPitch(pitch) * RotFromRoll(roll);
+    }
+
+    Matrix4d TransformFromRotTrans(const Matrix3d &rot, const Vector3d &translation) {
+      Matrix4d transform;
+      for (int x = 0; x < 3; ++x) {
+        for (int y = 0; y < 3; ++y) {
+          transform(x, y) = rot(x, y);
+        }
+      }
+
+      transform(3, 0) = translation[0];
+      transform(3, 1) = translation[1];
+      transform(3, 2) = translation[2];
+
+      transform(0, 3) = 0;
+      transform(1, 3) = 0;
+      transform(2, 3) = 0;
+      transform(3, 3) = 1;
+
+      return transform;
+    }
+
+  /// \brief Compute the Mercator scale from the latitude.
     double latToScale(double latitude) {
       return cos(latitude * M_PI / 180.0);
     }
@@ -103,80 +151,44 @@ namespace ITMLib {
 
     // TODO(andrei): There are 5+ different helper functions you can extract from this method to
     // make it leaner once it's working...
-    Matrix4f poseFromOxts(const OxTSFrame &frame, double scale, int frameIdx) {
+    Matrix4f poseFromOxts(const OxTSFrame &frame, double scale,
+                          const Vector3d &t_0,
+                          const Matrix3d &R_w_I0,
+                          int frameIdx) {
       Vector2d translation2d = latLonToMercator(frame.lat, frame.lon, scale);
       Vector3d translation(translation2d.x, translation2d.y, frame.alt);
 
-      // Hacky centering; TODO be neater
-//      translation -= Vector3d(612608, 4118210, 113.112);
+      translation -= t_0;
+
+      cout << "Translation: " << translation << endl;
 
       // Extract the 3D rotation information from yaw, pitch, and roll.
       // See the OxTS user manual, pg. 71, for more information.
-      double roll  = frame.roll;
-      double pitch = frame.pitch;
-      double yaw   = frame.yaw;
+      Matrix3d R_w_Ik = RotFromEuler(frame.yaw, frame.pitch, frame.roll);
+      Matrix3d R_I0_w = R_w_I0.t();
+      Matrix3d R_I0_Ik = R_w_Ik * R_I0_w;
 
-      if (frameIdx < 10) {
-//        cout << "Roll, pitch, yaw (heading)" << endl;
-//        cout << roll << " " << pitch << " " << yaw << endl;
-      }
+      Matrix3d R_I0_Ik_neg = R_I0_Ik;
+      R_I0_Ik_neg *= -1.0;
 
-      Matrix3d rotX = Matrix3d(
-          1,          0,           0,
-          0,  cos(roll),  -sin(roll),
-          0,  sin(roll),   cos(roll)
-      ).t();
-      Matrix3d rotY = Matrix3d(
-         cos(pitch),          0,   sin(pitch),
-         0,        1,         0,
-        -sin(pitch),          0,   cos(pitch)
-      ).t();
-      Matrix3d rotZ = Matrix3d(
-          cos(yaw), -sin(yaw),             0,
-          sin(yaw),  cos(yaw),             0,
-          0,                0,             1
-      ).t();
+      Vector3d t_k = R_I0_Ik_neg * translation;
 
-      Matrix3d rot = rotZ * rotY * rotX;
+      cout << "Rotation: " << endl << R_I0_Ik << endl;
+      cout << "Rotated translation: " << t_k << endl;
 
-//        rots.push_back(rot);
-//        trans.push_back(translation);
-
-      Matrix4d transform;
-      // TODO utility for this (setTransform(Matrix4f&, const Matrix3f&, const Vector3f&)
-      for (int x = 0; x < 3; ++x) {
-        for (int y = 0; y < 3; ++y) {
-          transform(x, y) = rot(x, y);
-        }
-      }
-
-//      transform(3, 0) = translation[1];
-//      transform(3, 1) = translation[2];
-//      transform(3, 2) = translation[0];
-      transform(3, 0) = translation[0];
-      transform(3, 1) = translation[1];
-      transform(3, 2) = translation[2];
-
-      // imu-to-velo (almost just a pure translation)
-//      R: 9.999976e-01 7.553071e-04 -2.035826e-03
-//        -7.854027e-04 9.998898e-01 -1.482298e-02
-//         2.024406e-03 1.482454e-02  9.998881e-01
-//      T: -8.086759e-01 3.195559e-01 -7.997231e-01
-      // velo-to-cam (minor translation, axis XYZ -> Z(-X)(-Y)
-      // R: 7.027555e-03 -9.999753e-01 2.599616e-05
-      // -2.254837e-03 -4.184312e-05 -9.999975e-01
-      // 9.999728e-01 7.027479e-03 -2.255075e-03
-//      T: -7.137748e-03 -7.482656e-02 -3.336324e-01
+      Matrix4d T_I0_Ik = TransformFromRotTrans(R_I0_Ik, t_k);
 
       // TODO(andrei): Read this from a file.
-      // Note that we're jumping through this hoop, namely IMU -> Velodyne -> Camera because that's
-      // how the calibration matrices are specified for the KITTI dataset.
+      // TODO(andrei): Double-check this:
+      // This matrix takes points in the IMU frame, and transforms them into the Velodyne frame.
       const Matrix4d kImuToVeloKitti = Matrix4d(
            9.999976e-01, 7.553071e-04, -2.035826e-03, -8.086759e-01,
           -7.854027e-04, 9.998898e-01, -1.482298e-02,  3.195559e-01,
            2.024406e-03, 1.482454e-02,  9.998881e-01, -7.997231e-01,
                     0.0,          0.0,           0.0,           1.0
       ).t();
+      // This matrix takes points in the velodyne frame, and transforms them into the left camera's
+      // frame. TODO(andrei): Color or gray? Does it matter?
       const Matrix4d kVeloToCamKitti = Matrix4d(
            7.027555e-03, -9.999753e-01,  2.599616e-05, -7.137748e-03,    //  0 -1  0  0.0
           -2.254837e-03, -4.184312e-05, -9.999975e-01, -7.482656e-02,    //  0  0 -1  0.0
@@ -190,17 +202,15 @@ namespace ITMLib {
          0, 0, 0, 1
       ).t();
 
-      transform(0, 3) = 0;
-      transform(1, 3) = 0;
-      transform(2, 3) = 0;
-      transform(3, 3) = 1;
+      Matrix4d T_IMU_Cam = kVeloToCamKitti * kImuToVeloKitti;
+      Matrix4d T_IMU_Cam_inv;
+      if (! T_IMU_Cam.inv(T_IMU_Cam_inv)) {
+        throw runtime_error("Ill-posed inversion.");
+      }
 
-      Matrix4d invVeloToCamKitti;
-      kVeloToCamKitti.inv(invVeloToCamKitti);
-      Matrix4d invVeloToCamKitti2;
-      kVeloToCamKitti2.inv(invVeloToCamKitti2);
-      Matrix4d invImuToVeloKitti;
-      kImuToVeloKitti.inv(invImuToVeloKitti);
+      // T_IMU_Cam = T_I*_Cam* = T_Ik_Camk, since the transform between the IMU and the camera is
+      // always the same, since they're both on the car.
+      Matrix4d T_Cam0_Camk = T_IMU_Cam * T_I0_Ik * T_IMU_Cam_inv;
 
       Matrix4d R_rect_00 = Matrix4d(
         9.999280e-01, 8.085985e-03, -8.866797e-03, 0,
@@ -221,33 +231,13 @@ namespace ITMLib {
       // So the transform we're interested in would be:
       //   Y_cam = transformCam * X
       //   transformCam = R_rect_00 * velo2cam * imuToVelo;
-      Matrix4d transformCam = R_rect_00 * kVeloToCamKitti * kImuToVeloKitti * transform;
+//      Matrix4d transformCam = R_rect_00 * kVeloToCamKitti * kImuToVeloKitti * transform;
 //      Matrix4d transformCam = R_rect_00 * kVeloToCamKitti * kImuToVeloKitti * tinv;
-
-      if (frameIdx < 10) {
-//        cout << endl;
-//
-//        cout << kVeloToCamKitti << endl;
-//        cout << kImuToVeloKitti << endl;
-        cout << "Read transform (in INU frame):" << endl;
-        cout << transform << endl;
-
-//        cout << transformCam << endl;
-//        cout << "[" << frameIdx << "] Translation (lat, lon, alt): " << translation << endl;
-//        cout << "[" << frameIdx << "] Rotation    (yaw, pit, rol): "
-//             << yawf << ", " << pitchf << ", " << rollf << endl;
-//
-//        cout << "[" << frameIdx << "] Rotation:   (matrix): " << endl << rot << endl;
-//        cout << "[" << frameIdx << "] Transform:   " << endl;
-//        prettyPrint(cout, transform);
-//
-//        cout << endl;
-      }
 
       Matrix4f transformCam_f;
       for(int x = 0; x < 4; ++x) {
         for(int y = 0; y < 4; ++y) {
-          transformCam_f.at(x, y) = static_cast<float>(transformCam.at(x, y));
+          transformCam_f.at(x, y) = static_cast<float>(T_Cam0_Camk.at(x, y));
         }
       }
       return transformCam_f;
@@ -264,9 +254,12 @@ namespace ITMLib {
       // Matrix classes used here are COLUMN major!!
       // TODO(andrei): Ensure precision is consistent.
 
-      // Keeps track of the inverse transform of the initial pose.
       const OxTSFrame &first_frame = oxtsFrames[0];
-      Matrix4f first_pose = poseFromOxts(first_frame, scale, 0);
+
+      Vector2d translation2d = latLonToMercator(first_frame.lat, first_frame.lon, scale);
+      Vector3d t_0(translation2d.x, translation2d.y, first_frame.alt);
+      Matrix3d R_w_I0 = RotFromEuler(first_frame.yaw, first_frame.pitch, first_frame.roll);
+      Matrix4f first_pose = poseFromOxts(first_frame, scale, t_0, R_w_I0, 0);
 
       Matrix4f tr_0_inv;
       if (!first_pose.inv(tr_0_inv)) {
@@ -275,10 +268,12 @@ namespace ITMLib {
 
       for (size_t frameIdx = 1; frameIdx < oxtsFrames.size(); ++frameIdx) {
         const OxTSFrame &frame = oxtsFrames[frameIdx];
-        Matrix4f pose = poseFromOxts(frame, scale, frameIdx);
+        Matrix4f pose = poseFromOxts(frame, scale, t_0, R_w_I0, frameIdx);
         Matrix4f newPose = tr_0_inv * pose;
 //        pose.inv(tr_0_inv);    // TODO(andrei): Rename this to make it clearer.
         poses.push_back(newPose);
+
+        // TODO(andrei): Dump converted GPS/IMU data and plot it in python as a sanity check.
 
         if (frameIdx < 10) {
           cout << "New transform (relative to first): " << endl
