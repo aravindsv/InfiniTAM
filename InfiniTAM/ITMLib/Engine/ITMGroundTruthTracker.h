@@ -58,12 +58,14 @@ namespace ITMLib {
 		// Keep track of relative transforms, which makes it easier to start reconstructing from an
 		// arbitrary frame, among other things.
 		vector<Matrix4f> poses;
-		Matrix4f first = readPose(fin);
-		Matrix4f inv_prev;
-		first.inv(inv_prev);
-		Matrix4f eye;
-		eye.setIdentity();
-		poses.push_back(eye);
+//		Matrix4f first = readPose(fin);
+//		Matrix4f inv_prev;
+//		first.inv(inv_prev);
+//		Matrix4f eye;
+//		eye.setIdentity();
+//		poses.push_back(eye);
+
+//		  poses.push_back()
 
 		while (! fin.eof()) {
 			// This matrix takes a point in the ith coordinate system, and projects it
@@ -74,9 +76,10 @@ namespace ITMLib {
 			//
 			// One therefore needs to set this pose as 'InvM' in the InfiniTAM tracker state.
 			Matrix4f new_pose = readPose(fin);
-			Matrix4f rel_pose = inv_prev * new_pose;
-			new_pose.inv(inv_prev);
-			poses.push_back(rel_pose);
+//			Matrix4f rel_pose = inv_prev * new_pose;
+//			new_pose.inv(inv_prev);
+//			poses.push_back(rel_pose);
+          	poses.push_back(new_pose);
 		}
 
 		return poses;
@@ -118,8 +121,12 @@ namespace ITMLib {
 			// nothing to track).
 			this->currentFrame++;
 			Matrix4f Minc = groundTruthPoses[currentFrame];
-			currentPose = currentPose * Minc;
-			trackingState->pose_d->SetInvM(currentPose);
+//			currentPose = currentPose * Minc;
+//			trackingState->pose_d->SetInvM(currentPose);
+
+			cout << endl << Minc << endl;
+
+			trackingState->pose_d->SetInvM(Minc);
 		}
 
 	  // Note: this doesn't seem to get used much in InfiniTAM. It's just
