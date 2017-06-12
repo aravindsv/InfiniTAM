@@ -21,9 +21,9 @@ namespace ITMLib {
 		  double lon;
 		  // altitude of the oxts-unit (m)
 		  double alt;
-		  //roll angle (rad),  0 = level, positive = left side up (-pi..pi)
+		  // roll angle (rad),  0 = level, positive = left side up (-pi..pi)
 		  double roll;
-		  //itch angle (rad), 0 = level, positive = front down (-pi/2..pi/2)
+		  // pitch angle (rad), 0 = level, positive = front down (-pi/2..pi/2)
 		  double pitch;
 		  // heading (rad),     0 = east,  positive = counter clockwise (-pi. .pi);
 		  double yaw;
@@ -31,35 +31,35 @@ namespace ITMLib {
 		  double vn;
 		  // velocity towards east (m/s);
 		  double ve;
-		  //  forward velocity, i.e. parallel to earth-surface (m/s)
+		  // forward velocity, i.e. parallel to earth-surface (m/s)
 		  double vf;
-		  //  leftward velocity, i.e. parallel to earth-surface (m/s)
+		  // leftward velocity, i.e. parallel to earth-surface (m/s)
 		  double vl;
-		  //  upward velocity, i.e. perpendicular to earth-surface (m/s)
+		  // upward velocity, i.e. perpendicular to earth-surface (m/s)
 		  double vu;
-		  //  acceleration in x, i.e. in direction of vehicle front (m/s^2)
+		  // acceleration in x, i.e. in direction of vehicle front (m/s^2)
 		  double ax;
-		  //  acceleration in y, i.e. in direction of vehicle left (m/s^2)
+		  // acceleration in y, i.e. in direction of vehicle left (m/s^2)
 		  double ay;
-		  //  acceleration in z, i.e. in direction of vehicle top (m/s^2)
+		  // acceleration in z, i.e. in direction of vehicle top (m/s^2)
 		  double az;
-		  //  forward acceleration (m/s^2)
+		  // forward acceleration (m/s^2)
 		  double af;
-		  //  leftward acceleration (m/s^2)
+		  // leftward acceleration (m/s^2)
 		  double al;
-		  //  upward acceleration (m/s^2)
+		  // upward acceleration (m/s^2)
 		  double au;
-		  //  angular rate around x (rad/s)
+		  // angular rate around x (rad/s)
 		  double wx;
-		  //  angular rate around y (rad/s)
+		  // angular rate around y (rad/s)
 		  double wy;
-		  //  angular rate around z (rad/s)
+		  // angular rate around z (rad/s)
 		  double wz;
-		  //  angular rate around forward axis (rad/s)
+		  // angular rate around forward axis (rad/s)
 		  double wf;
-		  //  angular rate around leftward axis (rad/s)
+		  // angular rate around leftward axis (rad/s)
 		  double wl;
-		  //  angular rate around upward axis (rad/s)
+		  // angular rate around upward axis (rad/s)
 		  double wu;
 		  // velocity accuracy (north/east in m)
 		  double posacc;

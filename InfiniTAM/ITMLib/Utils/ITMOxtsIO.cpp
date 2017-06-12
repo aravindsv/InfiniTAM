@@ -202,15 +202,27 @@ namespace ITMLib {
       Matrix4d invImuToVeloKitti;
       kImuToVeloKitti.inv(invImuToVeloKitti);
 
+      Matrix4d R_rect_00 = Matrix4d(
+        9.999280e-01, 8.085985e-03, -8.866797e-03, 0,
+        -8.123205e-03, 9.999583e-01, -4.169750e-03, 0,
+        8.832711e-03, 4.241477e-03, 9.999520e-01, 0,
+        0, 0, 0, 1
+      );
+
+//      Matrix4d tinv;
+//      transform.inv(tinv);
+
       // This IMHO looks like the correct way, but doesn't work
-      Matrix4d transformCam = kVeloToCamKitti * kImuToVeloKitti * transform;
-
-//      Y = P_rect_xx * R_rect_00 * (R|T)_velo_to_cam * (R|T)_imu_to_velo * X
+      // From the dataset devkit docs:
+      // To transform a point X from GPS/IMU coordinates to the image plane:
+      //   Y = P_rect_xx * R_rect_00 * (R|T)_velo_to_cam * (R|T)_imu_to_velo * X
       // Since we're not projecting points to 2D, what we basically care about is the following
-      // transform = R_rect_00 * velo2cam * imuToVelo;
-
-//      Matrix4d transformCam =  transform * invVeloToCamKitti2 * invImuToVeloKitti;
-//      Matrix4d transformCam = transform;
+      //   Y_cam = R_rect_00 * velo2cam * imuToVelo * X;
+      // So the transform we're interested in would be:
+      //   Y_cam = transformCam * X
+      //   transformCam = R_rect_00 * velo2cam * imuToVelo;
+      Matrix4d transformCam = R_rect_00 * kVeloToCamKitti * kImuToVeloKitti * transform;
+//      Matrix4d transformCam = R_rect_00 * kVeloToCamKitti * kImuToVeloKitti * tinv;
 
       if (frameIdx < 10) {
 //        cout << endl;
