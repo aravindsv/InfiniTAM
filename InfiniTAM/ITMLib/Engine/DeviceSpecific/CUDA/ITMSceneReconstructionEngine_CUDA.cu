@@ -126,7 +126,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
-	AllocationTempData *tempData = (AllocationTempData*)allocationTempData_host;
+	AllocationTempData *tempData = static_cast<AllocationTempData*>(allocationTempData_host);
 	tempData->noAllocatedVoxelEntries = scene->localVBA.lastFreeBlockId;
 	tempData->noAllocatedExcessEntries = scene->index.GetLastFreeExcessListId();
 	tempData->noVisibleEntries = 0;
@@ -151,13 +151,19 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			noTotalEntries, (AllocationTempData*)allocationTempData_device, entriesAllocType_device, entriesVisibleType,
 			blockCoords_device);
 	}
+	// Ensure updating the existing visible list went well.
+	ITMSafeCall(cudaGetLastError());
 
-	if (useSwapping)
+	if (useSwapping) {
 		buildVisibleList_device<true> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleEntryIDs,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
-	else
+	}
+	else {
 		buildVisibleList_device<false> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleEntryIDs,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
+	}
+	// Ensure the visible list construction kernel ran OK.
+	ITMSafeCall(cudaGetLastError());
 
 	if (useSwapping)
 	{
@@ -165,6 +171,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType);
 	}
 
+	printf("Copying data from device: %lu bytes\n", sizeof(AllocationTempData));
+	printf("Device ptr: %p\n", allocationTempData_device);
+	printf("Host ptr: %p\n", tempData);
+	printf("Last CUDA error code: %d\n", cudaGetLastError());
 	ITMSafeCall(cudaMemcpy(tempData, allocationTempData_device, sizeof(AllocationTempData), cudaMemcpyDeviceToHost));
 	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
@@ -222,6 +232,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 		// we fuse frames belonging to object instances, in which the actual instance is too far
 		// away. Its depth values are over the max depth threshold (and, likely too noisy) and
 		// they get ignored, leading to a blank ITMView with nothing new to integrate.
+		printf("Nothing visible in frame. Skipping integration...\n");
 		return;
 	}
 

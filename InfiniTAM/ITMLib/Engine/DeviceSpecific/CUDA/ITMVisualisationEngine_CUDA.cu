@@ -191,6 +191,7 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 			dim3 blockSize(256);
 			dim3 gridSize((int) ceil((float) noVisibleEntries / (float) blockSize.x));
 			ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
+
 			projectAndSplitBlocks_device << < gridSize, blockSize >> > (
 				hash_entries, visibleEntryIDs, noVisibleEntries, pose->GetM(),
 				intrinsics->projectionParamsSimple.all, imgSize, voxelSize,
@@ -208,6 +209,8 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 			// fill minmaxData
 			dim3 blockSize(16, 16);
 			dim3 gridSize((unsigned int) ceil((float) noTotalBlocks / 4.0f), 4);
+			fprintf(stderr, "Calling fillBlocks_device gs = (%d %d %d) for %d total blocks.\n",
+					gridSize.x, gridSize.y, gridSize.z, noTotalBlocks);
 			fillBlocks_device << < gridSize, blockSize >> > (
 				noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
 		}
@@ -522,17 +525,21 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 {
 	int x = threadIdx.x;
 	int y = threadIdx.y;
+  // TODO(andrei): use blockDim.y instead of the '4'.
 	int block = blockIdx.x * 4 + blockIdx.y;
 	if (block >= *noTotalBlocks) return;
 
-	const RenderingBlock & b(renderingBlocks[block]);
-	int xpos = b.upperLeft.x + x;
-	if (xpos > b.lowerRight.x) return;
-	int ypos = b.upperLeft.y + y;
-	if (ypos > b.lowerRight.y) return;
+	// XXX: It seems that the weird instance-based reconstruction crash bug stems from the second
+	// half of this kernel.
 
-	Vector2f & pixel(minmaxData[xpos + ypos*imgSize.x]);
-	atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
+//	const RenderingBlock & b(renderingBlocks[block]);
+//	int xpos = b.upperLeft.x + x;
+//	if (xpos > b.lowerRight.x) return;
+//	int ypos = b.upperLeft.y + y;
+//	if (ypos > b.lowerRight.y) return;
+//
+//	Vector2f & pixel(minmaxData[xpos + ypos*imgSize.x]);
+//	atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
 }
 
 __global__ void findMissingPoints_device(int *fwdProjMissingPoints, uint *noMissingPoints, const Vector2f *minmaximg,

@@ -14,7 +14,7 @@ void __cudaSafeCall(cudaError err, const char *file, const int line) {
 		const int kStackTraceDepth = 32;
 		// The number of top entries to skip when printing the stack trace.
 		// These include two internal layers from `backward-cpp`, plus this current function.
-		const int kStackTraceSkip = 3;
+		const int kStackTraceSkip = 0;
 
 		fprintf(stderr, "\nCUDA error. See stacktrace and details below:\n\n");
 
@@ -25,14 +25,18 @@ void __cudaSafeCall(cudaError err, const char *file, const int line) {
 		// Disable printing out boilerplate stack frames from the stack trace
 		// processing code.
 		st.skip_n_firsts(kStackTraceSkip);
+
+		// TODO(andrei): Make the printer use $source($line) ... format, so that the err positions
+		// become clickable in CLion.
 		Printer p;
 		p.address = true;
 		p.print(st);
 		fprintf(stderr, "\n");
 #endif
 
-		fprintf(stderr, "%s(%i) : cudaSafeCall() Runtime API error : %s.\n",
-				file, line, cudaGetErrorString(err));
+		fprintf(stderr, "%s(%i) : cudaSafeCall() Runtime API error : %d | %s.\n",
+				file, line, err, cudaGetErrorString(err));
+		fflush(stderr);
 
 		exit(-1);
 	}
