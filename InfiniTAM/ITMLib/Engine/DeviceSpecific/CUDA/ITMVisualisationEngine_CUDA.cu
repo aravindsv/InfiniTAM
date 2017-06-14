@@ -532,14 +532,14 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 	// XXX: It seems that the weird instance-based reconstruction crash bug stems from the second
 	// half of this kernel.
 
-//	const RenderingBlock & b(renderingBlocks[block]);
-//	int xpos = b.upperLeft.x + x;
-//	if (xpos > b.lowerRight.x) return;
-//	int ypos = b.upperLeft.y + y;
-//	if (ypos > b.lowerRight.y) return;
-//
-//	Vector2f & pixel(minmaxData[xpos + ypos*imgSize.x]);
-//	atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
+	const RenderingBlock & b(renderingBlocks[block]);
+	int xpos = b.upperLeft.x + x;
+	if (xpos > b.lowerRight.x) return;
+	int ypos = b.upperLeft.y + y;
+	if (ypos > b.lowerRight.y) return;
+
+	Vector2f & pixel(minmaxData[xpos + ypos*imgSize.x]);
+	atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
 }
 
 __global__ void findMissingPoints_device(int *fwdProjMissingPoints, uint *noMissingPoints, const Vector2f *minmaximg,

@@ -173,7 +173,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	printf("Copying data from device: %lu bytes\n", sizeof(AllocationTempData));
 	printf("Device ptr: %p\n", allocationTempData_device);
-	printf("Host ptr: %p\n", tempData);
+	printf("Host ptr: %p\n", allocationTempData_device);
 	printf("Last CUDA error code: %d\n", cudaGetLastError());
 	ITMSafeCall(cudaMemcpy(tempData, allocationTempData_device, sizeof(AllocationTempData), cudaMemcpyDeviceToHost));
 	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
