@@ -209,8 +209,6 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 			// fill minmaxData
 			dim3 blockSize(16, 16);
 			dim3 gridSize((unsigned int) ceil((float) noTotalBlocks / 4.0f), 4);
-			fprintf(stderr, "Calling fillBlocks_device gs = (%d %d %d) for %d total blocks.\n",
-					gridSize.x, gridSize.y, gridSize.z, noTotalBlocks);
 			fillBlocks_device << < gridSize, blockSize >> > (
 				noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
 		}
@@ -525,12 +523,11 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 {
 	int x = threadIdx.x;
 	int y = threadIdx.y;
-  // TODO(andrei): use blockDim.y instead of the '4'.
-	int block = blockIdx.x * 4 + blockIdx.y;
+	int block = blockIdx.x * blockDim.y + blockIdx.y;
 	if (block >= *noTotalBlocks) return;
 
-	// XXX: It seems that the weird instance-based reconstruction crash bug stems from the second
-	// half of this kernel.
+	// Note: It seems that the weird instance-based reconstruction crash (cuda error 77) bug stems
+	// from the second half of this kernel (June 2017).
 
 	const RenderingBlock & b(renderingBlocks[block]);
 	int xpos = b.upperLeft.x + x;

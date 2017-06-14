@@ -171,25 +171,19 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType);
 	}
 
-	printf("Copying data from device: %lu bytes\n", sizeof(AllocationTempData));
-	printf("Device ptr: %p\n", allocationTempData_device);
-	printf("Host ptr: %p\n", allocationTempData_device);
-	printf("Last CUDA error code: %d\n", cudaGetLastError());
 	ITMSafeCall(cudaMemcpy(tempData, allocationTempData_device, sizeof(AllocationTempData), cudaMemcpyDeviceToHost));
 	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
 	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
 
 	// Display some memory stats, useful for debugging mapping failures.
-//	printf("Total supported visible entries:  %d\n", noTotalEntries);
-	printf("Visible entries: %d\n", tempData->noVisibleEntries);
-	printf("Allocated voxel blocks in local GPU buffer: %d\n", scene->index.getNumAllocatedVoxelBlocks());
-	printf("Last free block ID:       %d\n", scene->localVBA.lastFreeBlockId);
-	printf("Last free excess list ID: %d\n", scene->index.GetLastFreeExcessListId());
-	printf("Allocated size:         %d\n", scene->localVBA.allocatedSize);
-	printf("\n");
-	// TODO(andrei): Does the stereo infinitam followup use a crf to enforce smoothness of the model
-	// itself, or just for the segmentation and shiiet?
+	printf("Visible entries: %8d | Allocated blocks in GPU buffer: %8d | "
+			"Last free block ID %8d | Last free excess block ID: %8d | Allocated size: %8d\n",
+			tempData->noVisibleEntries,
+			scene->index.getNumAllocatedVoxelBlocks(),
+			scene->localVBA.lastFreeBlockId,
+			scene->index.GetLastFreeExcessListId(),
+			scene->localVBA.allocatedSize);
 
 	ITMHashEntry *entries = scene->index.GetEntries();
 	if (scene->localVBA.lastFreeBlockId == 0) {
@@ -202,7 +196,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 				"Invalid free voxel block ID. InfiniTAM has likely run out of GPU memory.");
 	}
 
-  // TODO(andrei): Figure out how to find blocks which are actually populated.
+  // TODO(andrei): Figure out how to quickly find how many blocks are actually populated.
 //	Vector4s *blockCoords_h = new Vector4s[noTotalEntries];
 //	ITMSafeCall(cudaMemcpy(blockCoords_h, blockCoords_device,
 //						   sizeof(Vector4s) * noTotalEntries, cudaMemcpyDeviceToHost));
@@ -232,7 +226,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 		// we fuse frames belonging to object instances, in which the actual instance is too far
 		// away. Its depth values are over the max depth threshold (and, likely too noisy) and
 		// they get ignored, leading to a blank ITMView with nothing new to integrate.
-		printf("Nothing visible in frame. Skipping integration...\n");
 		return;
 	}
 
