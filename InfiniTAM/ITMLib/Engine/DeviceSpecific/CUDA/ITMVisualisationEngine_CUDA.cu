@@ -523,7 +523,7 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 {
 	int x = threadIdx.x;
 	int y = threadIdx.y;
-	int block = blockIdx.x * blockDim.y + blockIdx.y;
+	int block = blockIdx.x * 4 + blockIdx.y;
 	if (block >= *noTotalBlocks) return;
 
 	// Note: It seems that the weird instance-based reconstruction crash (cuda error 77) bug stems
