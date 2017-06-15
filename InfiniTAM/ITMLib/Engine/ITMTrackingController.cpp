@@ -42,7 +42,5 @@ void ITMTrackingController::Prepare(ITMTrackingState *trackingState, const ITMVi
 			visualisationEngine->ForwardRender(view, trackingState, renderState);
 			trackingState->age_pointCloud++;
 		}
-
-		ITMSafeCall(cudaGetLastError());
 	}
 }

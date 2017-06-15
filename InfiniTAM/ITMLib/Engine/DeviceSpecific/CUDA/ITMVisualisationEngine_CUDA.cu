@@ -209,8 +209,18 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 			// fill minmaxData
 			dim3 blockSize(16, 16);
 			dim3 gridSize((unsigned int) ceil((float) noTotalBlocks / 4.0f), 4);
+//			fprintf(stderr, "Calling fillBlocks_device gs = (%d %d %d) for %d total blocks.\n",
+//					gridSize.x, gridSize.y, gridSize.z, noTotalBlocks);
+//			fprintf(stderr, "MAX_RENDERING_BLOCKS = %d\n", MAX_RENDERING_BLOCKS);
+//			fprintf(stderr, "imgSize [%d x %d]\n", imgSize[0], imgSize[1]);
+
 			fillBlocks_device << < gridSize, blockSize >> > (
 				noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
+
+          	// TODO(andrei): Remove this once bug is completely fixed. Right now it seems the above
+			// fillBlocks kernel is trying to access negative coords.
+			ITMSafeCall(cudaDeviceSynchronize());
+			ITMSafeCall(cudaGetLastError());
 		}
 	}
 }
@@ -535,8 +545,16 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 	int ypos = b.upperLeft.y + y;
 	if (ypos > b.lowerRight.y) return;
 
+	// It seems that this check is useful in preventing an elusive bug where xpos and/or ypos are
+	// negative for some reason.
+	if (xpos >= imgSize.x || ypos >= imgSize.y || xpos < 0 || ypos < 0) {
+      return;
+	}
+
 	Vector2f & pixel(minmaxData[xpos + ypos*imgSize.x]);
-	atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
+	atomicMin(&pixel.x, b.zRange.x);		// The crash is on this line, caused it seems by xpos
+											// and ypos being less than 0.
+	atomicMax(&pixel.y, b.zRange.y);
 }
 
 __global__ void findMissingPoints_device(int *fwdProjMissingPoints, uint *noMissingPoints, const Vector2f *minmaximg,
