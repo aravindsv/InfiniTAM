@@ -280,6 +280,55 @@ _CPU_AND_GPU_CODE_ inline void drawPixelColour(DEVICEPTR(Vector4u) & dest, const
 	dest.w = 255;
 }
 
+/// \brief Renders a voxel based on the weight associated with its depth.
+/// Saturated (max-weight) voxels are rendered as blue, while single-measurement ones (weight 1) are
+/// colored red.
+template<class TVoxel, class TIndex>
+_CPU_AND_GPU_CODE_ inline void drawPixelWeight(
+	DEVICEPTR(Vector4u) & dest,
+	const CONSTPTR(Vector3f) & point,
+	const CONSTPTR(TVoxel) *voxelBlockData,
+	const CONSTPTR(typename TIndex::IndexData) *indexData,
+	int maxWeight,
+	float overlayWeight
+) {
+	// TODO(andrei): Support interpolated reads of the weights (w_depth, w_color), if useful. Not
+	// interpolating things causes flickering artifacts.
+	drawPixelColour<TVoxel, TIndex>(dest, point, voxelBlockData, indexData);
+
+	// Dummy variables
+	bool isFound = false;
+	typename TIndex::IndexCache cache;
+	Vector3i ipos(point.x, point.y, point.z);
+	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
+	uchar intensity = (uchar)(255.0f * (((float)resn.w_depth) / maxWeight));
+
+	Vector4u overlay;
+	if (resn.w_depth == maxWeight) {
+		overlay.r = 45;
+		overlay.g = 45;
+		overlay.b = 255;
+	}
+	else if (resn.w_depth <= 1){
+		overlay.r = 255;
+		overlay.g = 0;
+		overlay.b = 0;
+	}
+	else {
+		overlay.r = intensity;
+		overlay.g = intensity;
+		overlay.b = intensity;
+	}
+
+//	dest = (dest * (1.0 - overlayWeight)) + (overlay * overlayWeight);
+   Vector4f destf = (Vector4f(dest.r, dest.g, dest.b, dest.a) * (1.0 - overlayWeight)) +
+		            (Vector4f(overlay.r, overlay.g, overlay.b, overlay.a) * (overlayWeight));
+	dest.r = (uchar) destf.r;
+	dest.g = (uchar) destf.g;
+	dest.b = (uchar) destf.b;
+	dest.a = 255;
+};
+
 
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void processPixelICP(DEVICEPTR(Vector4u) &outRendering, DEVICEPTR(Vector4f) &pointsMap, DEVICEPTR(Vector4f) &normalsMap,
@@ -382,10 +431,14 @@ _CPU_AND_GPU_CODE_ inline void processPixelGrey(DEVICEPTR(Vector4u) &outRenderin
 }
 
 template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline void processPixelColour(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,
-	bool foundPoint, const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex, 
-	Vector3f lightSource)
-{
+_CPU_AND_GPU_CODE_ inline void processPixelColour(
+	DEVICEPTR(Vector4u) &outRendering,
+	const CONSTPTR(Vector3f) & point,
+	bool foundPoint,
+	const CONSTPTR(TVoxel) *voxelData,
+	const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
+	Vector3f lightSource
+) {
 	Vector3f outNormal;
 	float angle;
 
@@ -393,6 +446,36 @@ _CPU_AND_GPU_CODE_ inline void processPixelColour(DEVICEPTR(Vector4u) &outRender
 
 	if (foundPoint) drawPixelColour<TVoxel, TIndex>(outRendering, point, voxelData, voxelIndex);
 	else outRendering = Vector4u((uchar)0);
+}
+
+
+/// \brief Like 'processPixelColor', but with the option of overlaying information about the voxel
+///        weight, i.e., the number of measurements that were fused in.
+/// \param overlayWeight Specifies the intensity of the blended voxel weight information.
+template<class TVoxel, class TIndex>
+_CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
+		DEVICEPTR(Vector4u) &outRendering,
+		const CONSTPTR(Vector3f) & point,
+		bool foundPoint,
+		const CONSTPTR(TVoxel) *voxelData,
+		const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
+		Vector3f lightSource,
+		int maxWeight,
+		float overlayWeight = 0.5
+) {
+	Vector3f outNormal;
+	float angle;
+
+	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
+
+	if (foundPoint) {
+		drawPixelWeight<TVoxel, TIndex>(outRendering, point,
+										voxelData, voxelIndex,
+										maxWeight, overlayWeight);
+	}
+	else {
+		outRendering = Vector4u((uchar)0);
+	}
 }
 
 

@@ -23,7 +23,10 @@ namespace ITMLib
 			{
 				RENDER_SHADED_GREYSCALE,
 				RENDER_COLOUR_FROM_VOLUME,
-				RENDER_COLOUR_FROM_NORMAL
+				RENDER_COLOUR_FROM_NORMAL,
+			  	// Note: not supported on the CPU (TODO(andrei): Support this on the CPU based on
+				// the CUDA code. It should be very straightforward.)
+				RENDER_COLOUR_FROM_DEPTH_WEIGHT
 			};
 
 			virtual ~IITMVisualisationEngine(void) {}

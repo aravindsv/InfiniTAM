@@ -71,6 +71,8 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &v
 {
 	Vector4f pt_camera; Vector2f pt_image;
 	Vector3f rgb_measure, oldC, newC; Vector3u buffV3u;
+
+	// TODO(andrei): If you want to pass in custom weights, looks like this is the place to do it.
 	float newW, oldW;
 
 	buffV3u = voxel.clr;
@@ -118,12 +120,19 @@ struct ComputeUpdatedVoxelInfo<false, TVoxel> {
 
 template<class TVoxel>
 struct ComputeUpdatedVoxelInfo<true, TVoxel> {
-	_CPU_AND_GPU_CODE_ static void compute(DEVICEPTR(TVoxel) & voxel, const THREADPTR(Vector4f) & pt_model,
-		const THREADPTR(Matrix4f) & M_d, const THREADPTR(Vector4f) & projParams_d,
-		const THREADPTR(Matrix4f) & M_rgb, const THREADPTR(Vector4f) & projParams_rgb,
-		float mu, int maxW,
-		const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize_d,
-		const CONSTPTR(Vector4u) *rgb, const THREADPTR(Vector2i) & imgSize_rgb)
+	_CPU_AND_GPU_CODE_ static void compute(
+		DEVICEPTR(TVoxel) & voxel,
+		const THREADPTR(Vector4f) & pt_model,
+		const THREADPTR(Matrix4f) & M_d,
+		const THREADPTR(Vector4f) & projParams_d,
+		const THREADPTR(Matrix4f) & M_rgb,
+		const THREADPTR(Vector4f) & projParams_rgb,
+		float mu,
+		int maxW,
+		const CONSTPTR(float) *depth,
+		const CONSTPTR(Vector2i) & imgSize_d,
+		const CONSTPTR(Vector4u) *rgb,
+		const THREADPTR(Vector2i) & imgSize_rgb)
 	{
 		float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
 		if ((eta > mu) || (fabs(eta / mu) > 0.25f)) {

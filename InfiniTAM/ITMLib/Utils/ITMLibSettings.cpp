@@ -103,12 +103,11 @@ ITMLibSettings::ITMLibSettings(void)
 		printf("Error: Color tracker requires a voxel type with color information!\n");
 	}
 
-  // TODO(andrei): Consider setting this via the command line.
-//	groundTruthPoseFpath = "/home/andrei/datasets/kitti/2011_09_26"
-//			"/2011_09_26_drive_0019_sync/oxts/";
-	groundTruthPoseFpath = "/home/barsana/datasets/kitti/odometry-dataset/poses/06.txt";
-
+	// When this tracker is used, these parameters get set on engine creation.
+	groundTruthPoseFpath = "";
 	groundTruthPoseOffset = 0;
+
+	sdfLocalBlockNum = 0xF1000; 		// Original: 0x40000
 }
 
 ITMLibSettings::~ITMLibSettings()

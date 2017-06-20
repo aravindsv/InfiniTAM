@@ -66,6 +66,16 @@ template<class TVoxel, class TIndex>
 __global__ void renderColour_device(Vector4u *outRendering, const Vector4f *ptsRay, const TVoxel *voxelData,
 	const typename TIndex::IndexData *voxelIndex, Vector2i imgSize, Vector3f lightSource);
 
+template<class TVoxel, class TIndex>
+__global__ void renderColourFromWeight_device(
+		Vector4u *outRendering,
+		const Vector4f *ptsRay,
+		const TVoxel *voxelData,
+		const typename TIndex::IndexData *voxelIndex,
+		Vector2i imgSize,
+		Vector3f lightSource,
+		int maxW);
+
 // class implementation
 
 template<class TVoxel, class TIndex>
@@ -250,9 +260,14 @@ static void GenericRaycast(const ITMScene<TVoxel, TIndex> *scene, const Vector2i
 }
 
 template<class TVoxel, class TIndex>
-static void RenderImage_common(const ITMScene<TVoxel, TIndex> *scene, const ITMPose *pose, const ITMIntrinsics *intrinsics, const ITMRenderState *renderState,
-	ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type)
-{
+static void RenderImage_common(
+		const ITMScene<TVoxel, TIndex> *scene,
+		const ITMPose *pose,
+		const ITMIntrinsics *intrinsics,
+		const ITMRenderState *renderState,
+		ITMUChar4Image *outputImage,
+		IITMVisualisationEngine::RenderImageType type
+) {
 	Vector2i imgSize = outputImage->noDims;
 	Matrix4f invM = pose->GetInvM();
 
@@ -277,6 +292,11 @@ static void RenderImage_common(const ITMScene<TVoxel, TIndex> *scene, const ITMP
 		renderColourFromNormal_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
 			scene->index.getIndexData(), imgSize, lightSource);
 		break;
+	case IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT:
+		renderColourFromWeight_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
+				scene->index.getIndexData(), imgSize, lightSource, scene->sceneParams->maxW);
+		break;
+
 	case IITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
 	default:
 		renderGrey_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
@@ -681,6 +701,33 @@ __global__ void renderColourFromNormal_device(Vector4u *outRendering, const Vect
 	Vector4f ptRay = ptsRay[locId];
 
 	processPixelNormal<TVoxel, TIndex>(outRendering[locId], ptRay.toVector3(), ptRay.w > 0, voxelData, voxelIndex, lightSource);
+}
+
+template<class TVoxel, class TIndex>
+__global__ void renderColourFromWeight_device(
+		Vector4u *outRendering,
+		const Vector4f *ptsRay,
+		const TVoxel *voxelData,
+		const typename TIndex::IndexData *voxelIndex,
+		Vector2i imgSize,
+		Vector3f lightSource,
+		int maxW
+) {
+	int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
+	if (x >= imgSize.x || y >= imgSize.y) {
+		return;
+	}
+	int locId = x + y * imgSize.x;
+
+	Vector4f ptRay = ptsRay[locId];
+	processPixelColourWeight<TVoxel, TIndex>(
+			outRendering[locId],
+			ptRay.toVector3(),
+			ptRay.w > 0,
+			voxelData,
+			voxelIndex,
+			lightSource,
+			maxW);
 }
 
 template<class TVoxel, class TIndex>

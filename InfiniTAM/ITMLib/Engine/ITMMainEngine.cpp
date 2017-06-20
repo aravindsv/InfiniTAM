@@ -202,11 +202,21 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL:
+	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_DEPTH_WEIGHT:
 	{
 		IITMVisualisationEngine::RenderImageType type = IITMVisualisationEngine::RENDER_SHADED_GREYSCALE;
-		if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME) type = IITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME;
-		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL) type = IITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
-		if (renderState_freeview == NULL) renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+		if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME) {
+			type = IITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME;
+		}
+		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL) {
+			type = IITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
+		}
+		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_DEPTH_WEIGHT) {
+			type = IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT;
+		}
+		if (renderState_freeview == NULL) {
+			renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+		}
 
 		// This renders the free camera view. It uses raycasting.
 		visualisationEngine->FindVisibleBlocks(pose, intrinsics, renderState_freeview);
