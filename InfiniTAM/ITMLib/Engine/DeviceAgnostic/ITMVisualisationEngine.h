@@ -320,7 +320,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 		overlay.b = intensity;
 	}
 
-//	dest = (dest * (1.0 - overlayWeight)) + (overlay * overlayWeight);
+	// Operate with float vectors to support correct multiplication with scalar floats.
    Vector4f destf = (Vector4f(dest.r, dest.g, dest.b, dest.a) * (1.0 - overlayWeight)) +
 		            (Vector4f(overlay.r, overlay.g, overlay.b, overlay.a) * (overlayWeight));
 	dest.r = (uchar) destf.r;
