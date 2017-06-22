@@ -50,7 +50,7 @@ const long SDF_HASH_MASK = SDF_BUCKET_NUM - 1;
 // visualization engine. I'm not 100% sure why those happen; it may be some weird interplay between
 // this and MAX_RENDERING_BLOCKS. Or it may just be some other, even darker, bug which is otherwise
 // concealed by using smaller buffer sizes.
-#define SDF_EXCESS_LIST_SIZE 0x48000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
+#define SDF_EXCESS_LIST_SIZE 0x50000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
 #define SDF_GLOBAL_BLOCK_NUM (SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE)	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
 
 //#define SDF_EXCESS_LIST_SIZE 0x10000
