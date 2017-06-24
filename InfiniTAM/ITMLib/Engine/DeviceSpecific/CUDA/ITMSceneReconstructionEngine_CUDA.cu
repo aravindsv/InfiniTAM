@@ -161,6 +161,30 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 	}
 
+	// visibleEntryIDs is now populated with block IDs (?) which are visible.
+	int totalBlockCount = scene->index.getNumAllocatedVoxelBlocks();
+	int visibleEntryIds_bytes = totalBlockCount * sizeof(int);
+	int *visibleEntryIDs_d_copy;
+	ITMSafeCall(cudaMalloc(&visibleEntryIDs_d_copy, visibleEntryIds_bytes));
+	memset(visibleEntryIDs_d_copy, '\0', visibleEntryIds_bytes);
+	ITMSafeCall(cudaMemcpy(visibleEntryIDs_d_copy,
+						   visibleEntryIDs,
+						   visibleEntryIds_bytes,
+						   cudaMemcpyDeviceToDevice));
+
+  // TODO(andrei): Remove this once code's working.
+  // Sanity check
+//	int visibleBlocks = 0;
+//	for (int i = 0; i < totalBlockCount; ++i) {
+//		if (visibleEntryIDs_h[i] != 0) {
+//			visibleBlocks++;
+//		}
+//	}
+//
+//	printf("I counted %d visible blocks.\n\n", visibleBlocks);
+
+	frameVisibleBlocks.push(visibleEntryIDs_d_copy);
+
 	if (useSwapping)
 	{
 		reAllocateSwappedOutVoxelBlocks_device << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, hashTable, noTotalEntries,
@@ -277,8 +301,27 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		int maxWeight,
 		int minAge
 ) {
-	// TODO(andrei): Implement.
-	printf("\n\n V O X E L  D E C A Y\n\n");
+	// TODO(andrei): Make the timing actually work properly.
+	if (frameVisibleBlocks.size() >= minAge) {
+		int *visibleBlockIds_d = frameVisibleBlocks.front();
+		frameVisibleBlocks.pop();
+
+		// TODO actual stuff
+
+		ITMSafeCall(cudaFree(visibleBlockIds_d));
+	}
+
+	// Launch kernel for entire voxel hash (?), invalidate all voxels <maxWeight, >minAge.
+	// (Every block <=> voxel block.)
+	// Each block then sums up the number of voxels with valid data in them. If it's zero (or,
+	// maybe, close to zero?), then put that number in a list, and deallocate the blocks.
+	// Look at the swapping engine to see how they deal with fragmentation.
+	// This will be SLOW.
+	// Speedup idea: keep track of a list of the blocks ALLOCATED 'minAge' ago, and only run the
+	// decay check on them. Bear in mind that the weight currently cannot go down. If we change the
+	// error models, we may reach a point in the future where the weight does go down, but even so
+	// it would be quite unlikely to go down a lot after 5 frames have already elapsed. Maybe we
+	// could do this, but for the list of previously visible blocks.
 }
 
 // plain voxel array
@@ -326,9 +369,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::IntegrateInt
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	const ITMPlainVoxelArray::ITMVoxelArrayInfo *arrayInfo = scene->index.getIndexData();
 
-	// TODO(andrei): Won't this be faster on devices which support larger block sizes?
 	dim3 cudaBlockSize(8, 8, 8);
-	dim3 gridSize(scene->index.getVolumeSize().x / cudaBlockSize.x, scene->index.getVolumeSize().y / cudaBlockSize.y, scene->index.getVolumeSize().z / cudaBlockSize.z);
+	dim3 gridSize(
+		scene->index.getVolumeSize().x / cudaBlockSize.x,
+		scene->index.getVolumeSize().y / cudaBlockSize.y,
+		scene->index.getVolumeSize().z / cudaBlockSize.z);
 
 	if (scene->sceneParams->stopIntegratingAtMaxW) {
 		if (trackingState->requiresFullRendering)
@@ -379,13 +424,32 @@ __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxe
 	pt_model.z = (float)(z + arrayInfo->offset.z) * _voxelSize;
 	pt_model.w = 1.0f;
 
-	ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(voxelArray[locId], pt_model, M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
+	ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(
+			voxelArray[locId],
+			pt_model,
+			M_d,
+			projParams_d,
+			M_rgb,
+			projParams_rgb,
+			mu,
+			maxW,
+			depth,
+			depthImgSize,
+			rgb,
+			rgbImgSize);
 }
 
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
-__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, int *visibleEntryIDs,
-	const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i depthImgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d, 
-	Vector4f projParams_rgb, float _voxelSize, float mu, int maxW)
+__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable,
+										  int *visibleEntryIDs, const Vector4u *rgb,
+										  Vector2i rgbImgSize,
+										  const float *depth, Vector2i depthImgSize,
+										  Matrix4f M_d, Matrix4f M_rgb,
+										  Vector4f projParams_d,
+										  Vector4f projParams_rgb,
+										  float _voxelSize,
+										  float mu,
+										  int maxW)
 {
 	Vector3i globalPos;
 	int entryId = visibleEntryIDs[blockIdx.x];
@@ -543,10 +607,18 @@ __global__ void reAllocateSwappedOutVoxelBlocks_device(int *voxelAllocationList,
 }
 
 template<bool useSwapping>
-__global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapState *swapStates, int noTotalEntries,
-	int *visibleEntryIDs, AllocationTempData *allocData, uchar *entriesVisibleType, 
-	Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize)
-{
+__global__ void buildVisibleList_device(
+		ITMHashEntry *hashTable,
+		ITMHashSwapState *swapStates,
+		int noTotalEntries,
+		int *visibleEntryIDs,
+		AllocationTempData *allocData,
+		uchar *entriesVisibleType,
+		Matrix4f M_d,
+		Vector4f projParams_d,
+		Vector2i depthImgSize,
+		float voxelSize
+) {
 	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
 	if (targetIdx > noTotalEntries - 1) return;
 
@@ -583,8 +655,10 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 
 	if (shouldPrefix)
 	{
-		int offset = computePrefixSum_device<int>(hashVisibleType > 0, &allocData->noVisibleEntries,
-		                                          blockDim.x * blockDim.y, threadIdx.x);
+		int offset = computePrefixSum_device<int>(hashVisibleType > 0,
+												  &allocData->noVisibleEntries,
+												  blockDim.x * blockDim.y,
+												  threadIdx.x);
 		if (offset != -1) visibleEntryIDs[offset] = targetIdx;
 	}
 

@@ -4,6 +4,8 @@
 
 #include "../../ITMSceneReconstructionEngine.h"
 
+#include <queue>
+
 namespace ITMLib
 {
 	namespace Engine
@@ -21,6 +23,9 @@ namespace ITMLib
 			void *allocationTempData_host;
 			unsigned char *entriesAllocType_device;
 			Vector4s *blockCoords_device;
+
+			// Keeps track of recent lists of visible block IDs.	// TODO(andrei): Check if this is sane.
+			std::queue<int *> frameVisibleBlocks;
 
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
