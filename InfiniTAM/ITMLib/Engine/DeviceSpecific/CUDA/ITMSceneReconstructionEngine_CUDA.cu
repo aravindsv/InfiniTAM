@@ -172,37 +172,41 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
 	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
 
+	// This just returns the size of the pre-allocated buffer.
+	long allocatedBlocks = scene->index.getNumAllocatedVoxelBlocks();
+	// This is the number of blocks we are using out of the chunk that was allocated initially on
+	// the GPU (for non-swapping case).
+	long usedBlocks = allocatedBlocks - scene->localVBA.lastFreeBlockId;
+	long allocatedExcessBlocks = SDF_EXCESS_LIST_SIZE;
+	long usedExcessBlocks = allocatedExcessBlocks - tempData->noAllocatedExcessEntries;
+
+	if (usedBlocks > allocatedBlocks) {
+		usedBlocks = allocatedBlocks;
+	}
+	if (usedExcessBlocks > allocatedExcessBlocks) {
+		usedExcessBlocks = allocatedExcessBlocks;
+	}
+
+	float percentFree = 100.0f * (1.0f - static_cast<float>(usedBlocks) / allocatedBlocks);
+
 	// Display some memory stats, useful for debugging mapping failures.
-	printf("Visible entries: %8d | Allocated blocks in GPU buffer: %8d | "
-			"Last free block ID %8d | Last free excess block ID: %8d | Allocated size: %8d\n",
+	printf("Visible entries: %8d | Used blocks in main GPU buffer: %8ld/%ld (%.2f%% free) | "
+			"Used blocks in excess list: %8ld/%ld | Allocated size: %8d\n",
 			tempData->noVisibleEntries,
-			scene->index.getNumAllocatedVoxelBlocks(),
-			scene->localVBA.lastFreeBlockId,
-			scene->index.GetLastFreeExcessListId(),
+			usedBlocks,
+			allocatedBlocks,
+			percentFree,
+			usedExcessBlocks,
+			allocatedExcessBlocks,
 			scene->localVBA.allocatedSize);
 
 	ITMHashEntry *entries = scene->index.GetEntries();
-	if (scene->localVBA.lastFreeBlockId == 0) {
-		fprintf(stderr, "WARNING: lastFreeBlockId == 0. We can no longer accommodate new blocks.");
-	}
 	if (scene->localVBA.lastFreeBlockId < 0) {
 		fprintf(stderr, "ERROR: Last free block ID was negative (%d). This may indicate an "
 				"allocation failure, causing your map to stop being able to grow.\n", scene->localVBA.lastFreeBlockId);
 		throw std::runtime_error(
 				"Invalid free voxel block ID. InfiniTAM has likely run out of GPU memory.");
 	}
-
-  // TODO(andrei): Figure out how to quickly find how many blocks are actually populated.
-//	Vector4s *blockCoords_h = new Vector4s[noTotalEntries];
-//	ITMSafeCall(cudaMemcpy(blockCoords_h, blockCoords_device,
-//						   sizeof(Vector4s) * noTotalEntries, cudaMemcpyDeviceToHost));
-//
-//	for(int i = 0; i < noTotalEntries; ++i) {
-//      printf("%d, %d, %d\n", blockCoords_h[i].x, blockCoords_h[i].y, blockCoords_h[i].z);
-//
-//	}
-//
-//	delete[] blockCoords_h;
 }
 
 template<class TVoxel>
@@ -266,6 +270,15 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 	}
+}
+
+template<class TVoxel>
+void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
+		int maxWeight,
+		int minAge
+) {
+	// TODO(andrei): Implement.
+	printf("\n\n V O X E L  D E C A Y\n\n");
 }
 
 // plain voxel array
@@ -334,6 +347,13 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::IntegrateInt
 			integrateIntoScene_device < TVoxel, false, true> << <gridSize, cudaBlockSize >> >(localVBA, arrayInfo,
 				rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 	}
+}
+
+template<class TVoxel>
+void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::Decay(
+		int maxWeight, int minAge
+) {
+  throw std::runtime_error("Map decay is not supported in conjunction with plain voxel arrays.");
 }
 
 // device functions

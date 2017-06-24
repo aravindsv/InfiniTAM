@@ -12,6 +12,7 @@ namespace ITMLib
 		class ITMSceneReconstructionEngine_CUDA : public ITMSceneReconstructionEngine < TVoxel, TIndex >
 		{};
 
+		// Reconstruction engine for voxel hashing.
 		template<class TVoxel>
 		class ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash> : public ITMSceneReconstructionEngine < TVoxel, ITMVoxelBlockHash >
 		{
@@ -30,10 +31,13 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
-			ITMSceneReconstructionEngine_CUDA(void);
+		  void Decay(int maxWeight, int minAge) override;
+
+		  ITMSceneReconstructionEngine_CUDA(void);
 			~ITMSceneReconstructionEngine_CUDA(void);
 		};
 
+		// Reconstruction engine for plain voxel arrays (vanilla Kinectfusion-style).
 		template<class TVoxel>
 		class ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray> : public ITMSceneReconstructionEngine < TVoxel, ITMPlainVoxelArray >
 		{
@@ -45,6 +49,8 @@ namespace ITMLib
 
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMPlainVoxelArray> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
+
+		  void Decay(int maxWeight, int minAge) override;
 		};
 	}
 }

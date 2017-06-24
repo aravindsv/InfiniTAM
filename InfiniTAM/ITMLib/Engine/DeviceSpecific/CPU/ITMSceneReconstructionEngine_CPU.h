@@ -28,6 +28,8 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
+			void Decay(int maxWeight, int minAge) override;
+
 			ITMSceneReconstructionEngine_CPU(void);
 			~ITMSceneReconstructionEngine_CPU(void);
 		};
@@ -43,6 +45,8 @@ namespace ITMLib
 
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMPlainVoxelArray> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
+
+			void Decay(int maxWeight, int minAge) override;
 
 			ITMSceneReconstructionEngine_CPU(void);
 			~ITMSceneReconstructionEngine_CPU(void);

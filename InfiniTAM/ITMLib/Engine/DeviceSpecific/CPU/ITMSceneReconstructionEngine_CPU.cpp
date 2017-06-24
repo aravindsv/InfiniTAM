@@ -291,6 +291,11 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 }
 
 template<class TVoxel>
+void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::Decay(int maxWeight, int minAge) {
+	throw std::runtime_error("Voxel decay not supported on the CPU.");
+}
+
+template<class TVoxel>
 ITMSceneReconstructionEngine_CPU<TVoxel,ITMPlainVoxelArray>::ITMSceneReconstructionEngine_CPU(void) 
 {}
 
@@ -366,6 +371,14 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMPlainVoxelArray>::IntegrateInto
 		ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(voxelArray[locId], pt_model, M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, 
 			depth, depthImgSize, rgb, rgbImgSize);
 	}
+}
+
+template<class TVoxel>
+void ITMSceneReconstructionEngine_CPU<TVoxel, ITMPlainVoxelArray>::Decay(
+		int maxWeight,
+		int minAge
+) {
+	throw std::runtime_error("Voxel decay not supported on the CPU OR with plain voxel arrays.");
 }
 
 template class ITMLib::Engine::ITMSceneReconstructionEngine_CPU<ITMVoxel, ITMVoxelIndex>;

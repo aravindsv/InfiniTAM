@@ -47,6 +47,9 @@ namespace ITMLib
 			virtual void IntegrateIntoScene(ITMScene<TVoxel,TIndex> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState) = 0;
 
+			/** See: ITMDenseMapper::Decay. */
+			virtual void Decay(int maxWeight, int minAge) = 0;
+
 			ITMSceneReconstructionEngine(void) { }
 			virtual ~ITMSceneReconstructionEngine(void) { }
 		};

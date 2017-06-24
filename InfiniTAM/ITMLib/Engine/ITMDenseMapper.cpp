@@ -74,4 +74,9 @@ void ITMDenseMapper<TVoxel,TIndex>::UpdateVisibleList(const ITMView *view, const
 	sceneRecoEngine->AllocateSceneFromDepth(scene, view, trackingState, renderState, true);
 }
 
+template<class TVoxel, class TIndex>
+void ITMDenseMapper<TVoxel, TIndex>::Decay(int maxWeight, int minAge) {
+	sceneRecoEngine->Decay(maxWeight, minAge);
+}
+
 template class ITMLib::Engine::ITMDenseMapper<ITMVoxel, ITMVoxelIndex>;
