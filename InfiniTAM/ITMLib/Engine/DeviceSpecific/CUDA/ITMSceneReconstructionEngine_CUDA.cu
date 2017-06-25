@@ -40,8 +40,26 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 	int *visibleEntryIDs, AllocationTempData *allocData, uchar *entriesVisibleType,
 	Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize);
 
+/// \brief Erases blocks whose weight is smaller than 'maxWeight', and marks blocks which become
+///        empty in the process as pending deallocation in `outBlocksToDeallocate`.
+/// \tparam TVoxel The type of voxel representation to operate on (grayscale/color, float/short, etc.)
+/// \param localVBA The raw storage where the hash map entries reside.
+/// \param hashTable Maps entry IDs to addresses in the local VBA.
+/// \param visibleEntryIDs A list of blocks on which to operate (typically, this is the list
+///                        containing the visible blocks $k$ frames ago. The size of the list should
+///                        be known in advance, and be implicitly range-checked by setting the grid
+///                        size's x dimension to it.
+/// \param maxWeight Voxels with a *depth* weight smaller than or equal to this decay.
+/// \param outBlocksToDeallocate Will contain the blocks which became completely empty as a result
+///                              of the decay process.
+/// \param outToDeallocateCount Will contain the number of blocks to deallocate.
 template<class TVoxel>
-__global__ void decay_device(TVoxel *localVBA, const ITMHashEntry *hashTable, int *visibleEntryIDs, int maxWeight);
+__global__ void decay_device(TVoxel *localVBA,
+							 const ITMHashEntry *hashTable,
+							 int *visibleEntryIDs,
+							 int maxWeight,
+							 int *outBlocksToDeallocate,
+							 int *outToDeallocateCount);
 
 // host methods
 
@@ -332,7 +350,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		VisibleBlockInfo visible = frameVisibleBlocks.front();
 		frameVisibleBlocks.pop();
 
-		assert(visible.count >= 0);
 		dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 		dim3 gridSize(static_cast<uint32_t>(visible.count));
 
@@ -345,14 +362,26 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 		visible.blockIDs->UpdateDeviceFromHost();		// needed?
 
-		decay_device <TVoxel> <<<gridSize, cudaBlockSize>>>(
+		// TODO(andrei): Pre-allocate this in advance instead of reallocating at every time.
+		auto *outBlocksToDeallocate = new ORUtils::MemoryBlock<int>(visible.count * sizeof(int),
+																	MEMORYDEVICE_CUDA);
+		auto *outToDeallocateCount = new ORUtils::MemoryBlock<int>(1 * sizeof(int),
+																   MEMORYDEVICE_CUDA);
+
+		decay_device<TVoxel> <<<gridSize, cudaBlockSize>>>(
 				localVBA,
 				hashTable,
 				visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
-				maxWeight);
-      ITMSafeCall(cudaDeviceSynchronize());	// debug
+				maxWeight,
+				outBlocksToDeallocate->GetData(MEMORYDEVICE_CUDA),
+				outToDeallocateCount->GetData(MEMORYDEVICE_CUDA));
 
-//		delete visible.blockIDs;		// probably safe to re-enable
+		// TODO(andrei): Do something with the "to-deallocate" list.
+
+		delete outBlocksToDeallocate;
+		delete outToDeallocateCount;
+
+		delete visible.blockIDs;		// probably safe to re-enable
 	}
 
 	// Launch kernel for entire voxel hash (?), invalidate all voxels <maxWeight, >minAge.
@@ -734,46 +763,52 @@ __global__ void buildVisibleList_device(
 
 template<class TVoxel>
 __global__
-void decay_device(TVoxel *localVBA, const ITMHashEntry *hashTable, int *visibleEntryIDs, int maxWeight) {
+void decay_device(TVoxel *localVBA,
+				  const ITMHashEntry *hashTable,
+				  int *visibleEntryIDs,
+				  int maxWeight,
+				  int *outBlocksToDeallocate,
+				  int *toDeallocateCount
+) {
 	// Note: there are no range checks because we launch exactly as many threads as we need.
 
 	int entryId = visibleEntryIDs[blockIdx.x];
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
 
 	if (currentHashEntry.ptr < 0) {
-		printf("currentHashEntry.ptr < 0...\n");
 		return;
 	}
 
-	//*
 	// The global position of the voxel block.
 	Vector3i globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
 
 	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
 
-//	Vector4f pt_model;
-
 	// The local offset of the voxel in the current block.
 	int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
-//	if (blockIdx.x % 200 == 31 && 0 == locId) {
-//		printf("Entry ID from visible list: %8d | localVBA = %p | localVoxelBlock = %p\n",
-//			   entryId,
-//			   localVBA,
-//			   localVoxelBlock);
-//
-//		short depth = localVoxelBlock[locId].w_depth;
-//		printf("...[locId].w_depth = %d\n", static_cast<int>(depth));
-//	}
+	bool emptyVoxel = false;
 
-
-  //*
 	if (localVoxelBlock[locId].w_depth <= maxWeight && localVoxelBlock[locId].w_depth > 0) {
-		localVoxelBlock[locId].clr = Vector3u(0, 0, 0);
-		localVoxelBlock[locId].sdf = 100;
-
+		// TODO(andrei): More thorough way of "erasing" a voxel.
+//		localVoxelBlock[locId].clr = Vector3u(0, 0, 0);
+		localVoxelBlock[locId].sdf = 255;
+		localVoxelBlock[locId].w_depth = 0;
+		emptyVoxel = true;
 	}
+
+	if (localVoxelBlock[locId].w_depth == 0) {
+		emptyVoxel = true;
+	}
+
+	__syncthreads();
+
+	// TODO(andrei): Block-reduce sum for counting empty voxels.
+
+	__syncthreads();
+
+	// TODO(andrei): Compact blocks flagged as newly empty into 'outBlocksToDeallocate'.
 }
 
 
