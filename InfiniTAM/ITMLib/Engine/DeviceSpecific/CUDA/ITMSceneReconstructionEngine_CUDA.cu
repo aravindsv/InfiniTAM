@@ -376,6 +376,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				outBlocksToDeallocate->GetData(MEMORYDEVICE_CUDA),
 				outToDeallocateCount->GetData(MEMORYDEVICE_CUDA));
 
+		ITMSafeCall(cudaDeviceSynchronize());
+
 		// TODO(andrei): Do something with the "to-deallocate" list.
 
 		delete outBlocksToDeallocate;
@@ -383,18 +385,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 		delete visible.blockIDs;		// probably safe to re-enable
 	}
-
-	// Launch kernel for entire voxel hash (?), invalidate all voxels <maxWeight, >minAge.
-	// (Every block <=> voxel block.)
-	// Each block then sums up the number of voxels with valid data in them. If it's zero (or,
-	// maybe, close to zero?), then put that number in a list, and deallocate the blocks.
-	// Look at the swapping engine to see how they deal with fragmentation.
-	// This will be SLOW.
-	// Speedup idea: keep track of a list of the blocks ALLOCATED 'minAge' ago, and only run the
-	// decay check on them. Bear in mind that the weight currently cannot go down. If we change the
-	// error models, we may reach a point in the future where the weight does go down, but even so
-	// it would be quite unlikely to go down a lot after 5 frames have already elapsed. Maybe we
-	// could do this, but for the list of previously visible blocks.
 }
 
 // plain voxel array
@@ -549,13 +539,6 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 
 	if (stopMaxW) if (localVoxelBlock[locId].w_depth == maxW) return;
 	if (approximateIntegration) if (localVoxelBlock[locId].w_depth != 0) return;
-
-	if (blockIdx.x % 3121 == 0 && 0 == locId) {
-		printf("integrateIntoScene_device: ID %8d | localVBA = %p | localVoxelBlock = %p\n",
-			   entryId,
-               localVBA,
-			   localVoxelBlock);
-	}
 
 	pt_model.x = (float)(globalPos.x + x) * _voxelSize;
 	pt_model.y = (float)(globalPos.y + y) * _voxelSize;
@@ -739,6 +722,7 @@ __global__ void buildVisibleList_device(
 
 	__syncthreads();
 
+	// Computes the correct offsets for the visible blocks in `visibleEntryIDs`.
 	if (shouldPrefix)
 	{
 		int offset = computePrefixSum_device<int>(hashVisibleType > 0,
@@ -759,6 +743,25 @@ __global__ void buildVisibleList_device(
 		if (offset != -1) activeEntryIDs[offset] = targetIdx;
 	}
 #endif
+}
+
+// TODO(andrei): Move to ITMCUDAUtils
+/// \brief Naive reduction limited to a single block, useful for, e.g., quickly counting things.
+template<typename T>
+__device__
+void blockReduce(T *input, int count, int localId) {
+	if (localId >= count) {
+		return;
+	}
+
+	for(unsigned int s = count / 2; s > 0; s >>= 1) {
+		if (localId < s) {
+			int neighborId = localId + s;
+			input[localId] = input[localId] + input[neighborId];
+		}
+
+		__syncthreads();
+	}
 }
 
 template<class TVoxel>
@@ -802,11 +805,27 @@ void decay_device(TVoxel *localVBA,
 		emptyVoxel = true;
 	}
 
+	__shared__ int countBuffer[SDF_BLOCK_SIZE3];
+	countBuffer[locId] = static_cast<int>(emptyVoxel);
 	__syncthreads();
 
-	// TODO(andrei): Block-reduce sum for counting empty voxels.
-
+	// Block-level sum for counting non-empty voxels in this block.
+	blockReduce(countBuffer, SDF_BLOCK_SIZE3, locId);
 	__syncthreads();
+
+	int emptyVoxels = countBuffer[0];
+
+	if (locId == 0 && blockIdx.x % 115 == 0) {
+		printf("Block reduction result: %d/%d are empty.\n", emptyVoxels, SDF_BLOCK_SIZE3);
+	}
+
+  // Dirty trick instead of using a separate (global?) var
+//	int nonEmptyVoxelCount = *toDeallocateCount;
+
+//	if (nonEmptyVoxelCount < 10 && 0 == locId) {
+//		printf("Found nearly-empty block (may have been nearly-empty from before if size not "
+//			   "exactly zero). Non empty voxels: %d\n", *nonEmptyVoxelCount);
+//	}
 
 	// TODO(andrei): Compact blocks flagged as newly empty into 'outBlocksToDeallocate'.
 }
