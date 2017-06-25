@@ -37,7 +37,9 @@ namespace ITMLib
 
 			/// Removes voxels with a weight smaller than `maxWeight` and an age greater than
 			/// `minAge` de-allocating blocks which become empty in the process.
-			void Decay(int maxWeight = 1, int minAge = 5);
+			void Decay(ITMScene<TVoxel, TIndex> *scene,
+					   int maxWeight,
+					   int minAge);
 
 			/** \brief Constructor
 			    Ommitting a separate image size for the depth images

@@ -303,13 +303,16 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
 	uchar intensity = (uchar)(255.0f * (((float)resn.w_depth) / maxWeight));
 
+	// Weight below which a voxel is considered noisy.
+	const int noiseThreshold = 3;
+
 	Vector4u overlay;
 	if (resn.w_depth == maxWeight) {
 		overlay.r = 45;
 		overlay.g = 45;
 		overlay.b = 255;
 	}
-	else if (resn.w_depth <= 1){
+	else if (resn.w_depth < noiseThreshold){
 		overlay.r = 255;
 		overlay.g = 0;
 		overlay.b = 0;

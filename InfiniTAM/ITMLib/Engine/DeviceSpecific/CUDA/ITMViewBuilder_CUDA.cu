@@ -198,6 +198,10 @@ __global__ void filterDepth_device(float *imageData_out, const float *imageData_
 {
 	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
 
+	// TODO XXX(andrei): Could this also be causing the artifacts when using dispnet depth maps?
+	// It seems like 'filterDepth' only causes access violations when used in conjunction with
+	// dispnet's maps. Could it be because they're float maps originally, as opposed to converted
+	// short ones?
 	if (x < 2 || x > imgDims.x - 2 || y < 2 || y > imgDims.y - 2) return;
 
 	filterDepth(imageData_out, imageData_in, x, y, imgDims);

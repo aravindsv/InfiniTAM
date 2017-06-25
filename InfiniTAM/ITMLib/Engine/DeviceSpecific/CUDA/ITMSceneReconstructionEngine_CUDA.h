@@ -3,6 +3,7 @@
 #pragma once
 
 #include "../../ITMSceneReconstructionEngine.h"
+#include "../../../../ORUtils/MemoryBlock.h"
 
 #include <queue>
 
@@ -10,6 +11,11 @@ namespace ITMLib
 {
 	namespace Engine
 	{
+		struct VisibleBlockInfo {
+			size_t count;
+		  	ORUtils::MemoryBlock<int> *blockIDs;
+		};
+
 		template<class TVoxel, class TIndex>
 		class ITMSceneReconstructionEngine_CUDA : public ITMSceneReconstructionEngine < TVoxel, TIndex >
 		{};
@@ -25,7 +31,7 @@ namespace ITMLib
 			Vector4s *blockCoords_device;
 
 			// Keeps track of recent lists of visible block IDs.	// TODO(andrei): Check if this is sane.
-			std::queue<int *> frameVisibleBlocks;
+			std::queue<VisibleBlockInfo> frameVisibleBlocks;
 
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
@@ -36,7 +42,9 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
-		  void Decay(int maxWeight, int minAge) override;
+		  void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+                     int maxWeight,
+                     int minAge) override;
 
 		  ITMSceneReconstructionEngine_CUDA(void);
 			~ITMSceneReconstructionEngine_CUDA(void);
@@ -55,7 +63,9 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMPlainVoxelArray> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
-		  void Decay(int maxWeight, int minAge) override;
+		  void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene,
+					 int maxWeight,
+					 int minAge) override;
 		};
 	}
 }

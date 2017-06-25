@@ -48,7 +48,9 @@ namespace ITMLib
 				const ITMRenderState *renderState) = 0;
 
 			/** See: ITMDenseMapper::Decay. */
-			virtual void Decay(int maxWeight, int minAge) = 0;
+			virtual void Decay(ITMScene<TVoxel, TIndex> *scene,
+							   int maxWeight,
+							   int minAge) = 0;
 
 			ITMSceneReconstructionEngine(void) { }
 			virtual ~ITMSceneReconstructionEngine(void) { }

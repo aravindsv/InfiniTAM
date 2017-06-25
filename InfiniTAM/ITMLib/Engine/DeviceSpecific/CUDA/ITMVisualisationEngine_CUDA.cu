@@ -556,9 +556,6 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 	int block = blockIdx.x * 4 + blockIdx.y;
 	if (block >= *noTotalBlocks) return;
 
-	// Note: It seems that the weird instance-based reconstruction crash (cuda error 77) bug stems
-	// from the second half of this kernel (June 2017).
-
 	const RenderingBlock & b(renderingBlocks[block]);
 	int xpos = b.upperLeft.x + x;
 	if (xpos > b.lowerRight.x) return;
@@ -566,14 +563,13 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
 	if (ypos > b.lowerRight.y) return;
 
 	// It seems that this check is useful in preventing an elusive bug where xpos and/or ypos are
-	// negative for some reason.
+	// negative for some reason, leading to a kernel failure (error 77).
 	if (xpos >= imgSize.x || ypos >= imgSize.y || xpos < 0 || ypos < 0) {
       return;
 	}
 
 	Vector2f & pixel(minmaxData[xpos + ypos*imgSize.x]);
-	atomicMin(&pixel.x, b.zRange.x);		// The crash is on this line, caused it seems by xpos
-											// and ypos being less than 0.
+	atomicMin(&pixel.x, b.zRange.x);
 	atomicMax(&pixel.y, b.zRange.y);
 }
 
