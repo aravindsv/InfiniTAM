@@ -364,9 +364,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 		// TODO(andrei): Pre-allocate this in advance instead of reallocating at every time.
 		auto *outBlocksToDeallocate = new ORUtils::MemoryBlock<int>(visible.count * sizeof(int),
-																	MEMORYDEVICE_CUDA);
+																	true, true);
 		auto *outToDeallocateCount = new ORUtils::MemoryBlock<int>(1 * sizeof(int),
-																   MEMORYDEVICE_CUDA);
+																   true, true);
 
 		decay_device<TVoxel> <<<gridSize, cudaBlockSize>>>(
 				localVBA,
@@ -375,8 +375,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				maxWeight,
 				outBlocksToDeallocate->GetData(MEMORYDEVICE_CUDA),
 				outToDeallocateCount->GetData(MEMORYDEVICE_CUDA));
-
 		ITMSafeCall(cudaDeviceSynchronize());
+
+		outToDeallocateCount->UpdateHostFromDevice();
+		printf("Found %d candidate blocks...\n", outToDeallocateCount->GetData(MEMORYDEVICE_CPU)[0]);
 
 		// TODO(andrei): Do something with the "to-deallocate" list.
 
@@ -777,6 +779,7 @@ void decay_device(TVoxel *localVBA,
 
 	int entryId = visibleEntryIDs[blockIdx.x];
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
+	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
 
 	if (currentHashEntry.ptr < 0) {
 		return;
@@ -784,7 +787,7 @@ void decay_device(TVoxel *localVBA,
 
 	// The global position of the voxel block.
 	Vector3i globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
-	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
+	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * voxelsPerBlock]);
 
 	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
 
@@ -805,29 +808,33 @@ void decay_device(TVoxel *localVBA,
 		emptyVoxel = true;
 	}
 
-	__shared__ int countBuffer[SDF_BLOCK_SIZE3];
+	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
 	__syncthreads();
 
 	// Block-level sum for counting non-empty voxels in this block.
-	blockReduce(countBuffer, SDF_BLOCK_SIZE3, locId);
+	blockReduce(countBuffer, voxelsPerBlock, locId);
 	__syncthreads();
 
 	int emptyVoxels = countBuffer[0];
-
-	if (locId == 0 && blockIdx.x % 115 == 0) {
-		printf("Block reduction result: %d/%d are empty.\n", emptyVoxels, SDF_BLOCK_SIZE3);
-	}
-
-  // Dirty trick instead of using a separate (global?) var
-//	int nonEmptyVoxelCount = *toDeallocateCount;
-
-//	if (nonEmptyVoxelCount < 10 && 0 == locId) {
-//		printf("Found nearly-empty block (may have been nearly-empty from before if size not "
-//			   "exactly zero). Non empty voxels: %d\n", *nonEmptyVoxelCount);
+//	if (locId == 0 && blockIdx.x % 115 == 0) {
+//		printf("Block reduction result: %d/%d are empty.\n", emptyVoxels, voxelsPerBlock);
 //	}
 
-	// TODO(andrei): Compact blocks flagged as newly empty into 'outBlocksToDeallocate'.
+	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
+	if (locId == 0 && emptyBlock) {
+		atomicAdd(toDeallocateCount, 1);	// hack; should do a proper scan & compact
+//		printf("Empty block! %d/%d (%d)\n", emptyVoxels, voxelsPerBlock, *toDeallocateCount);
+
+//		int offset = computePrefixSum_device<int>(1,
+//												  toDeallocateCount,
+//												  SDF_BLOCK_SIZE3,
+//												  blockIdx.x);
+//		if (offset != -1) {
+//			printf("Compact offset: %d\n", offset);
+//			outBlocksToDeallocate[offset] = entryId;
+//		}
+	}
 }
 
 

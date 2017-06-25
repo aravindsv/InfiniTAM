@@ -168,6 +168,9 @@ void ITMSwappingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSc
 				neededEntryIDs_local, hashTable, localVBA);
 		}
 
+		// TODO(andrei): Doublecheck comment, but seems right.
+		// Now that we've moved the data to the transfer buffer, we can clean up its old slots, so
+		// that they can be used by new data later on.
 		{
 			blockSize = dim3(256);
 			gridSize = dim3((int)ceil((float)noNeededEntries / (float)blockSize.x));
@@ -264,6 +267,8 @@ __global__ void cleanMemory_device(
 	
 	swapStates[entryDestId].state = 0;
 
+	// `noAllocatedVoxelEntries` gets initialized with the last free block ID, and gets incremented
+	// here, for every entry which was put in the transfer buffer.
 	int vbaIdx = atomicAdd(&noAllocatedVoxelEntries[0], 1);
 	if (vbaIdx < sdfLocalBlockNum - 1)
 	{
