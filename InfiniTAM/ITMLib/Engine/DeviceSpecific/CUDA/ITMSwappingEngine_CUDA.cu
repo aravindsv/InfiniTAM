@@ -151,12 +151,19 @@ void ITMSwappingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSc
 
 		ITMSafeCall(cudaMemset(noNeededEntries_device, 0, sizeof(int)));
 
-		buildListToSwapOut_device << <gridSize, blockSize >> >(neededEntryIDs_local, noNeededEntries_device, swapStates,
-			hashTable, entriesVisibleType, noTotalEntries);
+		// Populates `neededEntryIDs_local` with the IDs of the blocks which should be swapped out.
+		buildListToSwapOut_device << <gridSize, blockSize >> >(
+				neededEntryIDs_local,
+				noNeededEntries_device,
+				swapStates,
+				hashTable,
+				entriesVisibleType,
+				noTotalEntries);
 
 		ITMSafeCall(cudaMemcpy(&noNeededEntries, noNeededEntries_device, sizeof(int), cudaMemcpyDeviceToHost));
 	}
 
+	// If we have anything that needs swapping out.
 	if (noNeededEntries > 0)
 	{
 		noNeededEntries = MIN(noNeededEntries, SDF_TRANSFER_BLOCK_NUM);
@@ -164,21 +171,30 @@ void ITMSwappingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSc
 			blockSize = dim3(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 			gridSize = dim3(noNeededEntries);
 
+			// Move the raw data from the blocks marked for getting swapped out, to the transfer
+			// buffer.
 			moveActiveDataToTransferBuffer_device << <gridSize, blockSize >> >(syncedVoxelBlocks_local, hasSyncedData_local,
 				neededEntryIDs_local, hashTable, localVBA);
 		}
 
-		// TODO(andrei): Doublecheck comment, but seems right.
 		// Now that we've moved the data to the transfer buffer, we can clean up its old slots, so
 		// that they can be used by new data later on.
 		{
 			blockSize = dim3(256);
 			gridSize = dim3((int)ceil((float)noNeededEntries / (float)blockSize.x));
 
-			ITMSafeCall(cudaMemcpy(noAllocatedVoxelEntries_device, &scene->localVBA.lastFreeBlockId, sizeof(int), cudaMemcpyHostToDevice));
+			ITMSafeCall(cudaMemcpy(noAllocatedVoxelEntries_device, &scene->localVBA.lastFreeBlockId,
+								   sizeof(int), cudaMemcpyHostToDevice));
 
-			cleanMemory_device << <gridSize, blockSize >> >(voxelAllocationList, noAllocatedVoxelEntries_device, swapStates, hashTable, localVBA,
-				neededEntryIDs_local, noNeededEntries, sdfLocalBlockNum);
+			cleanMemory_device << <gridSize, blockSize >> >(
+					voxelAllocationList,
+					noAllocatedVoxelEntries_device,
+					swapStates,
+					hashTable,
+					localVBA,
+					neededEntryIDs_local,
+					noNeededEntries,
+					sdfLocalBlockNum);
 
 			ITMSafeCall(cudaMemcpy(&scene->localVBA.lastFreeBlockId, noAllocatedVoxelEntries_device, sizeof(int), cudaMemcpyDeviceToHost));
 			scene->localVBA.lastFreeBlockId = MAX(scene->localVBA.lastFreeBlockId, 0);
@@ -264,7 +280,8 @@ __global__ void cleanMemory_device(
 	if (locId > noNeededEntries - 1) return;
 
 	int entryDestId = neededEntryIDs_local[locId];
-	
+
+	// Mark the entry as swapped out
 	swapStates[entryDestId].state = 0;
 
 	// `noAllocatedVoxelEntries` gets initialized with the last free block ID, and gets incremented
@@ -273,6 +290,7 @@ __global__ void cleanMemory_device(
 	if (vbaIdx < sdfLocalBlockNum - 1)
 	{
 		voxelAllocationList[vbaIdx + 1] = hashTable[entryDestId].ptr;
+		// `ptr == -1` means the entry has been swapped out.
 		hashTable[entryDestId].ptr = -1;
 	}
 }

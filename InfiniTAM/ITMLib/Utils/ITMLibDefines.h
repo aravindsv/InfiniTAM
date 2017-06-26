@@ -118,10 +118,15 @@ struct ITMVoxel_f_rgb
 
 	_CPU_AND_GPU_CODE_ ITMVoxel_f_rgb()
 	{
-		sdf = SDF_initialValue();
-		w_depth = 0;
-		clr = (uchar)0;
-		w_color = 0;
+		reset();
+	}
+
+	_CPU_AND_GPU_CODE_ void reset()
+	{
+	  sdf = SDF_initialValue();
+	  w_depth = 0;
+	  clr = (uchar)0;
+	  w_color = 0;
 	}
 };
 
@@ -149,6 +154,11 @@ struct ITMVoxel_s_rgb
 
 	_CPU_AND_GPU_CODE_ ITMVoxel_s_rgb()
 	{
+		reset();
+	}
+
+	_CPU_AND_GPU_CODE_ void reset()
+	{
 		sdf = SDF_initialValue();
 		w_depth = 0;
 		clr = (uchar)0;
@@ -173,8 +183,13 @@ struct ITMVoxel_s
 
 	_CPU_AND_GPU_CODE_ ITMVoxel_s()
 	{
-		sdf = SDF_initialValue();
-		w_depth = 0;
+		reset();
+	}
+
+	_CPU_AND_GPU_CODE_ void reset()
+	{
+	  sdf = SDF_initialValue();
+	  w_depth = 0;
 	}
 };
 
@@ -194,6 +209,11 @@ struct ITMVoxel_f
 	//uchar pad;
 
 	_CPU_AND_GPU_CODE_ ITMVoxel_f()
+	{
+		reset();
+	}
+
+	_CPU_AND_GPU_CODE_ void reset()
 	{
 		sdf = SDF_initialValue();
 		w_depth = 0;

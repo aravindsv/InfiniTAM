@@ -143,14 +143,27 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 	}
 };
 
-_CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(DEVICEPTR(uchar) *entriesAllocType, DEVICEPTR(uchar) *entriesVisibleType, int x, int y,
-	DEVICEPTR(Vector4s) *blockCoords, const CONSTPTR(float) *depth, Matrix4f invM_d, Vector4f projParams_d, float mu, Vector2i imgSize,
-	float oneOverVoxelSize, const CONSTPTR(ITMHashEntry) *hashTable, float viewFrustum_min, float viewFrustum_max)
-{
+_CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
+		DEVICEPTR(uchar) *entriesAllocType,
+		DEVICEPTR(uchar) *entriesVisibleType,
+		int x,
+		int y,
+		DEVICEPTR(Vector4s) *blockCoords,
+		const CONSTPTR(float) *depth,
+		Matrix4f invM_d,
+		Vector4f projParams_d,
+		float mu,
+		Vector2i imgSize,
+		float oneOverVoxelSize,
+		const CONSTPTR(ITMHashEntry) *hashTable,
+		float viewFrustum_min,
+		float viewFrustum_max
+) {
 	float depth_measure; unsigned int hashIdx; int noSteps;
 	Vector3f pt_camera_f, point_e, point, direction; Vector3s blockPos;
 
 	depth_measure = depth[x + y * imgSize.x];
+
 	if (depth_measure <= 0 || (depth_measure - mu) < 0 || (depth_measure - mu) < viewFrustum_min || (depth_measure + mu) > viewFrustum_max) return;
 
 	// This triangulates the point's position from x, y, and depth.
@@ -205,6 +218,9 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(DEVICEPTR(uchar) *
 			{
 				while (hashEntry.offset >= 1)
 				{
+					// Grab the indicated bucket in the offset list. Note that this info is already
+					// stored in the hash table, and we don't need to go to to the VBA to find any
+					// `next` pointer, as the diagram in the paper would have you believe.
 					hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
 					hashEntry = hashTable[hashIdx];
 
@@ -223,9 +239,9 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(DEVICEPTR(uchar) *
 
 			if (!isFound) //still not found
 			{
-				// TOOD(andrei): Could we detect allocation failures here?
-				entriesAllocType[hashIdx] = isExcess ? 2 : 1; //needs allocation 
-				if (!isExcess) entriesVisibleType[hashIdx] = 1; //new entry is visible
+				// TODO(andrei): Could we detect allocation failures here?
+				entriesAllocType[hashIdx] = isExcess ? 2 : 1; 		// needs allocation
+				if (!isExcess) entriesVisibleType[hashIdx] = 1; 	//new entry is visible
 
 				blockCoords[hashIdx] = Vector4s(blockPos.x, blockPos.y, blockPos.z, 1);
 			}

@@ -36,8 +36,7 @@ template <typename T>
 __device__ int computePrefixSum_device(uint element, T *sum, int localSize, int localId)
 {
 	// TODO: should be localSize...
-//	__shared__ uint prefixBuffer[16 * 16];
-	__shared__ uint prefixBuffer[512];		// Hack for supporting voxel decay. TODO make nicer
+	__shared__ uint prefixBuffer[16 * 16];
 	__shared__ uint groupOffset;
 
 	prefixBuffer[localId] = element;
