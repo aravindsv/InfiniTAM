@@ -216,25 +216,20 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	// TODO(andrei): Remove this once code's working.
 	// Sanity check
-  	int *visibleEntryIDs_h = new int[totalBlockCount];
-	ITMSafeCall(cudaMemcpy(visibleEntryIDs_h,
-						   visibleEntryIDs,
-						   totalBlockCount * sizeof(int),
-						   cudaMemcpyDeviceToHost));
-	int visibleBlocks = 0;
-	for (int i = 0; i < totalBlockCount; ++i) {
-		if (visibleEntryIDs_h[i] != 0) {
-			visibleBlocks++;
-		}
-	}
-
-	printf("I counted %d visible blocks.\n\n", visibleBlocks);
-	printf("IDs: %d %d %d", visibleEntryIDs_h[visibleBlocks - 1],
-		   visibleEntryIDs_h[visibleBlocks],
-		   visibleEntryIDs_h[visibleBlocks + 1]);
-	delete[] visibleEntryIDs_h;
+//  	int *visibleEntryIDs_h = new int[totalBlockCount];
+//	ITMSafeCall(cudaMemcpy(visibleEntryIDs_h,
+//						   visibleEntryIDs,
+//						   totalBlockCount * sizeof(int),
+//						   cudaMemcpyDeviceToHost));
+//	int visibleBlocks = 0;
+//	for (int i = 0; i < totalBlockCount; ++i) {
+//		if (visibleEntryIDs_h[i] != 0) {
+//			visibleBlocks++;
+//		}
+//	}
+//
+//	delete[] visibleEntryIDs_h;
 	// end sanity check
-
 
 	// This just returns the size of the pre-allocated buffer.
 	long allocatedBlocks = scene->index.getNumAllocatedVoxelBlocks();
@@ -345,6 +340,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		int maxWeight,
 		int minAge
 ) {
+	// As of late June 2017, this takes ~1.1ms at every frame, which is quite OK given that we have
+	// lower-hanging fruit to speed up, such as the actual semantic segmentation.
 	// TODO(andrei): Make the timing actually work properly, and don't run it every frame unless it's very fast.
 	if (frameVisibleBlocks.size() > minAge) {
 		VisibleBlockInfo visible = frameVisibleBlocks.front();
@@ -355,12 +352,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 		TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 		ITMHashEntry *hashTable = scene->index.GetEntries();
-		printf("Calling decay kernel... gs = %d, maxWeight = %d\n\n", gridSize.x, maxWeight);
-		fflush(stdout);
-
-		ITMSafeCall(cudaDeviceSynchronize());	// paranoia
-
-		visible.blockIDs->UpdateDeviceFromHost();		// needed?
 
 		// TODO(andrei): Pre-allocate this in advance instead of reallocating at every time.
 		auto *outBlocksToDeallocate = new ORUtils::MemoryBlock<int>(visible.count * sizeof(int),
@@ -377,14 +368,29 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				outToDeallocateCount->GetData(MEMORYDEVICE_CUDA));
 		ITMSafeCall(cudaDeviceSynchronize());
 
+		// TODO(andrei): Remove these calls if we work 100% on-device.
 		outToDeallocateCount->UpdateHostFromDevice();
-		printf("Found %d candidate blocks...\n", outToDeallocateCount->GetData(MEMORYDEVICE_CPU)[0]);
+		outBlocksToDeallocate->UpdateHostFromDevice();
+		int freedBlockCount = *(outToDeallocateCount->GetData(MEMORYDEVICE_CPU));
+
+		size_t savings = sizeof(TVoxel) * 512 * freedBlockCount;
+		float savingsMb = (savings / 1024.0f / 1024.0f);
+
+		printf("Found %d candidate blocks to deallocate. Can save %fMb\n",
+			   freedBlockCount,
+			   savingsMb);
+
+		for(int i = 0; i < freedBlockCount; ++i) {
+			printf("%d ", outBlocksToDeallocate->GetData(MEMORYDEVICE_CPU)[i]);
+			if ((i + 1) % 15 == 0) {
+				printf("\n");
+			}
+		}
 
 		// TODO(andrei): Do something with the "to-deallocate" list.
 
 		delete outBlocksToDeallocate;
 		delete outToDeallocateCount;
-
 		delete visible.blockIDs;		// probably safe to re-enable
 	}
 }
@@ -749,6 +755,7 @@ __global__ void buildVisibleList_device(
 
 // TODO(andrei): Move to ITMCUDAUtils
 /// \brief Naive reduction limited to a single block, useful for, e.g., quickly counting things.
+/// Mutates `input`. The result will be left in `input[0]`.
 template<typename T>
 __device__
 void blockReduce(T *input, int count, int localId) {
@@ -798,7 +805,6 @@ void decay_device(TVoxel *localVBA,
 
 	if (localVoxelBlock[locId].w_depth <= maxWeight && localVoxelBlock[locId].w_depth > 0) {
 		// TODO(andrei): More thorough way of "erasing" a voxel.
-//		localVoxelBlock[locId].clr = Vector3u(0, 0, 0);
 		localVoxelBlock[locId].sdf = 255;
 		localVoxelBlock[locId].w_depth = 0;
 		emptyVoxel = true;
@@ -808,6 +814,7 @@ void decay_device(TVoxel *localVBA,
 		emptyVoxel = true;
 	}
 
+	// Prepare for counting the number of empty voxels in each block.
 	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
 	__syncthreads();
@@ -817,23 +824,12 @@ void decay_device(TVoxel *localVBA,
 	__syncthreads();
 
 	int emptyVoxels = countBuffer[0];
-//	if (locId == 0 && blockIdx.x % 115 == 0) {
-//		printf("Block reduction result: %d/%d are empty.\n", emptyVoxels, voxelsPerBlock);
-//	}
 
 	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
 	if (locId == 0 && emptyBlock) {
-		atomicAdd(toDeallocateCount, 1);	// hack; should do a proper scan & compact
-//		printf("Empty block! %d/%d (%d)\n", emptyVoxels, voxelsPerBlock, *toDeallocateCount);
-
-//		int offset = computePrefixSum_device<int>(1,
-//												  toDeallocateCount,
-//												  SDF_BLOCK_SIZE3,
-//												  blockIdx.x);
-//		if (offset != -1) {
-//			printf("Compact offset: %d\n", offset);
-//			outBlocksToDeallocate[offset] = entryId;
-//		}
+		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
+		int offset = atomicAdd(toDeallocateCount, 1);
+		outBlocksToDeallocate[offset] = entryId;
 	}
 }
 
