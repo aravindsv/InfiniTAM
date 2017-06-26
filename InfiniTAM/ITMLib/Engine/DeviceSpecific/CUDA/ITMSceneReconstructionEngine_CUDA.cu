@@ -181,7 +181,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
 
 	if (gridSizeVS.x > 0) {
-		// TODO(andrei): What does visibility type 3 mean?
+		// 0 = invisible (I think)
+		// 1 = visible and in memory
+		// 2 = visible but swapped out
+		// 3 = visible at previous frame and in memory
 		setToType3<<<gridSizeVS, cudaBlockSizeVS>>>(entriesVisibleType, visibleEntryIDs, renderState_vh->noVisibleEntries);
 	}
 
@@ -802,26 +805,6 @@ __global__ void buildVisibleList_device(
 		if (offset != -1) activeEntryIDs[offset] = targetIdx;
 	}
 #endif
-}
-
-// TODO(andrei): Move to ITMCUDAUtils
-/// \brief Naive reduction limited to a single block, useful for, e.g., quickly counting things.
-/// Mutates `input`. The result will be left in `input[0]`.
-template<typename T>
-__device__
-void blockReduce(T *input, int count, int localId) {
-	if (localId >= count) {
-		return;
-	}
-
-	for(unsigned int s = count / 2; s > 0; s >>= 1) {
-		if (localId < s) {
-			int neighborId = localId + s;
-			input[localId] = input[localId] + input[neighborId];
-		}
-
-		__syncthreads();
-	}
 }
 
 template<class TVoxel>
