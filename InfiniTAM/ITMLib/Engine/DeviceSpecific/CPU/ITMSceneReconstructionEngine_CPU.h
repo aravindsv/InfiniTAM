@@ -30,6 +30,8 @@ namespace ITMLib
 
 			void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, int maxWeight, int minAge) override;
 
+			size_t GetDecayedBlockCount() override;
+
 			ITMSceneReconstructionEngine_CPU(void);
 			~ITMSceneReconstructionEngine_CPU(void);
 		};
@@ -47,6 +49,8 @@ namespace ITMLib
 				const ITMRenderState *renderState);
 
 			void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene, int maxWeight, int minAge) override;
+
+			size_t GetDecayedBlockCount() override;
 
 			ITMSceneReconstructionEngine_CPU(void);
 			~ITMSceneReconstructionEngine_CPU(void);

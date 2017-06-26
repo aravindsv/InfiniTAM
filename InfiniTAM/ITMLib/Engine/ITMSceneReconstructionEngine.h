@@ -52,6 +52,9 @@ namespace ITMLib
 							   int maxWeight,
 							   int minAge) = 0;
 
+			/** Returns the total number of decayed and deallocated voxel blocks. */
+			virtual size_t GetDecayedBlockCount() = 0;
+
 			ITMSceneReconstructionEngine(void) { }
 			virtual ~ITMSceneReconstructionEngine(void) { }
 		};

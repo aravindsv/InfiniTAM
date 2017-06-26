@@ -81,4 +81,9 @@ void ITMDenseMapper<TVoxel, TIndex>::Decay(ITMScene<TVoxel, TIndex> *scene,
   sceneRecoEngine->Decay(scene, maxWeight, minAge);
 }
 
+template<class TVoxel, class TIndex>
+size_t ITMDenseMapper<TVoxel, TIndex>::GetDecayedBlockCount() const {
+	return sceneRecoEngine->GetDecayedBlockCount();
+}
+
 template class ITMLib::Engine::ITMDenseMapper<ITMVoxel, ITMVoxelIndex>;

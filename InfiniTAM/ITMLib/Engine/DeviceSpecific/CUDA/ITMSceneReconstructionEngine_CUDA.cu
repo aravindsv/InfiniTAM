@@ -432,9 +432,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 								   1 * sizeof(int),
 								   cudaMemcpyDeviceToHost));
 			ITMSafeCall(cudaFree(lastFreeBlockId_d));
+
+			totalDecayedBlockCount += freedBlockCount;
 		}
 		else {
-			size_t savings = sizeof(TVoxel) * 512 * freedBlockCount;
+			size_t savings = sizeof(TVoxel) * SDF_BLOCK_SIZE3 * freedBlockCount;
 			float savingsMb = (savings / 1024.0f / 1024.0f);
 
 			printf("Found %d candidate blocks to deallocate with weight [%d] or below and age [%d]. "
@@ -447,6 +449,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 		delete visible.blockIDs;
 	}
+}
+
+template<class TVoxel>
+size_t ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::GetDecayedBlockCount() {
+	return static_cast<size_t>(totalDecayedBlockCount);
 }
 
 // plain voxel array
@@ -527,6 +534,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::Decay(
 ) {
   throw std::runtime_error("Map decay is not supported in conjunction with plain voxel arrays, "
 						   "only with voxel block hashing.");
+}
+
+template<class TVoxel>
+size_t ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::GetDecayedBlockCount() {
+	throw std::runtime_error("Map decay is not supported in conjunction with plain voxel arrays, "
+									 "only with voxel block hashing.");
 }
 
 

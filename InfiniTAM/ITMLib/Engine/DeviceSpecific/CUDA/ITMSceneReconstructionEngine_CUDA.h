@@ -40,6 +40,8 @@ namespace ITMLib
 			// The maximum number of blocks which can be deallocated in one operation.
 			const int maxBlocksToDeallocate = 16000;
 
+			long totalDecayedBlockCount = 0L;
+
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
 
@@ -49,11 +51,13 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
-		  void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
-                     int maxWeight,
-                     int minAge) override;
+			void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+					   int maxWeight,
+					   int minAge) override;
 
-		  ITMSceneReconstructionEngine_CUDA(void);
+			size_t GetDecayedBlockCount() override;
+
+			ITMSceneReconstructionEngine_CUDA(void);
 			~ITMSceneReconstructionEngine_CUDA(void);
 		};
 
@@ -73,6 +77,8 @@ namespace ITMLib
 		  void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene,
 					 int maxWeight,
 					 int minAge) override;
+
+		  size_t GetDecayedBlockCount() override;
 		};
 	}
 }

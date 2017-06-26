@@ -41,6 +41,8 @@ namespace ITMLib
 					   int maxWeight,
 					   int minAge);
 
+			size_t GetDecayedBlockCount() const;
+
 			/** \brief Constructor
 			    Ommitting a separate image size for the depth images
 			    will assume same resolution as for the RGB images.
