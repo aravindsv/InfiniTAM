@@ -59,7 +59,8 @@ __global__ void decay_device(TVoxel *localVBA,
 							 int *visibleEntryIDs,
 							 int maxWeight,
 							 int *outBlocksToDeallocate,
-							 int *outToDeallocateCount);
+							 int *outToDeallocateCount,
+							 int maxBlocksToDeallocate);
 
 /// \brief Frees the VBA blocks with the IDs contained in `blockIdsToCleanup`.
 /// Based on 'cleanMemory_device' from the swapping engine.
@@ -343,8 +344,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		int maxWeight,
 		int minAge
 ) {
-	// As of late June 2017, this takes ~1.1ms at every frame, which is quite OK given that we have
-	// lower-hanging fruit to speed up, such as the actual semantic segmentation.
+	// As of late June 2017, this method takes ~0.5ms at every frame, which is quite OK given that
+	// we have lower-hanging fruit to speed up, such as the actual semantic segmentation.
+
 	const bool deallocateEmptyBlocks = true;
 
 	if (frameVisibleBlocks.size() > minAge) {
@@ -364,13 +366,16 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
 				maxWeight,
 				blocksToDeallocate_device,
-				blocksToDeallocateCount_device);
+				blocksToDeallocateCount_device,
+				maxBlocksToDeallocate);
 
 		int freedBlockCount;
 		ITMSafeCall(cudaMemcpy(&freedBlockCount,
 							   blocksToDeallocateCount_device,
 							   1 * sizeof(int),
 							   cudaMemcpyDeviceToHost));
+		// Convert from a last-element index to a count.
+		freedBlockCount += 1;
 
 		if (deallocateEmptyBlocks) {
 			// Note: no explicit cleanup was done at the end of the sequences!
@@ -388,9 +393,19 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			// With (w=3, a=10) dispnet pruning:    75.63% free (a little harsh, but looks OK)
 			// With (w=5, a=15) dispnet extreme:    79.22% free (extreme)
 
-			// TODO-LOW(andrei): Run capabilities check on startup, and then query caps object for max
-			// number of threads per block (can't do it here without introducing brittle assumptions
-			// about, e.g., GPU ID).
+			// Print a warning in the unlikely case that we filled the `blocksToDeallocate_device`
+			// buffer.
+			if (freedBlockCount > maxBlocksToDeallocate) {
+				fprintf(stderr, "Warning: reached maximum deallocation limit. Some blocks may have "
+						"been eligible for deallocation after voxel decay, but could not be "
+						"deallocated. Found %d blocks to free and the limit is %d.\n",
+						freedBlockCount, maxBlocksToDeallocate);
+				freedBlockCount = maxBlocksToDeallocate;
+			}
+
+			// TODO-LOW(andrei): Run capabilities check on startup, and then query caps object for
+			// max number of threads per block (can't do it here without introducing brittle
+			// assumptions about, e.g., GPU ID).
 			dim3 freeBlockSize(1024, 1, 1);
 			dim3 freeGridSize((freedBlockCount - 1) / freeBlockSize.x + 1);
 
@@ -405,12 +420,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 			freeBlocks_device<TVoxel> <<<freeGridSize, freeBlockSize>>> (
 					voxelAllocationList,
-							lastFreeBlockId_d,
-							hashTable,
-							blocksToDeallocate_device,
-							freedBlockCount);
+					lastFreeBlockId_d,
+					hashTable,
+					blocksToDeallocate_device,
+					freedBlockCount);
 
-			ITMSafeCall(cudaMemcpy(&scene->localVBA.lastFreeBlockId, lastFreeBlockId_d,
+			ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_d,
 								   1 * sizeof(int),
 								   cudaMemcpyDeviceToHost));
 			ITMSafeCall(cudaFree(lastFreeBlockId_d));
@@ -816,7 +831,8 @@ void decay_device(TVoxel *localVBA,
 				  int *visibleEntryIDs,
 				  int maxWeight,
 				  int *outBlocksToDeallocate,
-				  int *toDeallocateCount
+				  int *toDeallocateCount,
+				  int maxBlocksToDeallocate
 ) {
 	// Note: there are no range checks because we launch exactly as many threads as we need.
 
@@ -863,7 +879,9 @@ void decay_device(TVoxel *localVBA,
 	if (locId == 0 && emptyBlock) {
 		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
 		int offset = atomicAdd(toDeallocateCount, 1);
-		outBlocksToDeallocate[offset] = entryId;
+		if (offset < maxBlocksToDeallocate) {
+			outBlocksToDeallocate[offset] = entryId;
+		}
 	}
 }
 
@@ -877,7 +895,7 @@ __global__ void freeBlocks_device(
 ) {
 	int listIdx = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (listIdx > blockIdsCount - 1) {
+	if (listIdx >= blockIdsCount) {
 		return;
 	}
 
@@ -895,7 +913,7 @@ __global__ void freeBlocks_device(
 	// thread block because usually there's 1-2k blocks per frame that need to be freed.
 	int vbaIdx = atomicAdd(&lastFreeBlockId[0], 1);
 	// Put the address of the newly freed block onto the free list.
-	voxelAllocationList[vbaIdx + 1] = hashTable[entryDestId].ptr;
+	voxelAllocationList[vbaIdx] = hashTable[entryDestId].ptr;
 
 	// `ptr == -2` means the entry has been cleared out completely.
 	hashTable[entryDestId].ptr = -2;

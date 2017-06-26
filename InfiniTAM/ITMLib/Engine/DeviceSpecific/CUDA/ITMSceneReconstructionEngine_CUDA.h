@@ -40,7 +40,6 @@ namespace ITMLib
 			// The maximum number of blocks which can be deallocated in one operation.
 			const int maxBlocksToDeallocate = 16000;
 
-
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
 
