@@ -85,6 +85,9 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstruct
 	int noTotalEntries = ITMVoxelBlockHash::noTotalEntries;
 	ITMSafeCall(cudaMalloc((void**)&entriesAllocType_device, noTotalEntries));
 	ITMSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
+
+	ITMSafeCall(cudaMalloc((void**)&blocksToDeallocate_device, maxBlocksToDeallocate * sizeof(int)));
+	ITMSafeCall(cudaMalloc((void**)&blocksToDeallocateCount_device, 1 * sizeof(int)));
 }
 
 template<class TVoxel>
@@ -94,6 +97,9 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMSceneReconstruc
 	ITMSafeCall(cudaFree(allocationTempData_device));
 	ITMSafeCall(cudaFree(entriesAllocType_device));
 	ITMSafeCall(cudaFree(blockCoords_device));
+
+	ITMSafeCall(cudaFree(blocksToDeallocate_device));
+	ITMSafeCall(cudaFree(blocksToDeallocateCount_device));
 }
 
 template<class TVoxel>
@@ -196,8 +202,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 	}
 	else {
-      printf("Launching visible list building kernel. Maximum possible ID is noTotalEntries = %d (bucket count + excess list size)\n",
-	         noTotalEntries);
 		buildVisibleList_device<false> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleEntryIDs,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 	}
@@ -231,23 +235,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	};
 	frameVisibleBlocks.push(visibleBlockInfo);
 
-	// TODO(andrei): Remove this once code's working.
-	// Sanity check
-//  	int *visibleEntryIDs_h = new int[totalBlockCount];
-//	ITMSafeCall(cudaMemcpy(visibleEntryIDs_h,
-//						   visibleEntryIDs,
-//						   totalBlockCount * sizeof(int),
-//						   cudaMemcpyDeviceToHost));
-//	int visibleBlocks = 0;
-//	for (int i = 0; i < totalBlockCount; ++i) {
-//		if (visibleEntryIDs_h[i] != 0) {
-//			visibleBlocks++;
-//		}
-//	}
-//
-//	delete[] visibleEntryIDs_h;
-	// end sanity check
-
 	// This just returns the size of the pre-allocated buffer.
 	long allocatedBlocks = scene->index.getNumAllocatedVoxelBlocks();
 	// This is the number of blocks we are using out of the chunk that was allocated initially on
@@ -263,9 +250,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		usedExcessBlocks = allocatedExcessBlocks;
 	}
 
-	float percentFree = 100.0f * (1.0f - static_cast<float>(usedBlocks) / allocatedBlocks);
-
 	// Display some memory stats, useful for debugging mapping failures.
+	float percentFree = 100.0f * (1.0f - static_cast<float>(usedBlocks) / allocatedBlocks);
 	printf("Visible entries: %8d | Used blocks in main GPU buffer: %8ld/%ld (%.2f%% free) | "
 			"Used blocks in excess list: %8ld/%ld | Allocated size: %8d\n",
 			tempData->noVisibleEntries,
@@ -371,21 +357,20 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 		ITMHashEntry *hashTable = scene->index.GetEntries();
 
-		// TODO(andrei): Pre-allocate this in advance instead of reallocating at every time.
-		auto *outBlocksToDeallocate = new ORUtils::MemoryBlock<int>(visible.count * sizeof(int),
-																	true, true);
-		auto *outToDeallocateCount = new ORUtils::MemoryBlock<int>(1 * sizeof(int),
-																   true, true);
-
+		ITMSafeCall(cudaMemsetAsync(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
 		decay_device<TVoxel> <<<gridSize, cudaBlockSize>>>(
 				localVBA,
 				hashTable,
 				visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
 				maxWeight,
-				outBlocksToDeallocate->GetData(MEMORYDEVICE_CUDA),
-				outToDeallocateCount->GetData(MEMORYDEVICE_CUDA));
-		outToDeallocateCount->UpdateHostFromDevice();
-		int freedBlockCount = *(outToDeallocateCount->GetData(MEMORYDEVICE_CPU));
+				blocksToDeallocate_device,
+				blocksToDeallocateCount_device);
+
+		int freedBlockCount;
+		ITMSafeCall(cudaMemcpy(&freedBlockCount,
+							   blocksToDeallocateCount_device,
+							   1 * sizeof(int),
+							   cudaMemcpyDeviceToHost));
 
 		if (deallocateEmptyBlocks) {
 			// Note: no explicit cleanup was done at the end of the sequences!
@@ -418,11 +403,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 								   1 * sizeof(int),
 								   cudaMemcpyHostToDevice));
 
-			freeBlocks_device<TVoxel> << < freeGridSize, freeBlockSize >> > (
+			freeBlocks_device<TVoxel> <<<freeGridSize, freeBlockSize>>> (
 					voxelAllocationList,
 							lastFreeBlockId_d,
 							hashTable,
-							outBlocksToDeallocate->GetData(MEMORYDEVICE_CUDA),
+							blocksToDeallocate_device,
 							freedBlockCount);
 
 			ITMSafeCall(cudaMemcpy(&scene->localVBA.lastFreeBlockId, lastFreeBlockId_d,
@@ -442,8 +427,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				   savingsMb);
 		}
 
-		delete outBlocksToDeallocate;
-		delete outToDeallocateCount;
 		delete visible.blockIDs;
 	}
 }

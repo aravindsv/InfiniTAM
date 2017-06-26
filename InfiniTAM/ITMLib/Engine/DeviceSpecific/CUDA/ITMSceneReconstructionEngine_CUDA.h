@@ -30,8 +30,16 @@ namespace ITMLib
 			unsigned char *entriesAllocType_device;
 			Vector4s *blockCoords_device;
 
-			// Keeps track of recent lists of visible block IDs.	// TODO(andrei): Check if this is sane.
+			// Keeps track of recent lists of visible block IDs. Used by the voxel decay.
 			std::queue<VisibleBlockInfo> frameVisibleBlocks;
+			// Used by the voxel decay code to keep track of empty blocks which can be safely
+			// deleted and reused.
+			int *blocksToDeallocate_device;
+			int *blocksToDeallocateCount_device;
+
+			// The maximum number of blocks which can be deallocated in one operation.
+			const int maxBlocksToDeallocate = 16000;
+
 
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
