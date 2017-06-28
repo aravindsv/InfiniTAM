@@ -42,5 +42,12 @@ namespace ITMLib
 
 			~ITMMeshingEngine_CUDA(void);
 		};
+
+	/// \brief Populates 'visibleBlockGlobalPos' with the positions of the blocks which are in use.
+	// This kernel is run for every bucket of the hash map.
+	__global__ void findAllocatedBlocks(Vector4s *visibleBlockGlobalPos,
+										const ITMHashEntry *hashTable,
+										int noTotalEntries);
+
 	}
 }

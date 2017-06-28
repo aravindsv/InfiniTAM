@@ -11,8 +11,6 @@ template<class TVoxel>
 __global__ void meshScene_device(ITMMesh::Triangle *triangles, unsigned int *noTriangles_device, float factor, int noTotalEntries,
 	int noMaxTriangles, const Vector4s *visibleBlockGlobalPos, const TVoxel *localVBA, const ITMHashEntry *hashTable);
 
-__global__ void findAllocateBlocks(Vector4s *visibleBlockGlobalPos, const ITMHashEntry *hashTable, int noTotalEntries);
-
 using namespace ITMLib::Engine;
 
 template<class TVoxel>
@@ -59,7 +57,7 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 
 		std::cout << "Finding the allocated scene blocks using CUDA grid size: " << gridSize
 				  << " and block size: " << cudaBlockSize << std::endl;
-		findAllocateBlocks << <gridSize, cudaBlockSize >> >(visibleBlockGlobalPos_device, hashTable, noTotalEntries);
+		findAllocatedBlocks << <gridSize, cudaBlockSize >> >(visibleBlockGlobalPos_device, hashTable, noTotalEntries);
 		ITMSafeCall(cudaDeviceSynchronize());
 		ITMSafeCall(cudaGetLastError());
 	}
@@ -105,9 +103,11 @@ template<class TVoxel>
 void ITMMeshingEngine_CUDA<TVoxel, ITMPlainVoxelArray>::MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMPlainVoxelArray> *scene)
 {}
 
-// This kernel is run for every bucket of the hash map.
-__global__ void findAllocateBlocks(Vector4s *visibleBlockGlobalPos, const ITMHashEntry *hashTable, int noTotalEntries)
-{
+__global__ void ITMLib::Engine::findAllocatedBlocks(
+		Vector4s *visibleBlockGlobalPos,
+		const ITMHashEntry *hashTable,
+		int noTotalEntries
+) {
 	int entryId = threadIdx.x + blockIdx.x * blockDim.x;
 	if (entryId > noTotalEntries - 1) return;
 
@@ -117,7 +117,7 @@ __global__ void findAllocateBlocks(Vector4s *visibleBlockGlobalPos, const ITMHas
 	// in it in the next stage.
 	if (currentHashEntry.ptr >= 0) {
 		// visibleBlockGlobalPos maps each VBA entry to the block's position in 3D. If a VBA is not
-		// referenced
+		// referenced, its 'w' stays 0. Neat!
 		visibleBlockGlobalPos[currentHashEntry.ptr] = Vector4s(
 				currentHashEntry.pos.x, currentHashEntry.pos.y, currentHashEntry.pos.z, 1);
 	}

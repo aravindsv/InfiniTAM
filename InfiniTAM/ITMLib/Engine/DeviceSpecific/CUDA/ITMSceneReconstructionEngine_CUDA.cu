@@ -4,6 +4,7 @@
 #include "ITMCUDAUtils.h"
 #include "../../DeviceAgnostic/ITMSceneReconstructionEngine.h"
 #include "../../../Objects/ITMRenderState_VH.h"
+#include "../../../ITMLib.h"
 
 struct AllocationTempData {
 	int noAllocatedVoxelEntries;
@@ -64,12 +65,14 @@ __global__ void decay_device(TVoxel *localVBA,
 
 /// \brief Used to perform voxel decay on all voxels in a volume.
 template<class TVoxel>
-__global__ void decay_full_device(TVoxel *localVBA,
-								  const ITMHashEntry *hashTable,
-								  int maxWeight,
-								  int *outBlocksToDeallocate,
-								  int *outToDeallocateCount,
-								  int maxBlocksToDeallocate);
+__global__ void decay_full_device(
+		Vector4s *visibleBlockGlobalPos,
+		TVoxel *localVBA,
+		const ITMHashEntry *hashTable,
+		int maxWeight,
+		int *outBlocksToDeallocate,
+		int *outToDeallocateCount,
+		int maxBlocksToDeallocate);
 
 /// \brief Frees the VBA blocks with the IDs contained in `blockIdsToCleanup`.
 /// Based on 'cleanMemory_device' from the swapping engine.
@@ -384,7 +387,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						   cudaMemcpyHostToDevice));
 
 	int freedBlockCount = 0;
-	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
+	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 
 	if (forceAllVoxels) {
 		// Launch kernel for ALL voxels in the map.
@@ -392,27 +395,35 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		// here, and we're OK with the malloc overhead.
 		fprintf(stderr, "WILL now decay ALL voxels in the map...\n");
 
-		// Ghetto solution: look at EVERYTHING in the queue at the moment (so still, not everything
-		// that was *ever* visible, but close enough...), add it all to a set<int>, and pass that to
-		// the decay kernel... not perfect, but good enough for a first iteration.
-		// TODO(andrei): How is meshing done?
-		// Answer: the meshing code first launches a per-block kernel over all possible blocks in
-		// the buckets and excess list, and for those with valid pointers, flag them in a list of
-		// size `sdfLocalBlockNum`. But dunno if this is necessary.
-		// Afterwards, they just launch a mega-job per-voxel, over sdfLocalBlockNum blocks, which
-		// basically fits a mini-mesh for every voxel's vicinity using marching cubes. It's slow,
-		// since we launch a thread for every *voxel*, but as long as we only do it in real time
-		// for instances, which have ~10k blocks (which we could reduce further), it should be OK.
-		// A visible entries list can have 8k-10k elements anyway for the static map on a given
-		// frame.
+		// TODO(andrei): This should definitely be a separate method...
+		// First, we check every bucket and see if it's allocated, populating each index
+		// in `visibleBlockGlobalPos` with the block's position, whereby every element in
+		// this array corresponds to a VBA element.
 		long sdfLocalBlockNum = scene->index.getNumAllocatedVoxelBlocks();
-		dim3 gridSize(sdfLocalBlockNum);
+		int noTotalEntries = scene->index.noTotalEntries;
+		Vector4s *visibleBlockGlobalPos_device;
+		ITMSafeCall(cudaMalloc((void**)&visibleBlockGlobalPos_device, sdfLocalBlockNum * sizeof(Vector4s)));
+		ITMSafeCall(cudaMemset(visibleBlockGlobalPos_device, 0, sizeof(Vector4s) * sdfLocalBlockNum));
 
+		dim3 hashTableVisitBlockSize(1024);
+		dim3 hashTableVisitGridSize((noTotalEntries - 1) / hashTableVisitBlockSize.x + 1);
+
+		fprintf(stderr, "Launching findAllocatedBlocks with gs.x = %d\n", hashTableVisitGridSize.x);
+		fprintf(stderr, "total entries: %d %x\n", noTotalEntries, noTotalEntries);
+		ITMLib::Engine::findAllocatedBlocks<<<hashTableVisitGridSize, hashTableVisitBlockSize>>>(
+				visibleBlockGlobalPos_device, hashTable, noTotalEntries
+		);
+		ITMSafeCall(cudaDeviceSynchronize());
+		ITMSafeCall(cudaGetLastError());
+		printf("Aight, computed allocated blocks OK...\n");
+
+		// We now know, for every block allocated in the VBA, whether it's in use, and what its
+		// global coordinates are.
+		dim3 gridSize(sdfLocalBlockNum);
 		fprintf(stderr, "Calling decay_full_device...: gs.x = %d\n", gridSize.x);
-		// TODO(andrei): This may be very slow because of the default huge excess list, which gets
-		// allocated even for tiny object instances.
 		ITMSafeCall(cudaMemset(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
-		decay_full_device <TVoxel> <<< gridSize, cudaBlockSize >>> (
+		decay_full_device <TVoxel> <<< gridSize, voxelBlockSize >>> (
+				visibleBlockGlobalPos_device,
 				localVBA,
 				hashTable,
 				maxWeight,
@@ -421,11 +432,14 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				maxBlocksToDeallocate);
 		ITMSafeCall(cudaDeviceSynchronize());
 		ITMSafeCall(cudaGetLastError());
-      printf("decay_full_device went OK\n\n");
+
+		printf("decay_full_device went OK\n\n");
 		ITMSafeCall(cudaMemcpy(&freedBlockCount,
 							   blocksToDeallocateCount_device,
 							   1 * sizeof(int),
 							   cudaMemcpyDeviceToHost));
+
+		ITMSafeCall(cudaFree(visibleBlockGlobalPos_device));
 
 		// Convert from a last-element index to a count.
 //		freedBlockCount += 1;
@@ -441,9 +455,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			// meaningful depth to be estimated, so there's nothing to do for them.
 			if (visible.count > 0) {
 				dim3 gridSize(static_cast<uint32_t>(visible.count));
-
 				ITMSafeCall(cudaMemset(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
-				decay_device<TVoxel> <<< gridSize, cudaBlockSize >>> (
+				decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 						localVBA,
 						hashTable,
 						visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
@@ -963,73 +976,83 @@ void decay_device(TVoxel *localVBA,
 	}
 }
 
-
 // TODO(andrei): Get rid of code duplication.
 // TODO(andrei): Should we use readVoxel everywhere to support the excess list?
 
 template<class TVoxel>
 __global__
-void decay_full_device(TVoxel *localVBA,
-					   const ITMHashEntry *hashTable,
-				  int maxWeight,
-				  int *outBlocksToDeallocate,
-				  int *toDeallocateCount,
-				  int maxBlocksToDeallocate
+void decay_full_device(
+		Vector4s *visibleBlockGlobalPos,
+		TVoxel *localVBA,
+		const ITMHashEntry *hashTable,
+		int maxWeight,
+		int *outBlocksToDeallocate,
+		int *toDeallocateCount,
+		int maxBlocksToDeallocate
 ) {
-	const ITMHashEntry &currentHashEntry = hashTable[blockIdx.x];
-	if (currentHashEntry.ptr < 0) {
+	int vbaIdx = blockIdx.x;
+	const Vector4s blockGridPos = visibleBlockGlobalPos[vbaIdx];
+
+	if (blockGridPos.w == 0) {
+		// A zero means no hash table entry points to this block.
 		return;
 	}
 
+	Vector3i localVoxPos(threadIdx.x, threadIdx.y, threadIdx.z);
+//	if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
+//		printf("Working with VBA idx #%d\n", vbaIdx);
+//	}
+
+	Vector3i blockPos = Vector3i(blockGridPos.x, blockGridPos.y, blockGridPos.z) * SDF_BLOCK_SIZE;
+	Vector3i globalVoxPos = blockPos + localVoxPos;
+
 	bool isFound = false;
 
-	Vector3i blockGlobalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
-	Vector3i localPos(threadIdx.x, threadIdx.y, threadIdx.z);
-	Vector3i voxelGlobalPos = localPos + blockGlobalPos;
-//	TVoxel voxel = readVoxel(localVBA, hashTable, voxelGlobalPos, isFound);
-
-	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
-	int voxelIdx = findVoxel(hashTable, voxelGlobalPos, isFound, cache);
-
 	// Note: since we're operating on allocated blocks exclusively, then we must always FIND the
-	// voxel, right?
-	if (! isFound) {
-//		if (threadIdx.x == 0 && blockIdx.x % 100 == 33) {
-			printf("Did NOT find voxel...\n");
-//		}
+	// voxel. TODO(andrei): Should we assert that here?
+	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
+	int voxelIdx = findVoxel(hashTable, globalVoxPos, isFound, cache);
+
+//	if (!isFound) {
+//		printf("\n\nERROR: voxel not found!\n");
+//	}
+
+//	if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
+//		printf("Working with VBA idx #%d and weight is %d\n", vbaIdx,
+//			   static_cast<int>(localVBA[vbaIdx].w_depth));
+//    }
+
+	int vbaPenis = vbaIdx * SDF_BLOCK_SIZE3 + (threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE);
+
+	if (localVBA[vbaPenis].w_depth != 0 && blockIdx.x % 100 == 3) {
+		printf("Found element with nonzero weight: %d\n", static_cast<int>(localVBA[vbaPenis].w_depth));
 	}
-  else {
-		if (threadIdx.x == 0 && blockIdx.x % 10 == 3) {
-			printf("Found voxel (sample)> You are sane!...\n");
+
+	// TODO(andrei): Unconstantify.
+	// TODO(andrei): EVERYTHING GAAAAH
+	// TODO(andrei): Thank ETH staff for providing the lab with coffee.
+	bool emptyVoxel = false;
+	if (localVBA[vbaPenis].w_depth <= 5 && localVBA[vbaPenis].w_depth > 0) {
+		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
+			printf("Resetting voxel in VBA @ idx = %d!\n", vbaIdx);
 		}
-
+		localVBA[vbaPenis].reset();
+		emptyVoxel = true;
 	}
 
-	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
+//	if (localVBA[cache.blockPtr].w_depth == 0) {
+//		emptyVoxel = true;
+//	}
 
-	// This was the old way of doing things, but may not have been 100% OK for blocks allocated in
-	// the excess list, I think. (Confirmed: using this blindly can lead to cubic holes in the
-	// resulting map.)
-//	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * voxelsPerBlock]);
+//	if (emptyVoxel) {
+//		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0 && vbaIdx % 1000 == 13) {
+//			printf("Found an empty voxel! In VBA block %d!\n", vbaIdx);
+//		}
+//	}
 
+	const int voxelsPerBlock = SDF_BLOCK_SIZE3;
 
   /*
-	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
-
-	// The local offset of the voxel in the current block.
-	int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
-
-	bool emptyVoxel = false;
-
-	if (localVoxelBlock[locId].w_depth <= maxWeight && localVoxelBlock[locId].w_depth > 0) {
-		localVoxelBlock[locId].reset();
-		emptyVoxel = true;
-	}
-
-	if (localVoxelBlock[locId].w_depth == 0) {
-		emptyVoxel = true;
-	}
-
 	// Prepare for counting the number of empty voxels in each block.
 	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
