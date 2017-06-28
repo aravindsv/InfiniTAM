@@ -990,8 +990,8 @@ void decay_full_device(
 		int *toDeallocateCount,
 		int maxBlocksToDeallocate
 ) {
-	int vbaIdx = blockIdx.x;
-	const Vector4s blockGridPos = visibleBlockGlobalPos[vbaIdx];
+	int voxelBlockIdx = blockIdx.x;
+	const Vector4s blockGridPos = visibleBlockGlobalPos[voxelBlockIdx];
 
 	if (blockGridPos.w == 0) {
 		// A zero means no hash table entry points to this block.
@@ -1007,52 +1007,32 @@ void decay_full_device(
 	Vector3i globalVoxPos = blockPos + localVoxPos;
 
 	bool isFound = false;
-
 	// Note: since we're operating on allocated blocks exclusively, then we must always FIND the
 	// voxel. TODO(andrei): Should we assert that here?
 	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
 	int voxelIdx = findVoxel(hashTable, globalVoxPos, isFound, cache);
 
-//	if (!isFound) {
-//		printf("\n\nERROR: voxel not found!\n");
-//	}
-
-//	if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
-//		printf("Working with VBA idx #%d and weight is %d\n", vbaIdx,
-//			   static_cast<int>(localVBA[vbaIdx].w_depth));
-//    }
-
-	int vbaPenis = vbaIdx * SDF_BLOCK_SIZE3 + (threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE);
-
-	if (localVBA[vbaPenis].w_depth != 0 && blockIdx.x % 100 == 3) {
-		printf("Found element with nonzero weight: %d\n", static_cast<int>(localVBA[vbaPenis].w_depth));
+	if (localVBA[voxelIdx].w_depth != 0 && blockIdx.x % 100 == 3 &&
+			threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+		printf("Found element with nonzero weight: %d\n",
+			   static_cast<int>(localVBA[voxelIdx].w_depth));
 	}
 
-	// TODO(andrei): Unconstantify.
-	// TODO(andrei): EVERYTHING GAAAAH
-	// TODO(andrei): Thank ETH staff for providing the lab with coffee.
 	bool emptyVoxel = false;
-	if (localVBA[vbaPenis].w_depth <= 5 && localVBA[vbaPenis].w_depth > 0) {
+	if (localVBA[voxelIdx].w_depth <= maxWeight && localVBA[voxelIdx].w_depth > 0) {
 		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
-			printf("Resetting voxel in VBA @ idx = %d!\n", vbaIdx);
 		}
-		localVBA[vbaPenis].reset();
+		localVBA[voxelIdx].reset();
 		emptyVoxel = true;
 	}
 
-//	if (localVBA[cache.blockPtr].w_depth == 0) {
-//		emptyVoxel = true;
-//	}
-
-//	if (emptyVoxel) {
-//		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0 && vbaIdx % 1000 == 13) {
-//			printf("Found an empty voxel! In VBA block %d!\n", vbaIdx);
-//		}
-//	}
+	if (localVBA[voxelIdx].w_depth == 0) {
+		emptyVoxel = true;
+	}
 
 	const int voxelsPerBlock = SDF_BLOCK_SIZE3;
+	int locId = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.y * blockDim.x;
 
-  /*
 	// Prepare for counting the number of empty voxels in each block.
 	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
@@ -1069,7 +1049,7 @@ void decay_full_device(
 		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
 		int offset = atomicAdd(toDeallocateCount, 1);
 		if (offset < maxBlocksToDeallocate) {
-			outBlocksToDeallocate[offset] = entryId;
+			outBlocksToDeallocate[offset] = voxelIdx;
 		}
 	}
    //*/
