@@ -37,9 +37,11 @@ namespace ITMLib
 
 			/// Removes voxels with a weight smaller than `maxWeight` and an age greater than
 			/// `minAge` de-allocating blocks which become empty in the process.
-			void Decay(ITMScene<TVoxel, TIndex> *scene,
-					   int maxWeight,
-					   int minAge);
+			/// If `forceAllVoxels` is true, then the operation is performed on ALL voxels in the
+			/// map, which can be rather slow. Otherwise, the system operates on the list of voxels
+			/// visible `minAge` frames ago, which is not 100% accurate, but orders of magnitude
+			/// faster for large maps.
+			void Decay(ITMScene<TVoxel, TIndex> *scene, int maxWeight, int minAge, bool forceAllVoxels = false);
 
 			size_t GetDecayedBlockCount() const;
 

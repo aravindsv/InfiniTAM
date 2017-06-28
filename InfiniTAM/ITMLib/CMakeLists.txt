@@ -202,24 +202,18 @@ SOURCE_GROUP(Utils FILES ${ITMLIB_UTILS_SOURCES} ${ITMLIB_UTILS_HEADERS})
 # Specify the include directories, target and link libraries #
 ##############################################################
 
-# TODO(andrei): Remove message spam.
-
 if(WITH_CUDA)
-    message(STATUS "Working with CUDA. Will try to establish capabilities...")
-
   if(NOT DEFINED CUDA_COMPUTE_CAPABILITY)
-      # This looks like it finds the right dir...
-      message(STATUS "Will try include stuff from ${PROJECT_SOURCE_DIR}")
     include(${PROJECT_SOURCE_DIR}/cmake/CUDACheckCompute.cmake)
   endif()
+
   set(CUDA_ARCH ${CUDA_COMPUTE_CAPABILITY} CACHE STRING "CUDA architectures to compile for" FORCE)
-    message(STATUS "Cuda compute: ${CUDA_COMPUTE_CAPABILITY}")
-      message(STATUS "Cuda arch: ${CUDA_ARCH}")
+  message(STATUS "Using CUDA compute capability: ${CUDA_COMPUTE_CAPABILITY}")
+  message(STATUS "Using CUDA arch: ${CUDA_ARCH}")
   string(REPLACE " " ";" CUDA_ARCH_LIST ${CUDA_ARCH})
   foreach(a ${CUDA_ARCH_LIST})
     set(CUDA_ARCH_OPTIONS "${CUDA_ARCH_OPTIONS} -gencode arch=compute_${a},code=compute_${a}")
   endforeach()
-    message(STATUS "Cuda incl dirs...")
   include_directories(${CUDA_INCLUDE_DIRS})
   cuda_add_library(ITMLib
 	${ITMLIB_CPU_OBJECTS}

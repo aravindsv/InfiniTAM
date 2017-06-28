@@ -36,6 +36,7 @@ namespace ITMLib
 			// deleted and reused.
 			int *blocksToDeallocate_device;
 			int *blocksToDeallocateCount_device;
+			int *lastFreeBlockId_device;
 
 			// The maximum number of blocks which can be deallocated in one operation.
 			const int maxBlocksToDeallocate = 16000;
@@ -53,7 +54,8 @@ namespace ITMLib
 
 			void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 					   int maxWeight,
-					   int minAge) override;
+					   int minAge,
+					   bool forceAllVoxels) override;
 
 			size_t GetDecayedBlockCount() override;
 
@@ -76,7 +78,8 @@ namespace ITMLib
 
 		  void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene,
 					 int maxWeight,
-					 int minAge) override;
+					 int minAge,
+					 bool forceAllVoxels) override;
 
 		  size_t GetDecayedBlockCount() override;
 		};

@@ -89,6 +89,7 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstruct
 
 	ITMSafeCall(cudaMalloc((void**)&blocksToDeallocate_device, maxBlocksToDeallocate * sizeof(int)));
 	ITMSafeCall(cudaMalloc((void**)&blocksToDeallocateCount_device, 1 * sizeof(int)));
+	ITMSafeCall(cudaMalloc((void**)&lastFreeBlockId_device, 1 * sizeof(int)));
 }
 
 template<class TVoxel>
@@ -101,6 +102,7 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMSceneReconstruc
 
 	ITMSafeCall(cudaFree(blocksToDeallocate_device));
 	ITMSafeCall(cudaFree(blocksToDeallocateCount_device));
+	ITMSafeCall(cudaFree(lastFreeBlockId_device));
 }
 
 template<class TVoxel>
@@ -108,6 +110,13 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITM
 {
 	int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
 	int blockSize = scene->index.getVoxelBlockSize();
+
+	totalDecayedBlockCount = 0;
+	// Clean up the visible frame queue used in voxel decay.
+	while (! frameVisibleBlocks.empty()) {
+		delete frameVisibleBlocks.front().blockIDs;
+		frameVisibleBlocks.pop();
+	}
 
 	TVoxel *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
 	memsetKernel<TVoxel>(voxelBlocks_ptr, TVoxel(), numBlocks * blockSize);
@@ -256,15 +265,16 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	// Display some memory stats, useful for debugging mapping failures.
 	float percentFree = 100.0f * (1.0f - static_cast<float>(usedBlocks) / allocatedBlocks);
-	printf("Visible entries: %8d | Used blocks in main GPU buffer: %8ld/%ld (%.2f%% free) | "
-			"Used blocks in excess list: %8ld/%ld | Allocated size: %8d\n",
+	float allocatedSizeMiB = scene->localVBA.allocatedSize * sizeof(ITMVoxel) / 1024.0f / 1024.0f;
+	printf("[Visible: %6d | Used blocks (primary): %8ld/%ld (%.2f%% free)\n"
+			" Used blocks (excess list): %8ld/%ld | Total allocated size: %.2fMiB]\n",
 			tempData->noVisibleEntries,
 			usedBlocks,
 			allocatedBlocks,
 			percentFree,
 			usedExcessBlocks,
 			allocatedExcessBlocks,
-			scene->localVBA.allocatedSize);
+			allocatedSizeMiB);
 
 	ITMHashEntry *entries = scene->index.GetEntries();
 	if (scene->localVBA.lastFreeBlockId < 0) {
@@ -345,41 +355,67 @@ template<class TVoxel>
 void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 		int maxWeight,
-		int minAge
+		int minAge,
+		bool forceAllVoxels
 ) {
-	// As of late June 2017, this method takes ~0.5ms at every frame, which is quite OK given that
+	// As of late June 2017, this method takes ~0.75ms at every frame, which is quite OK given that
 	// we have lower-hanging fruit to speed up, such as the actual semantic segmentation.
 
-	const bool deallocateEmptyBlocks = true;
+	// TODO(andrei): Refactor this method once the functionality is more or less complete.
 
-	if (frameVisibleBlocks.size() > minAge) {
-		VisibleBlockInfo visible = frameVisibleBlocks.front();
-		frameVisibleBlocks.pop();
+	const bool deallocateEmptyBlocks = true;	// This could be a config param of the recon engine.
 
-		dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-		dim3 gridSize(static_cast<uint32_t>(visible.count));
+	int *voxelAllocationList = scene->localVBA.GetAllocationList();
+	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
+	ITMHashEntry *hashTable = scene->index.GetEntries();
 
-		TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
-		ITMHashEntry *hashTable = scene->index.GetEntries();
+	ITMSafeCall(cudaMemcpy(lastFreeBlockId_device, &(scene->localVBA.lastFreeBlockId),
+						   1 * sizeof(int),
+						   cudaMemcpyHostToDevice));
+	int freedBlockCount = 0;
 
-		ITMSafeCall(cudaMemsetAsync(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
-		decay_device<TVoxel> <<<gridSize, cudaBlockSize>>>(
-				localVBA,
-				hashTable,
-				visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
-				maxWeight,
-				blocksToDeallocate_device,
-				blocksToDeallocateCount_device,
-				maxBlocksToDeallocate);
+	if (forceAllVoxels) {
+		// Launch kernel for ALL voxels in the map.
+		// TODO(andrei): Use custom block cleanup buffer, since we DO expect to do lots of work
+		// here, and we're OK with the malloc overhead.
+		fprintf(stderr, "Should now decay ALL voxels in the map...\n");
+	}
+	else {
+		// Be conservative, and only run the decay for blocks visible `minAge` frames ago.
+		if (frameVisibleBlocks.size() > minAge) {
+			VisibleBlockInfo visible = frameVisibleBlocks.front();
+			frameVisibleBlocks.pop();
 
-		int freedBlockCount;
-		ITMSafeCall(cudaMemcpy(&freedBlockCount,
-							   blocksToDeallocateCount_device,
-							   1 * sizeof(int),
-							   cudaMemcpyDeviceToHost));
-		// Convert from a last-element index to a count.
-		freedBlockCount += 1;
+			// Ensure there are voxels to work with. We can often encounter empty frames when
+			// reconstructing individual objects which are too far from the camera for any
+			// meaningful depth to be estimated, so there's nothing to do for them.
+			if (visible.count > 0) {
+				dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
+				dim3 gridSize(static_cast<uint32_t>(visible.count));
 
+				ITMSafeCall(cudaMemset(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
+				decay_device<TVoxel> <<< gridSize, cudaBlockSize >>> (
+						localVBA,
+						hashTable,
+						visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
+						maxWeight,
+						blocksToDeallocate_device,
+						blocksToDeallocateCount_device,
+						maxBlocksToDeallocate);
+
+				ITMSafeCall(cudaMemcpy(&freedBlockCount,
+									   blocksToDeallocateCount_device,
+									   1 * sizeof(int),
+									   cudaMemcpyDeviceToHost));
+				delete visible.blockIDs;
+
+				// Convert from a last-element index to a count.
+				freedBlockCount += 1;
+			}
+		}
+	}
+
+	if (freedBlockCount > 1) {
 		if (deallocateEmptyBlocks) {
 			// Note: no explicit cleanup was done at the end of the sequences!
 			// Mini-bench: 50 frames starting with 3900 in odometry sequence 08.
@@ -400,8 +436,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			// buffer.
 			if (freedBlockCount > maxBlocksToDeallocate) {
 				fprintf(stderr, "Warning: reached maximum deallocation limit. Some blocks may have "
-						"been eligible for deallocation after voxel decay, but could not be "
-						"deallocated. Found %d blocks to free and the limit is %d.\n",
+								"been eligible for deallocation after voxel decay, but could not be "
+								"deallocated. Found %d blocks to free and the limit is %d.\n",
 						freedBlockCount, maxBlocksToDeallocate);
 				freedBlockCount = maxBlocksToDeallocate;
 			}
@@ -412,30 +448,18 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			dim3 freeBlockSize(1024, 1, 1);
 			dim3 freeGridSize((freedBlockCount - 1) / freeBlockSize.x + 1);
 
-			int *voxelAllocationList = scene->localVBA.GetAllocationList();
-			int *excessAllocationList = scene->index.GetExcessAllocationList();
-
-			int *lastFreeBlockId_d;
-			ITMSafeCall(cudaMalloc(&lastFreeBlockId_d, 1 * sizeof(int)));
-			ITMSafeCall(cudaMemcpy(lastFreeBlockId_d, &(scene->localVBA.lastFreeBlockId),
-								   1 * sizeof(int),
-								   cudaMemcpyHostToDevice));
-
-			freeBlocks_device<TVoxel> <<<freeGridSize, freeBlockSize>>> (
+			freeBlocks_device<TVoxel> <<< freeGridSize, freeBlockSize >>> (
 					voxelAllocationList,
-					lastFreeBlockId_d,
+					lastFreeBlockId_device,
 					hashTable,
 					blocksToDeallocate_device,
 					freedBlockCount);
 
-			ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_d,
+			ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
 								   1 * sizeof(int),
 								   cudaMemcpyDeviceToHost));
-			ITMSafeCall(cudaFree(lastFreeBlockId_d));
-
 			totalDecayedBlockCount += freedBlockCount;
-		}
-		else {
+		} else {
 			size_t savings = sizeof(TVoxel) * SDF_BLOCK_SIZE3 * freedBlockCount;
 			float savingsMb = (savings / 1024.0f / 1024.0f);
 
@@ -446,8 +470,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				   minAge,
 				   savingsMb);
 		}
-
-		delete visible.blockIDs;
+	}
+	else {
+		printf("Decay process found NO voxel blocks to deallocate.\n");
 	}
 }
 
@@ -528,9 +553,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::IntegrateInt
 
 template<class TVoxel>
 void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::Decay(
-		ITMScene<TVoxel, ITMPlainVoxelArray> *scene,
-		int maxWeight,
-		int minAge
+		ITMScene<TVoxel, ITMPlainVoxelArray>*, int, int, bool
 ) {
   throw std::runtime_error("Map decay is not supported in conjunction with plain voxel arrays, "
 						   "only with voxel block hashing.");
@@ -539,7 +562,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::Decay(
 template<class TVoxel>
 size_t ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::GetDecayedBlockCount() {
 	throw std::runtime_error("Map decay is not supported in conjunction with plain voxel arrays, "
-									 "only with voxel block hashing.");
+							 "only with voxel block hashing.");
 }
 
 
@@ -906,7 +929,10 @@ __global__ void freeBlocks_device(
 
 	// TODO-LOW(andrei): Given that we're relying A LOT on this atomic, perhaps it could be worth it
 	// to change this to a scan & compact type of operation. Sadly we can't "cheat" and use a single
-	// thread block because usually there's 1-2k blocks per frame that need to be freed.
+	// thread block because usually there's 1-2k blocks per frame that need to be freed. Because of
+	// the memory access linearization, this makes the decay REALLY slow (2-3x +) for frames where
+	// we need to remove lots of things, such as the trail of some partially-masked noisy object,
+	// like a bicycle.
 	int vbaIdx = atomicAdd(&lastFreeBlockId[0], 1);
 	// Put the address of the newly freed block onto the free list.
 	voxelAllocationList[vbaIdx] = hashTable[entryDestId].ptr;
