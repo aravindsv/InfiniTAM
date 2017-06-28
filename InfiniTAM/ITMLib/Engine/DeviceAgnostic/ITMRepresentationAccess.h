@@ -21,18 +21,23 @@ _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(const THREADPTR(Vector3i) & p
 	return point.x + (point.y - blockPos.x) * SDF_BLOCK_SIZE + (point.z - blockPos.y) * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE - blockPos.z * SDF_BLOCK_SIZE3;
 }
 
-_CPU_AND_GPU_CODE_ inline int findVoxel(const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex, const THREADPTR(Vector3i) & point,
-	THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
-{
+_CPU_AND_GPU_CODE_ inline int findVoxel(
+		const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
+		const THREADPTR(Vector3i) &point,
+		THREADPTR(bool) &isFound,
+		THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) &cache
+) {
 	Vector3i blockPos;
 	short linearIdx = pointToVoxelBlockPos(point, blockPos);
 
+	// We found the voxel in a regular bucket.
 	if IS_EQUAL3(blockPos, cache.blockPos)
 	{
 		isFound = true;
 		return cache.blockPtr + linearIdx;
 	}
 
+	// Look for the voxel in the excess list, by walking it until the end of the "chain".
 	int hashIdx = hashIndex(blockPos);
 
 	while (true) 

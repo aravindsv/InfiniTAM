@@ -105,6 +105,7 @@ template<class TVoxel>
 void ITMMeshingEngine_CUDA<TVoxel, ITMPlainVoxelArray>::MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMPlainVoxelArray> *scene)
 {}
 
+// This kernel is run for every bucket of the hash map.
 __global__ void findAllocateBlocks(Vector4s *visibleBlockGlobalPos, const ITMHashEntry *hashTable, int noTotalEntries)
 {
 	int entryId = threadIdx.x + blockIdx.x * blockDim.x;
@@ -112,8 +113,14 @@ __global__ void findAllocateBlocks(Vector4s *visibleBlockGlobalPos, const ITMHas
 
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
 
-	if (currentHashEntry.ptr >= 0) 
-		visibleBlockGlobalPos[currentHashEntry.ptr] = Vector4s(currentHashEntry.pos.x, currentHashEntry.pos.y, currentHashEntry.pos.z, 1);
+	// If this bucket is not unused (ptr < -1), and not swapped out (ptr == -1), we are interested
+	// in it in the next stage.
+	if (currentHashEntry.ptr >= 0) {
+		// visibleBlockGlobalPos maps each VBA entry to the block's position in 3D. If a VBA is not
+		// referenced
+		visibleBlockGlobalPos[currentHashEntry.ptr] = Vector4s(
+				currentHashEntry.pos.x, currentHashEntry.pos.y, currentHashEntry.pos.z, 1);
+	}
 }
 
 template<class TVoxel>

@@ -212,7 +212,7 @@ if(WITH_CUDA)
   message(STATUS "Using CUDA arch: ${CUDA_ARCH}")
   string(REPLACE " " ";" CUDA_ARCH_LIST ${CUDA_ARCH})
   foreach(a ${CUDA_ARCH_LIST})
-    set(CUDA_ARCH_OPTIONS "${CUDA_ARCH_OPTIONS} -gencode arch=compute_${a},code=compute_${a}")
+    set(CUDA_ARCH_OPTIONS "${CUDA_ARCH_OPTIONS} -G -g -gencode arch=compute_${a},code=compute_${a}")
   endforeach()
   include_directories(${CUDA_INCLUDE_DIRS})
   cuda_add_library(ITMLib

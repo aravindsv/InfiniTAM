@@ -62,6 +62,15 @@ __global__ void decay_device(TVoxel *localVBA,
 							 int *outToDeallocateCount,
 							 int maxBlocksToDeallocate);
 
+/// \brief Used to perform voxel decay on all voxels in a volume.
+template<class TVoxel>
+__global__ void decay_full_device(TVoxel *localVBA,
+								  const ITMHashEntry *hashTable,
+								  int maxWeight,
+								  int *outBlocksToDeallocate,
+								  int *outToDeallocateCount,
+								  int maxBlocksToDeallocate);
+
 /// \brief Frees the VBA blocks with the IDs contained in `blockIdsToCleanup`.
 /// Based on 'cleanMemory_device' from the swapping engine.
 /// Does **NOT** work with swapping enabled. (Adding support for cleanup+decay doesn't seem too
@@ -253,27 +262,28 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	// This is the number of blocks we are using out of the chunk that was allocated initially on
 	// the GPU (for non-swapping case).
 	long usedBlocks = allocatedBlocks - scene->localVBA.lastFreeBlockId;
-	long allocatedExcessBlocks = SDF_EXCESS_LIST_SIZE;
-	long usedExcessBlocks = allocatedExcessBlocks - tempData->noAllocatedExcessEntries;
+
+	long allocatedExcessEntries = SDF_EXCESS_LIST_SIZE;
+	long usedExcessEntries = allocatedExcessEntries - tempData->noAllocatedExcessEntries;
 
 	if (usedBlocks > allocatedBlocks) {
 		usedBlocks = allocatedBlocks;
 	}
-	if (usedExcessBlocks > allocatedExcessBlocks) {
-		usedExcessBlocks = allocatedExcessBlocks;
+	if (usedExcessEntries > allocatedExcessEntries) {
+		usedExcessEntries = allocatedExcessEntries;
 	}
 
 	// Display some memory stats, useful for debugging mapping failures.
 	float percentFree = 100.0f * (1.0f - static_cast<float>(usedBlocks) / allocatedBlocks);
 	float allocatedSizeMiB = scene->localVBA.allocatedSize * sizeof(ITMVoxel) / 1024.0f / 1024.0f;
 	printf("[Visible: %6d | Used blocks (primary): %8ld/%ld (%.2f%% free)\n"
-			" Used blocks (excess list): %8ld/%ld | Total allocated size: %.2fMiB]\n",
+			" Used excess list slots: %8ld/%ld | Total allocated size: %.2fMiB]\n",
 			tempData->noVisibleEntries,
 			usedBlocks,
 			allocatedBlocks,
 			percentFree,
-			usedExcessBlocks,
-			allocatedExcessBlocks,
+			usedExcessEntries,
+			allocatedExcessEntries,
 			allocatedSizeMiB);
 
 	ITMHashEntry *entries = scene->index.GetEntries();
@@ -372,13 +382,53 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 	ITMSafeCall(cudaMemcpy(lastFreeBlockId_device, &(scene->localVBA.lastFreeBlockId),
 						   1 * sizeof(int),
 						   cudaMemcpyHostToDevice));
+
 	int freedBlockCount = 0;
+	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 
 	if (forceAllVoxels) {
 		// Launch kernel for ALL voxels in the map.
 		// TODO(andrei): Use custom block cleanup buffer, since we DO expect to do lots of work
 		// here, and we're OK with the malloc overhead.
-		fprintf(stderr, "Should now decay ALL voxels in the map...\n");
+		fprintf(stderr, "WILL now decay ALL voxels in the map...\n");
+
+		// Ghetto solution: look at EVERYTHING in the queue at the moment (so still, not everything
+		// that was *ever* visible, but close enough...), add it all to a set<int>, and pass that to
+		// the decay kernel... not perfect, but good enough for a first iteration.
+		// TODO(andrei): How is meshing done?
+		// Answer: the meshing code first launches a per-block kernel over all possible blocks in
+		// the buckets and excess list, and for those with valid pointers, flag them in a list of
+		// size `sdfLocalBlockNum`. But dunno if this is necessary.
+		// Afterwards, they just launch a mega-job per-voxel, over sdfLocalBlockNum blocks, which
+		// basically fits a mini-mesh for every voxel's vicinity using marching cubes. It's slow,
+		// since we launch a thread for every *voxel*, but as long as we only do it in real time
+		// for instances, which have ~10k blocks (which we could reduce further), it should be OK.
+		// A visible entries list can have 8k-10k elements anyway for the static map on a given
+		// frame.
+		long sdfLocalBlockNum = scene->index.getNumAllocatedVoxelBlocks();
+		dim3 gridSize(sdfLocalBlockNum);
+
+		fprintf(stderr, "Calling decay_full_device...: gs.x = %d\n", gridSize.x);
+		// TODO(andrei): This may be very slow because of the default huge excess list, which gets
+		// allocated even for tiny object instances.
+		ITMSafeCall(cudaMemset(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
+		decay_full_device <TVoxel> <<< gridSize, cudaBlockSize >>> (
+				localVBA,
+				hashTable,
+				maxWeight,
+				blocksToDeallocate_device,
+				blocksToDeallocateCount_device,
+				maxBlocksToDeallocate);
+		ITMSafeCall(cudaDeviceSynchronize());
+		ITMSafeCall(cudaGetLastError());
+      printf("decay_full_device went OK\n\n");
+		ITMSafeCall(cudaMemcpy(&freedBlockCount,
+							   blocksToDeallocateCount_device,
+							   1 * sizeof(int),
+							   cudaMemcpyDeviceToHost));
+
+		// Convert from a last-element index to a count.
+//		freedBlockCount += 1;
 	}
 	else {
 		// Be conservative, and only run the decay for blocks visible `minAge` frames ago.
@@ -390,7 +440,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			// reconstructing individual objects which are too far from the camera for any
 			// meaningful depth to be estimated, so there's nothing to do for them.
 			if (visible.count > 0) {
-				dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 				dim3 gridSize(static_cast<uint32_t>(visible.count));
 
 				ITMSafeCall(cudaMemset(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
@@ -854,7 +903,6 @@ void decay_device(TVoxel *localVBA,
 				  int maxBlocksToDeallocate
 ) {
 	// Note: there are no range checks because we launch exactly as many threads as we need.
-
 	int entryId = visibleEntryIDs[blockIdx.x];
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
 	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
@@ -863,10 +911,109 @@ void decay_device(TVoxel *localVBA,
 		return;
 	}
 
+	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
+	// The local offset of the voxel in the current block.
+	int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
+
+	// TODO(andrei): Handle this situation correctly. If we don't skip deleting these entries, we
+	// end up deleting the block corresponding to the original block which had that hash value =>
+	// the bad block doesn't get deleted (but may become unreachable), and the original block, which
+	// may be completely visible and useful, gets deleted causing square holes in the map.
+	if (currentHashEntry.offset > 0) {
+        if(locId == 0 && (blockIdx.x % 10) == 3) {
+			printf("Found excess list entry while decaying. Not deleting. (offset = %d)\n",
+				   currentHashEntry.offset);
+		}
+		return;
+	}
+
 	// The global position of the voxel block.
 	Vector3i globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * voxelsPerBlock]);
 
+	bool emptyVoxel = false;
+
+	if (localVoxelBlock[locId].w_depth <= maxWeight && localVoxelBlock[locId].w_depth > 0) {
+		localVoxelBlock[locId].reset();
+		emptyVoxel = true;
+	}
+
+	if (localVoxelBlock[locId].w_depth == 0) {
+		emptyVoxel = true;
+	}
+
+	// Prepare for counting the number of empty voxels in each block.
+	__shared__ int countBuffer[voxelsPerBlock];
+	countBuffer[locId] = static_cast<int>(emptyVoxel);
+	__syncthreads();
+
+	// Block-level sum for counting non-empty voxels in this block.
+	blockReduce(countBuffer, voxelsPerBlock, locId);
+	__syncthreads();
+
+	int emptyVoxels = countBuffer[0];
+
+	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
+	if (locId == 0 && emptyBlock) {
+		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
+		int offset = atomicAdd(toDeallocateCount, 1);
+		if (offset < maxBlocksToDeallocate) {
+			outBlocksToDeallocate[offset] = entryId;
+		}
+	}
+}
+
+
+// TODO(andrei): Get rid of code duplication.
+// TODO(andrei): Should we use readVoxel everywhere to support the excess list?
+
+template<class TVoxel>
+__global__
+void decay_full_device(TVoxel *localVBA,
+					   const ITMHashEntry *hashTable,
+				  int maxWeight,
+				  int *outBlocksToDeallocate,
+				  int *toDeallocateCount,
+				  int maxBlocksToDeallocate
+) {
+	const ITMHashEntry &currentHashEntry = hashTable[blockIdx.x];
+	if (currentHashEntry.ptr < 0) {
+		return;
+	}
+
+	bool isFound = false;
+
+	Vector3i blockGlobalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
+	Vector3i localPos(threadIdx.x, threadIdx.y, threadIdx.z);
+	Vector3i voxelGlobalPos = localPos + blockGlobalPos;
+//	TVoxel voxel = readVoxel(localVBA, hashTable, voxelGlobalPos, isFound);
+
+	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
+	int voxelIdx = findVoxel(hashTable, voxelGlobalPos, isFound, cache);
+
+	// Note: since we're operating on allocated blocks exclusively, then we must always FIND the
+	// voxel, right?
+	if (! isFound) {
+//		if (threadIdx.x == 0 && blockIdx.x % 100 == 33) {
+			printf("Did NOT find voxel...\n");
+//		}
+	}
+  else {
+		if (threadIdx.x == 0 && blockIdx.x % 10 == 3) {
+			printf("Found voxel (sample)> You are sane!...\n");
+		}
+
+	}
+
+	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
+
+	// This was the old way of doing things, but may not have been 100% OK for blocks allocated in
+	// the excess list, I think. (Confirmed: using this blindly can lead to cubic holes in the
+	// resulting map.)
+//	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * voxelsPerBlock]);
+
+
+  /*
 	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
 
 	// The local offset of the voxel in the current block.
@@ -902,6 +1049,7 @@ void decay_device(TVoxel *localVBA,
 			outBlocksToDeallocate[offset] = entryId;
 		}
 	}
+   //*/
 }
 
 template<class TVoxel>

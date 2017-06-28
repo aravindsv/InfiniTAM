@@ -218,9 +218,8 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 			{
 				while (hashEntry.offset >= 1)
 				{
-					// Grab the indicated bucket in the offset list. Note that this info is already
-					// stored in the hash table, and we don't need to go to to the VBA to find any
-					// `next` pointer, as the diagram in the paper would have you believe.
+					// Get the next element in the excess list by inspecting the appropriate hash
+					// table element.
 					hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
 					hashEntry = hashTable[hashIdx];
 
