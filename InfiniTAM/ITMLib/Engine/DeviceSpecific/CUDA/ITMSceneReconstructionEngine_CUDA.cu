@@ -395,6 +395,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		// here, and we're OK with the malloc overhead.
 		fprintf(stderr, "WILL now decay ALL voxels in the map...\n");
 
+		// TODO(andrei): Don't malloc anything in this method.
 		// TODO(andrei): This should definitely be a separate method...
 		// First, we check every bucket and see if it's allocated, populating each index
 		// in `visibleBlockGlobalPos` with the block's position, whereby every element in
@@ -510,12 +511,15 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			dim3 freeBlockSize(1024, 1, 1);
 			dim3 freeGridSize((freedBlockCount - 1) / freeBlockSize.x + 1);
 
+			printf("Starting free kernel.\n");
 			freeBlocks_device<TVoxel> <<< freeGridSize, freeBlockSize >>> (
 					voxelAllocationList,
 					lastFreeBlockId_device,
 					hashTable,
 					blocksToDeallocate_device,
 					freedBlockCount);
+			ITMSafeCall(cudaDeviceSynchronize());
+			ITMSafeCall(cudaGetLastError());
 
 			ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
 								   1 * sizeof(int),
@@ -999,10 +1003,6 @@ void decay_full_device(
 	}
 
 	Vector3i localVoxPos(threadIdx.x, threadIdx.y, threadIdx.z);
-//	if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
-//		printf("Working with VBA idx #%d\n", vbaIdx);
-//	}
-
 	Vector3i blockPos = Vector3i(blockGridPos.x, blockGridPos.y, blockGridPos.z) * SDF_BLOCK_SIZE;
 	Vector3i globalVoxPos = blockPos + localVoxPos;
 
@@ -1012,11 +1012,11 @@ void decay_full_device(
 	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
 	int voxelIdx = findVoxel(hashTable, globalVoxPos, isFound, cache);
 
-	if (localVBA[voxelIdx].w_depth != 0 && blockIdx.x % 100 == 3 &&
-			threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-		printf("Found element with nonzero weight: %d\n",
-			   static_cast<int>(localVBA[voxelIdx].w_depth));
-	}
+//	if (localVBA[voxelIdx].w_depth != 0 && blockIdx.x % 100 == 3 &&
+//			threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+//		printf("Found element with nonzero weight: %d\n",
+//			   static_cast<int>(localVBA[voxelIdx].w_depth));
+//	}
 
 	bool emptyVoxel = false;
 	if (localVBA[voxelIdx].w_depth <= maxWeight && localVBA[voxelIdx].w_depth > 0) {
@@ -1049,7 +1049,11 @@ void decay_full_device(
 		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
 		int offset = atomicAdd(toDeallocateCount, 1);
 		if (offset < maxBlocksToDeallocate) {
-			outBlocksToDeallocate[offset] = voxelIdx;
+//			 TODO(andrei): This is the
+
+			// This is incorrect: doing this discards precise identity info. We need the full
+			// coords to establish the exact block identity when there's a collision.
+			outBlocksToDeallocate[offset] = hashIndex(globalVoxPos);
 		}
 	}
    //*/
