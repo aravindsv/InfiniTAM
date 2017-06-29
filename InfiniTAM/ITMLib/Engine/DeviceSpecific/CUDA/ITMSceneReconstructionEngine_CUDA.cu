@@ -66,13 +66,15 @@ __global__ void decay_device(TVoxel *localVBA,
 /// \brief Used to perform voxel decay on all voxels in a volume.
 template<class TVoxel>
 __global__ void decay_full_device(
-		Vector4s *visibleBlockGlobalPos,
+		const Vector4s *visibleBlockGlobalPos,
 		TVoxel *localVBA,
-		const ITMHashEntry *hashTable,
+		ITMHashEntry *hashTable,
 		int maxWeight,
 		int *outBlocksToDeallocate,
-		int *outToDeallocateCount,
-		int maxBlocksToDeallocate);
+		int *toDeallocateCount,
+		int maxBlocksToDeallocate,
+		int *lastFreeBlockId,
+		int *voxelAllocationList);
 
 /// \brief Frees the VBA blocks with the IDs contained in `blockIdsToCleanup`.
 /// Based on 'cleanMemory_device' from the swapping engine.
@@ -430,17 +432,21 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				maxWeight,
 				blocksToDeallocate_device,
 				blocksToDeallocateCount_device,
-				maxBlocksToDeallocate);
+				maxBlocksToDeallocate,
+				lastFreeBlockId_device,
+				voxelAllocationList);
 		ITMSafeCall(cudaDeviceSynchronize());
 		ITMSafeCall(cudaGetLastError());
-
 		printf("decay_full_device went OK\n\n");
+
 		ITMSafeCall(cudaMemcpy(&freedBlockCount,
 							   blocksToDeallocateCount_device,
 							   1 * sizeof(int),
 							   cudaMemcpyDeviceToHost));
+		printf("decay_full_device deleted %d blocks\n\n", freedBlockCount);
 
 		ITMSafeCall(cudaFree(visibleBlockGlobalPos_device));
+		freedBlockCount = 0;		// XXX: hack for debugging
 
 		// Convert from a last-element index to a count.
 //		freedBlockCount += 1;
@@ -465,6 +471,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						blocksToDeallocate_device,
 						blocksToDeallocateCount_device,
 						maxBlocksToDeallocate);
+				ITMSafeCall(cudaDeviceSynchronize());
+				ITMSafeCall(cudaGetLastError());
 
 				ITMSafeCall(cudaMemcpy(&freedBlockCount,
 									   blocksToDeallocateCount_device,
@@ -480,6 +488,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 
 	if (freedBlockCount > 1) {
 		if (deallocateEmptyBlocks) {
+			// TODO(andrei): New benchmarks once the complete implementation is in place!
 			// Note: no explicit cleanup was done at the end of the sequences!
 			// Mini-bench: 50 frames starting with 3900 in odometry sequence 08.
 			// sdfLocalBlockNum: 0x80000
@@ -986,42 +995,52 @@ void decay_device(TVoxel *localVBA,
 template<class TVoxel>
 __global__
 void decay_full_device(
-		Vector4s *visibleBlockGlobalPos,
+		const Vector4s *visibleBlockGlobalPos,
 		TVoxel *localVBA,
-		const ITMHashEntry *hashTable,
+		ITMHashEntry *hashTable,
 		int maxWeight,
-		int *outBlocksToDeallocate,
-		int *toDeallocateCount,
-		int maxBlocksToDeallocate
+		int *outBlocksToDeallocate,		// Remove?
+		int *toDeallocateCount,			// Remove?
+		int maxBlocksToDeallocate,		// Remove?
+		int *lastFreeBlockId,
+		int *voxelAllocationList
 ) {
-	int voxelBlockIdx = blockIdx.x;
-	const Vector4s blockGridPos = visibleBlockGlobalPos[voxelBlockIdx];
+	const int voxelBlockIdx = blockIdx.x;
+	const Vector4s blockGridPos_4s = visibleBlockGlobalPos[voxelBlockIdx];
 
-	if (blockGridPos.w == 0) {
+	if (blockGridPos_4s.w == 0) {
 		// A zero means no hash table entry points to this block.
 		return;
 	}
 
-	Vector3i localVoxPos(threadIdx.x, threadIdx.y, threadIdx.z);
-	Vector3i blockPos = Vector3i(blockGridPos.x, blockGridPos.y, blockGridPos.z) * SDF_BLOCK_SIZE;
-	Vector3i globalVoxPos = blockPos + localVoxPos;
+	const Vector3i localVoxPos(threadIdx.x, threadIdx.y, threadIdx.z);
+	// Note: this also acts as the key for the voxel block hash.
+	const Vector3i blockGridPos = Vector3i(blockGridPos_4s.x, blockGridPos_4s.y, blockGridPos_4s.z);
+	const Vector3i blockPos = blockGridPos * SDF_BLOCK_SIZE;
+	const Vector3i globalVoxPos = blockPos + localVoxPos;
+	int locId = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.y * blockDim.x;
 
 	bool isFound = false;
 	// Note: since we're operating on allocated blocks exclusively, then we must always FIND the
 	// voxel. TODO(andrei): Should we assert that here?
 	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
-	int voxelIdx = findVoxel(hashTable, globalVoxPos, isFound, cache);
+	// TODO(andrei): findVoxel does redundant work by re-extracting our 'blockGridPos' from
+	// 'globalVoxPos'. Why not pass it directly?
+//	int voxelIdx = findVoxel(hashTable, globalVoxPos, isFound, cache);
+	int blockHashIdx = -1;
+	int blockPrevHashIdx = -1;
+	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx, cache);
 
-//	if (localVBA[voxelIdx].w_depth != 0 && blockIdx.x % 100 == 3 &&
-//			threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-//		printf("Found element with nonzero weight: %d\n",
-//			   static_cast<int>(localVBA[voxelIdx].w_depth));
-//	}
+	if (-1 == blockHashIdx) {
+		printf("ERROR: could not find bucket.\n");
+		return;
+	}
 
+	// TODO(andrei): Unconstantify.
 	bool emptyVoxel = false;
-	if (localVBA[voxelIdx].w_depth <= maxWeight && localVBA[voxelIdx].w_depth > 0) {
-		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
-		}
+	if (localVBA[voxelIdx].w_depth <= 3 && localVBA[voxelIdx].w_depth > 0) {
+//		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
+//		}
 		localVBA[voxelIdx].reset();
 		emptyVoxel = true;
 	}
@@ -1031,7 +1050,6 @@ void decay_full_device(
 	}
 
 	const int voxelsPerBlock = SDF_BLOCK_SIZE3;
-	int locId = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.y * blockDim.x;
 
 	// Prepare for counting the number of empty voxels in each block.
 	__shared__ int countBuffer[voxelsPerBlock];
@@ -1044,19 +1062,52 @@ void decay_full_device(
 
 	int emptyVoxels = countBuffer[0];
 
-	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
-	if (locId == 0 && emptyBlock) {
-		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
-		int offset = atomicAdd(toDeallocateCount, 1);
-		if (offset < maxBlocksToDeallocate) {
-//			 TODO(andrei): This is the
+	// The old code, putting stuff in a specific list for future deletion.
+//	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
+//	if (locId == 0 && emptyBlock) {
+//		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
+//		int offset = atomicAdd(toDeallocateCount, 1);
+//		if (offset < maxBlocksToDeallocate) {
+//			// This is incorrect: doing this discards precise identity info. We need the full
+//			// coords to establish the exact block identity when there's a collision.
+//			outBlocksToDeallocate[offset] = hashIndex(globalVoxPos);
+//
+//			// Alternative: couldn't we just deallocate stuff here?
+//		}
+//	}
 
-			// This is incorrect: doing this discards precise identity info. We need the full
-			// coords to establish the exact block identity when there's a collision.
-			outBlocksToDeallocate[offset] = hashIndex(globalVoxPos);
+	bool blockEmpty = (emptyVoxels == voxelsPerBlock);
+	if (locId == 0 && blockEmpty) {
+//
+//		printf("PURGE kernel: found empty block with hash table IDX #%d\n", blockHashIdx);
+
+		// First, deallocate the VBA slot.
+		int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
+		voxelAllocationList[freeListIdx] = hashTable[blockHashIdx].ptr;
+
+		// Next, mark the hash table entry as unallocated.
+		hashTable[blockHashIdx].ptr = -2;
+
+		// Finally, do bookkeeping for buckets with more than one element.
+		// TODO(andrei): Update excess freelist! (Should work without but leak memory.)
+		if (blockPrevHashIdx != -1) {
+			// If this is set, it means that we have an element behind us.
+			hashTable[blockPrevHashIdx].offset = hashTable[blockHashIdx].offset;
 		}
+		else {
+			// The hash table entry we removed is in the main bucket array. If it had a valid 'next'
+			// element in the excess array, move that one to the main bucket array.
+			if (hashTable[blockHashIdx].offset >= 1) {
+				int nextIdx = SDF_BUCKET_NUM + hashTable[blockHashIdx].offset - 1;
+				hashTable[blockHashIdx] = hashTable[nextIdx];
+			}
+			// Otherwise (most common case) there was only one entry in the hash table, and we
+			// deleted it, so we're done.
+		}
+
+//		// XXX: for debug stats
+//		atomicAdd(&toDeallocateCount[0], 1);
 	}
-   //*/
 }
 
 template<class TVoxel>

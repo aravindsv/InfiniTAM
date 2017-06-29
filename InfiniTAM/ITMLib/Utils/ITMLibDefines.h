@@ -71,7 +71,7 @@ struct ITMHashEntry
 {
 	/** Position of the corner of the 8x8x8 volume, that identifies the entry. */
 	Vector3s pos;
-	/** Offset in the excess list. */
+	/** Offset of the next element in the excess list, or <= 0 if none exists. */
 	int offset;
 	/** Pointer to the voxel block array.
 	    - >= 0 identifies an actual allocated entry in the voxel block array

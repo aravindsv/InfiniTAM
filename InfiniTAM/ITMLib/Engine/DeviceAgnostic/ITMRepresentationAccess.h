@@ -30,7 +30,7 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 	Vector3i blockPos;
 	short linearIdx = pointToVoxelBlockPos(point, blockPos);
 
-	// We found the voxel in a regular bucket.
+	// We found the voxel in the cache.
 	if IS_EQUAL3(blockPos, cache.blockPos)
 	{
 		isFound = true;
@@ -55,6 +55,57 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 		hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
 	}
 
+	isFound = false;
+	return -1;
+}
+
+// TODO(andrei): If it works, document the params and clean up.
+/// \brief Tweaked version used by the voxel decay code.
+_CPU_AND_GPU_CODE_ inline int findVoxel(
+		const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
+		const THREADPTR(Vector3i) &blockGridCoords,
+		int linearIdx,
+		THREADPTR(bool) &isFound,
+		THREADPTR(int) &outHashIdx,
+		THREADPTR(int) &outPrevHashIdx,
+		THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) &cache		// Do we need this in this use case?
+) {
+	// blockPos == blockGridCoords
+	Vector3i blockPos = blockGridCoords;
+	outPrevHashIdx = -1;
+
+	// We found the voxel in the cache.
+	if IS_EQUAL3(blockPos, cache.blockPos)
+	{
+		isFound = true;
+		return cache.blockPtr + linearIdx;
+	}
+
+	// Look for the voxel in the excess list, by walking it until the end of the "chain".
+	int hashIdx = hashIndex(blockPos);
+
+	while (true)
+	{
+		ITMHashEntry hashEntry = voxelIndex[hashIdx];
+
+		if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= 0)
+		{
+			isFound = true;
+			cache.blockPos = blockPos; cache.blockPtr = hashEntry.ptr * SDF_BLOCK_SIZE3;
+			// Return the offset (in the buckets or excess list of the entry where we found the block).
+			outHashIdx = hashIdx;
+			return cache.blockPtr + linearIdx;
+		}
+
+		if (hashEntry.offset < 1) {
+			break;
+		}
+
+		outPrevHashIdx = hashIdx;
+		hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
+	}
+
+	outHashIdx = -1;
 	isFound = false;
 	return -1;
 }
