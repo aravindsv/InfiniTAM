@@ -1023,13 +1023,9 @@ void decay_full_device(
 	bool isFound = false;
 	// Note: since we're operating on allocated blocks exclusively, then we must always FIND the
 	// voxel. TODO(andrei): Should we assert that here?
-	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
-	// TODO(andrei): findVoxel does redundant work by re-extracting our 'blockGridPos' from
-	// 'globalVoxPos'. Why not pass it directly?
-//	int voxelIdx = findVoxel(hashTable, globalVoxPos, isFound, cache);
 	int blockHashIdx = -1;
 	int blockPrevHashIdx = -1;
-	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx, cache);
+	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
 
 	if (-1 == blockHashIdx) {
 		printf("ERROR: could not find bucket.\n");
@@ -1059,28 +1055,10 @@ void decay_full_device(
 	// Block-level sum for counting non-empty voxels in this block.
 	blockReduce(countBuffer, voxelsPerBlock, locId);
 	__syncthreads();
+	int emptyVoxelCount = countBuffer[0];
 
-	int emptyVoxels = countBuffer[0];
-
-	// The old code, putting stuff in a specific list for future deletion.
-//	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
-//	if (locId == 0 && emptyBlock) {
-//		// TODO-LOW(andrei): Use a proper scan & compact pattern for performance.
-//		int offset = atomicAdd(toDeallocateCount, 1);
-//		if (offset < maxBlocksToDeallocate) {
-//			// This is incorrect: doing this discards precise identity info. We need the full
-//			// coords to establish the exact block identity when there's a collision.
-//			outBlocksToDeallocate[offset] = hashIndex(globalVoxPos);
-//
-//			// Alternative: couldn't we just deallocate stuff here?
-//		}
-//	}
-
-	bool blockEmpty = (emptyVoxels == voxelsPerBlock);
+	bool blockEmpty = (emptyVoxelCount == voxelsPerBlock);
 	if (locId == 0 && blockEmpty) {
-//
-//		printf("PURGE kernel: found empty block with hash table IDX #%d\n", blockHashIdx);
-
 		// First, deallocate the VBA slot.
 		int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
 		voxelAllocationList[freeListIdx] = hashTable[blockHashIdx].ptr;
