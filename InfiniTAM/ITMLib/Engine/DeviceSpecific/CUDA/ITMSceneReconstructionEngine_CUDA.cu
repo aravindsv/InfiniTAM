@@ -41,6 +41,7 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 	int *visibleEntryIDs, AllocationTempData *allocData, uchar *entriesVisibleType,
 	Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize);
 
+// TODO(andrei): Redo documentation after you finish implementing this.
 /// \brief Erases blocks whose weight is smaller than 'maxWeight', and marks blocks which become
 ///        empty in the process as pending deallocation in `outBlocksToDeallocate`.
 /// \tparam TVoxel The type of voxel representation to operate on (grayscale/color, float/short, etc.)
@@ -56,12 +57,15 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 /// \param outToDeallocateCount Will contain the number of blocks to deallocate.
 template<class TVoxel>
 __global__ void decay_device(TVoxel *localVBA,
-							 const ITMHashEntry *hashTable,
+							 ITMHashEntry *hashTable,
 							 int *visibleEntryIDs,
 							 int maxWeight,
 							 int *outBlocksToDeallocate,
 							 int *outToDeallocateCount,
-							 int maxBlocksToDeallocate);
+							 int maxBlocksToDeallocate,
+							 int *voxelAllocationList,
+							 int *lastFreeBlockId
+);
 
 /// \brief Used to perform voxel decay on all voxels in a volume.
 template<class TVoxel>
@@ -480,7 +484,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						maxWeight,
 						blocksToDeallocate_device,
 						blocksToDeallocateCount_device,
-						maxBlocksToDeallocate);
+						maxBlocksToDeallocate,
+						voxelAllocationList,
+						lastFreeBlockId_device
+				);
 				ITMSafeCall(cudaDeviceSynchronize());
 				ITMSafeCall(cudaGetLastError());
 
@@ -929,16 +936,68 @@ __global__ void buildVisibleList_device(
 #endif
 }
 
+// TODO(andrei): Get rid of code duplication.
+// TODO(andrei): Should we use readVoxel everywhere to support the excess list?
+
+/// \brief Deletes an entry in the hash table and frees its VBA slot.
+/// \param hashTable
+/// \param blockHashIdx         The index of the block to erase in the hash table.
+/// \param blockPrevHashIdx     The index of the previous entry in the hash table, if it exists,
+///                             i.e., if the bucket has more than one element and we're not deleting
+///                             the first one. (-1 otherwise)
+/// \param lastFreeBlockId      Index in the voxel allocation list (free list).
+/// \param voxelAllocationList  List of free voxels.
+template<class TVoxel>
+__device__
+void deleteEntry(
+		ITMHashEntry *hashTable,
+		int blockHashIdx,
+		int blockPrevHashIdx,
+		int *lastFreeBlockId,
+		int *voxelAllocationList
+) {
+	// First, deallocate the VBA slot.
+	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
+	voxelAllocationList[freeListIdx] = hashTable[blockHashIdx].ptr;
+
+	// Next, mark the hash table entry as unallocated.
+	hashTable[blockHashIdx].ptr = -2;
+
+	// Finally, do bookkeeping for buckets with more than one element.
+	// TODO(andrei): Update excess freelist! (Should work without but leak memory.)
+	if (blockPrevHashIdx != -1) {
+//		printf("Actually operating on an element in the excess list (prev.next = %d, idx = %d)!\n",
+//			   static_cast<int>(SDF_BUCKET_NUM + hashTable[blockPrevHashIdx].offset - 1),
+//			   blockHashIdx
+//		);
+
+		// If this is set, it means that we have an element behind us.
+		hashTable[blockPrevHashIdx].offset = hashTable[blockHashIdx].offset;
+	}
+	else {
+		// The hash table entry we removed is in the main bucket array. If it had a valid 'next'
+		// element in the excess array, move that one to the main bucket array.
+		if (hashTable[blockHashIdx].offset >= 1) {
+			int nextIdx = SDF_BUCKET_NUM + hashTable[blockHashIdx].offset - 1;
+			hashTable[blockHashIdx] = hashTable[nextIdx];
+		}
+		// Otherwise (most common case) there was only one entry in the hash table, and we
+		// deleted it, so we're done.
+	}
+}
+
 // This kernel runs per-voxel, just like 'decay_full_device'.
 template<class TVoxel>
 __global__
 void decay_device(TVoxel *localVBA,
-				  const ITMHashEntry *hashTable,
+				  ITMHashEntry *hashTable,
 				  int *visibleEntryIDs,
 				  int maxWeight,
 				  int *outBlocksToDeallocate,
 				  int *toDeallocateCount,
-				  int maxBlocksToDeallocate
+				  int maxBlocksToDeallocate,
+				  int *voxelAllocationList,
+				  int *lastFreeBlockId
 ) {
 	// Note: there are no range checks because we launch exactly as many threads as we need.
 	int entryId = visibleEntryIDs[blockIdx.x];
@@ -953,7 +1012,7 @@ void decay_device(TVoxel *localVBA,
 	// The local offset of the voxel in the current block.
 	int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
-  bool isExcess = false;
+	bool isExcess = false;
 	// XXX: continue working from here
 	// Note: this entryId can also point to the excess list, right? We could therefore look at the
 	// block location, hash it, and then walk the list until we find ourselves again. Then we'll
@@ -965,37 +1024,6 @@ void decay_device(TVoxel *localVBA,
 //			   "%ld == 0x%lx).\n", entryId, SDF_BUCKET_NUM,
 //			   SDF_GLOBAL_BLOCK_NUM, SDF_GLOBAL_BLOCK_NUM);
 		isExcess = true;
-	}
-
-	if (locId == 0) {
-		// TODO(andrei): Only do this work if needed.
-		Vector3i blockPos = currentHashEntry.pos.toInt();
-//	const Vector3s dummyPoint(0, 0, 0);
-		bool isFound = false;
-		int outBlockIdx = -1;
-		int outPrevBlockIdx = -1;
-
-		findVoxel(hashTable, blockPos, 0, isFound, outBlockIdx, outPrevBlockIdx);
-
-		// Some paranoid sanity checks. TODO(andrei): Consider adding flag for toggling.
-		if (!isFound || outBlockIdx < 0) {
-			printf("\n\nFATAL ERROR: sanity check failed in 'decay_device'.\n");
-			return;
-		}
-
-		if (outPrevBlockIdx == -1) {
-			if (isExcess) {
-				printf("\n[ERROR] Found entity in excess list with no previous element!\n");
-			}
-		}
-		else {
-			if (! isExcess) {
-				printf("\n[ERROR] Found entity in bucket list with a previous guy!\n");
-			}
-//			else {
-//				printf("A-OK: dude in excess list whose address is in the excess list!\n");
-//			}
-		}
 	}
 
 	// TODO(andrei): Correctly delete the element now.
@@ -1046,55 +1074,67 @@ void decay_device(TVoxel *localVBA,
 //			outBlocksToDeallocate[offset] = entryId;
 //		}
 //	}
-}
 
-// TODO(andrei): Get rid of code duplication.
-// TODO(andrei): Should we use readVoxel everywhere to support the excess list?
+	if (locId == 0 && emptyBlock) {
+		// TODO(andrei): Only do this work if needed.
+		Vector3i blockPos = currentHashEntry.pos.toInt();
+		bool isFound = false;
+		int outBlockIdx = -1;
+		int outPrevBlockIdx = -1;
 
-/// \brief Deletes an entry in the hash table and frees its VBA slot.
-/// \param hashTable
-/// \param blockHashIdx         The index of the block to erase in the hash table.
-/// \param blockPrevHashIdx     The index of the previous entry in the hash table, if it exists,
-///                             i.e., if the bucket has more than one element and we're not deleting
-///                             the first one. (-1 otherwise)
-/// \param lastFreeBlockId      Index in the voxel allocation list (free list).
-/// \param voxelAllocationList  List of free voxels.
-template<class TVoxel>
-__device__
-void deleteEntry(
-		ITMHashEntry *hashTable,
-		int blockHashIdx,
-		int blockPrevHashIdx,
-		int *lastFreeBlockId,
-		int *voxelAllocationList
-) {
-	// First, deallocate the VBA slot.
-	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
-	voxelAllocationList[freeListIdx] = hashTable[blockHashIdx].ptr;
+		findVoxel(hashTable, blockPos, 0, isFound, outBlockIdx, outPrevBlockIdx);
 
-	// Next, mark the hash table entry as unallocated.
-	hashTable[blockHashIdx].ptr = -2;
+		// Some paranoid sanity checks. TODO(andrei): Consider adding flag for toggling.
+		if (!isFound || outBlockIdx < 0) {
+          // wait, maybe this *could* happen if we're trying to clean up a block which we already removed in a prev. frame!
+			// but it does also happen in the first frame where we're doing this decay...
 
-	// Finally, do bookkeeping for buckets with more than one element.
-	// TODO(andrei): Update excess freelist! (Should work without but leak memory.)
-	if (blockPrevHashIdx != -1) {
-		printf("Actually operating on an element in the excess list (prev.next = %d, idx = %d)!\n",
-			   static_cast<int>(SDF_BUCKET_NUM + hashTable[blockPrevHashIdx].offset - 1),
-			   blockHashIdx
-		);
-
-		// If this is set, it means that we have an element behind us.
-		hashTable[blockPrevHashIdx].offset = hashTable[blockHashIdx].offset;
-	}
-	else {
-		// The hash table entry we removed is in the main bucket array. If it had a valid 'next'
-		// element in the excess array, move that one to the main bucket array.
-		if (hashTable[blockHashIdx].offset >= 1) {
-			int nextIdx = SDF_BUCKET_NUM + hashTable[blockHashIdx].offset - 1;
-			hashTable[blockHashIdx] = hashTable[nextIdx];
+			if (blockPos.x % 10 == 3) {
+				printf("\n\nFATAL ERROR: sanity check failed in 'decay_device' voxel (block) "
+							   "found = %d, outBlockIdx = %d (%d, %d, %d) ; %s.\n",
+					   static_cast<int>(isFound),
+					   outBlockIdx,
+					   blockPos.x,
+					   blockPos.y,
+					   blockPos.z,
+					   isExcess ? "excess" : "non-excess"
+				);
+			}
+			return;
 		}
-		// Otherwise (most common case) there was only one entry in the hash table, and we
-		// deleted it, so we're done.
+
+		if (outPrevBlockIdx == -1) {
+			if (isExcess) {
+				printf("\n[ERROR] Found entity in excess list with no previous element (%d, %d, %d)!\n",
+					   blockPos.x,
+					   blockPos.y,
+					   blockPos.z);
+			}
+		}
+		else {
+			if (! isExcess) {
+				printf("\n[ERROR] Found entity in bucket list with a previous guy!\n");
+			}
+//			else {
+//				printf("A-OK: dude in excess list whose address is in the excess list!\n");
+//			}
+		}
+
+		// Idea: write some flag or whatever at blockIdx.x => and then run job where each thread
+		// processes one such element. Note that the diff in our case would be small because we're
+		// using atomics, but if we were to switch to actual scans it might speed things up quite a bit!
+
+		if (blockPos.x % 10 == 3) {
+			printf("Will delete block with hash idx %d (prev = %d); (%d, %d, %d); %s\n",
+				   outBlockIdx,
+				   outPrevBlockIdx,
+				   blockPos.x,
+				   blockPos.y,
+				   blockPos.z,
+				   isExcess ? "excess" : "non-excess"
+			);
+		}
+		deleteEntry<TVoxel>(hashTable, outBlockIdx, outPrevBlockIdx, lastFreeBlockId, voxelAllocationList);
 	}
 }
 
