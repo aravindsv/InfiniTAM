@@ -64,7 +64,8 @@ __global__ void decay_device(TVoxel *localVBA,
 							 int *outToDeallocateCount,
 							 int maxBlocksToDeallocate,
 							 int *voxelAllocationList,
-							 int *lastFreeBlockId
+							 int *lastFreeBlockId,
+							 int *locks
 );
 
 /// \brief Used to perform voxel decay on all voxels in a volume.
@@ -471,6 +472,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			VisibleBlockInfo visible = frameVisibleBlocks.front();
 			frameVisibleBlocks.pop();
 
+			int *locks_device;
+			ITMSafeCall(cudaMalloc(&locks_device, SDF_BUCKET_NUM * sizeof(int)));
+			ITMSafeCall(cudaMemset( locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
+
 			// Ensure there are voxels to work with. We can often encounter empty frames when
 			// reconstructing individual objects which are too far from the camera for any
 			// meaningful depth to be estimated, so there's nothing to do for them.
@@ -486,7 +491,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						blocksToDeallocateCount_device,
 						maxBlocksToDeallocate,
 						voxelAllocationList,
-						lastFreeBlockId_device
+						lastFreeBlockId_device,
+						locks_device
 				);
 				ITMSafeCall(cudaDeviceSynchronize());
 				ITMSafeCall(cudaGetLastError());
@@ -496,6 +502,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 									   1 * sizeof(int),
 									   cudaMemcpyDeviceToHost));
 				delete visible.blockIDs;
+
+				ITMSafeCall(cudaFree(locks_device));
 
 				// Convert from a last-element index to a count.
 				freedBlockCount += 1;
@@ -823,7 +831,8 @@ __global__ void allocateVoxelBlocksList_device(
 		}
 		else
 		{
-			// TODO(andrei): Handle this better.
+			// TODO(andrei): Handle this better. We could probably get away with just looking at
+			// noAllocatedVoxelEntries and noAllocatedExcessEntries after the kernel completes.
 			if (vbaIdx >= 0)
 			{
 				printf("WARNING: Could not allocate in excess list! There was still room in the main VBA, "
@@ -937,8 +946,8 @@ __global__ void buildVisibleList_device(
 }
 
 // TODO(andrei): Get rid of code duplication.
-// TODO(andrei): Should we use readVoxel everywhere to support the excess list?
 
+// TODO(andrei): Refactor this and redocument.
 /// \brief Deletes an entry in the hash table and frees its VBA slot.
 /// \param hashTable
 /// \param blockHashIdx         The index of the block to erase in the hash table.
@@ -951,11 +960,14 @@ template<class TVoxel>
 __device__
 void deleteEntry(
 		ITMHashEntry *hashTable,
+		int hashValue,
 		int blockHashIdx,
 		int blockPrevHashIdx,
 		int *lastFreeBlockId,
-		int *voxelAllocationList
+		int *voxelAllocationList,
+		int *bucketLocks
 ) {
+  // TODO(andrei): maybe readd locking here
 	// First, deallocate the VBA slot.
 	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
 	voxelAllocationList[freeListIdx] = hashTable[blockHashIdx].ptr;
@@ -979,11 +991,23 @@ void deleteEntry(
 		// element in the excess array, move that one to the main bucket array.
 		if (hashTable[blockHashIdx].offset >= 1) {
 			int nextIdx = SDF_BUCKET_NUM + hashTable[blockHashIdx].offset - 1;
+			printf("No previous, but our block had a sucessor; putting succ in our slot. "
+						   "current Idx: %d ; next idx: %d Hash val: %d\n", blockHashIdx, nextIdx, hashValue);
+
 			hashTable[blockHashIdx] = hashTable[nextIdx];
+
+			// Free up the slot we just copied into the main VBA.
+			// [RIP] Not doing this can mean the zombie block gets detected as valid in the future,
+			// even though nobody points to it, even though it's in the excess area.
+			hashTable[nextIdx].offset = 0;
+			hashTable[nextIdx].ptr = -2;
 		}
 		// Otherwise (most common case) there was only one entry in the hash table, and we
 		// deleted it, so we're done.
 	}
+
+  // TODO(andrei): Enable this when everything else is working OK.
+//	atomicSub(&bucketLocks[hashValue], 1);
 }
 
 // This kernel runs per-voxel, just like 'decay_full_device'.
@@ -997,7 +1021,8 @@ void decay_device(TVoxel *localVBA,
 				  int *toDeallocateCount,
 				  int maxBlocksToDeallocate,
 				  int *voxelAllocationList,
-				  int *lastFreeBlockId
+				  int *lastFreeBlockId,
+				  int *locks
 ) {
 	// Note: there are no range checks because we launch exactly as many threads as we need.
 	int entryId = visibleEntryIDs[blockIdx.x];
@@ -1013,20 +1038,12 @@ void decay_device(TVoxel *localVBA,
 	int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
 	bool isExcess = false;
-	// XXX: continue working from here
-	// Note: this entryId can also point to the excess list, right? We could therefore look at the
-	// block location, hash it, and then walk the list until we find ourselves again. Then we'll
-	// know who the previous element is, and we can delete ourselves. But we should only do this if
-	// we can tell that we're actually in the excess list, and not in the buckets. If we're in the
-	// buckets but we have a successor, all we have to do is move the successor to our slot.
 	if (entryId > SDF_BUCKET_NUM && locId == 0) {
 //		printf("Visible list entry in excess list: idx = %d (regular buckets until %ld, total size "
 //			   "%ld == 0x%lx).\n", entryId, SDF_BUCKET_NUM,
 //			   SDF_GLOBAL_BLOCK_NUM, SDF_GLOBAL_BLOCK_NUM);
 		isExcess = true;
 	}
-
-	// TODO(andrei): Correctly delete the element now.
 
 //	if (currentHashEntry.offset > 0) {
 //        if(locId == 0 && (blockIdx.x % 100) == 3) {
@@ -1081,6 +1098,17 @@ void decay_device(TVoxel *localVBA,
 		bool isFound = false;
 		int outBlockIdx = -1;
 		int outPrevBlockIdx = -1;
+		int keyHash = hashIndex(blockPos);
+
+		int contention = atomicAdd(&locks[keyHash], 1);
+		if (contention) {
+			// TODO(andrei): In the future, we can just put the blocked voxel in a delete-later list or
+			// something...
+
+			printf("Contention on bucket of hash value %d. Not going further with block (%d, %d, "
+						   "%d).\n", keyHash, blockPos.x, blockPos.y, blockPos.z);
+			return;
+		}
 
 		findVoxel(hashTable, blockPos, 0, isFound, outBlockIdx, outPrevBlockIdx);
 
@@ -1134,7 +1162,9 @@ void decay_device(TVoxel *localVBA,
 				   isExcess ? "excess" : "non-excess"
 			);
 		}
-		deleteEntry<TVoxel>(hashTable, outBlockIdx, outPrevBlockIdx, lastFreeBlockId, voxelAllocationList);
+
+		deleteEntry<TVoxel>(hashTable, keyHash, outBlockIdx, outPrevBlockIdx, lastFreeBlockId,
+							voxelAllocationList, locks);
 	}
 }
 
@@ -1220,7 +1250,7 @@ void decay_full_device(
 		return;
 	}
 
-	// TODO(andrei): Unconstantify.
+	// TODO(andrei): Unconstantify weight threshold.
 	bool emptyVoxel = false;
 	if (localVBA[voxelIdx].w_depth <= 3 && localVBA[voxelIdx].w_depth > 0) {
 //		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
@@ -1244,11 +1274,13 @@ void decay_full_device(
 	blockReduce(countBuffer, voxelsPerBlock, locId);
 	__syncthreads();
 	int emptyVoxelCount = countBuffer[0];
+	// TODO(andrei): Use the tips from the original Niessner paper for GC: Min-SDF and max-weight thresholds.
 
-	bool blockEmpty = (emptyVoxelCount == voxelsPerBlock);
-	if (locId == 0 && blockEmpty) {
-		deleteEntry<TVoxel>(hashTable, blockHashIdx, blockPrevHashIdx, lastFreeBlockId, voxelAllocationList);
-	}
+	// TODO(andrei): Re-add once deleting is sync'd properly.
+//	bool blockEmpty = (emptyVoxelCount == voxelsPerBlock);
+//	if (locId == 0 && blockEmpty) {
+//		deleteEntry<TVoxel>(hashTable, blockHashIdx, blockPrevHashIdx, lastFreeBlockId, voxelAllocationList);
+//	}
 }
 
 
