@@ -27,7 +27,7 @@ namespace ITMLib
 
 			/** A list of "visible entries", that are
 			currently being processed by integration
-			and tracker.
+			and tracker. One entry corresponds to a hash table element.
 			*/
 			ORUtils::MemoryBlock<uchar> *entriesVisibleType;
             

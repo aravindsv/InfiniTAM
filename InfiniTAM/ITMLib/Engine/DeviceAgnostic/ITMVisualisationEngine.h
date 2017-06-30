@@ -321,15 +321,15 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 
 	if (outBlockIdx >= SDF_BUCKET_NUM || outPrevBlockIdx != -1) {
       // Make voxels from blocks in the excess list custom-tinted.
-		if (resn.w_depth < noiseThreshold) {
+		if (resn.w_depth <  noiseThreshold) {
 			// To-cull excess list blocks
 			overlay.r = 255;
-			overlay.g = 0;
-			overlay.b = 255;
+			overlay.g = 255;
+			overlay.b = 10;
 		}
 		else {
 			// Regular excess list blocks
-			overlay.r = intensity;
+			overlay.r = 10;
 			overlay.g = intensity;
 			overlay.b = 200;
 		}

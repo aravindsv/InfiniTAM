@@ -206,6 +206,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
 
 	if (gridSizeVS.x > 0) {
+		// Flags all previously visible blocks accordingly (runs for every element in the
+		// visibleEntryIDs list).
 		// 0 = invisible (I think)
 		// 1 = visible and in memory
 		// 2 = visible but swapped out
@@ -261,10 +263,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	auto *visibleEntryIDsCopy = new ORUtils::MemoryBlock<int>(
 			visibleEntryIDsByteCount, MEMORYDEVICE_CUDA);
 
-	ITMSafeCall(cudaMemcpy(visibleEntryIDsCopy->GetData(MEMORYDEVICE_CUDA),
-						   visibleEntryIDs,
-						   visibleEntryIDsByteCount,
-						   cudaMemcpyDeviceToDevice));
+	if (visibleEntryIDsByteCount > 0) {
+		ITMSafeCall(cudaMemcpy(visibleEntryIDsCopy->GetData(MEMORYDEVICE_CUDA),
+							   visibleEntryIDs,
+							   visibleEntryIDsByteCount,
+							   cudaMemcpyDeviceToDevice));
+	}
 	VisibleBlockInfo visibleBlockInfo = {
 		visibleBlockCount,
 		frameIdx,
@@ -456,6 +460,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 	// TODO(andrei): Refactor this method once the functionality is more or less complete.
 
 	const bool deallocateEmptyBlocks = false;	// This could be a config param of the recon engine.
+	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
 
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
@@ -465,13 +470,15 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						   1 * sizeof(int),
 						   cudaMemcpyHostToDevice));
 
-	int freedBlockCount = 0;
+//	int freedBlockCount = 0;
 	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 
 	if (forceAllVoxels) {
 		// TODO(andrei): Make this function obey the 'deallocateEmptryBlocks' flag.
-		freedBlockCount = fullDecay<TVoxel>(scene, maxWeight, this->lastFreeBlockId_device);
-		totalDecayedBlockCount += freedBlockCount;
+		// TODO(andrei): Remove duplicate functionality for counting freed blocks.
+//		int freedBlockCount =
+		fullDecay<TVoxel>(scene, maxWeight, this->lastFreeBlockId_device);
+//		totalDecayedBlockCount += freedBlockCount;
 
 		// TODO(andrei): Do this flow properly.
 		return;
@@ -482,20 +489,21 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			VisibleBlockInfo visible = frameVisibleBlocks.front();
 			frameVisibleBlocks.pop();
 
-			printf("Running decay_decvice on the %lu blocks visible at frame %lu.\n",
+			printf("Running decay_device on the %lu blocks visible at frame %lu.\n",
 				   visible.count,
 				   visible.frameIdx);
-
-			int *locks_device;
-			ITMSafeCall(cudaMalloc(&locks_device, SDF_BUCKET_NUM * sizeof(int)));
-			ITMSafeCall(cudaMemset( locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
 
 			// Ensure there are voxels to work with. We can often encounter empty frames when
 			// reconstructing individual objects which are too far from the camera for any
 			// meaningful depth to be estimated, so there's nothing to do for them.
 			if (visible.count > 0) {
+				int *locks_device;
+				ITMSafeCall(cudaMalloc(&locks_device, SDF_BUCKET_NUM * sizeof(int)));
+				ITMSafeCall(cudaMemset( locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
+
 				dim3 gridSize(static_cast<uint32_t>(visible.count));
 				ITMSafeCall(cudaMemset(blocksToDeallocateCount_device, 0, 1 * sizeof(int)));
+
 				decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 						localVBA,
 						hashTable,
@@ -511,20 +519,30 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 				ITMSafeCall(cudaDeviceSynchronize());
 				ITMSafeCall(cudaGetLastError());
 
-				ITMSafeCall(cudaMemcpy(&freedBlockCount,
-									   blocksToDeallocateCount_device,
+				// This is important for ensuring ITM "knows" about the freed up blocks in the VBA.
+				ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
 									   1 * sizeof(int),
 									   cudaMemcpyDeviceToHost));
+
+//				ITMSafeCall(cudaMemcpy(&freedBlockCount,
+//									   blocksToDeallocateCount_device,
+//									   1 * sizeof(int),
+//									   cudaMemcpyDeviceToHost));
 				delete visible.blockIDs;
 
 				ITMSafeCall(cudaFree(locks_device));
 
 				// Convert from a last-element index to a count.
-				freedBlockCount += 1;
+//				freedBlockCount += 1;
 			}
 		}
 	}
 
+	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
+	printf("decay_full_device deleted %d blocks\n\n", freedBlockCount);
+	totalDecayedBlockCount += freedBlockCount;
+
+	/*
 	if (freedBlockCount > 1) {
 		if (deallocateEmptyBlocks) {
 			// TODO(andrei): New benchmarks once the complete implementation is in place!
@@ -588,6 +606,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 	else {
 		printf("Decay process found NO voxel blocks to deallocate.\n");
 	}
+	//*/
 }
 
 
@@ -1005,17 +1024,23 @@ void deleteBlock(
 
 		printf("Contention on bucket of hash value %d. Not going further with block (%d, %d, "
 					   "%d).\n", keyHash, blockPos.x, blockPos.y, blockPos.z);
+		atomicSub(&locks[keyHash], 1);
 		return;
 	}
 
 	findVoxel(hashTable, blockPos, 0, isFound, outBlockIdx, outPrevBlockIdx);
-	bool isExcess = (outBlockIdx > SDF_BUCKET_NUM);
+	bool isExcess = (outBlockIdx >= SDF_BUCKET_NUM);
 
-//	if (isExcess || hashTable[outBlockIdx].ptr > 0) {
-//		// XXX debug: just don't deal with any bucket which contains >1 element
-		// This seems to prevent block-shaped holes from appearing on the map.
-//		return;
-//	}
+	if (isExcess || hashTable[outBlockIdx].offset >= 1) {
+		// Even after tons of careful debugging, there still seem to be a few Heisenbugs around
+		// causing the wrong blocks to disappear when deleting an element from a bucket with more
+		// than one element. However, if our hash table's size is large enough, this happens quite
+		// rarely, so we ignore it for now, since we save enough memory by deleting single-block
+		// buckets anyway.
+		// TODO(andrei): See if you can isolate the issue to ONLY 'isExcess' or 'hasNext'.
+		atomicSub(&locks[keyHash], 1);
+		return;
+	}
 
 	// Some paranoid sanity checks. TODO(andrei): Consider adding flag for toggling.
 	if (!isFound || outBlockIdx < 0) {
@@ -1047,16 +1072,16 @@ void deleteBlock(
 		}
 	}
 
-	if (blockPos.x % 10 == 3) {
-		printf("Will delete block with hash idx %d (prev = %d); (%d, %d, %d); %s\n",
-			   outBlockIdx,
-			   outPrevBlockIdx,
-			   blockPos.x,
-			   blockPos.y,
-			   blockPos.z,
-			   isExcess ? "excess" : "non-excess"
-		);
-	}
+//	if (blockPos.x % 10 == 3) {
+//		printf("Will delete block with hash idx %d (prev = %d); (%d, %d, %d); %s\n",
+//			   outBlockIdx,
+//			   outPrevBlockIdx,
+//			   blockPos.x,
+//			   blockPos.y,
+//			   blockPos.z,
+//			   isExcess ? "excess" : "non-excess"
+//		);
+//	}
 
 	// First, deallocate the VBA slot.
 	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
@@ -1071,18 +1096,17 @@ void deleteBlock(
 	if (outPrevBlockIdx != -1) {
 		// If this is set, it means that we have an element behind us (and we're in the excess list).
 		hashTable[outPrevBlockIdx].offset = hashTable[outBlockIdx].offset;
+		hashTable[outBlockIdx].offset = 0;
 	}
 	else {
 		// The hash table entry we removed is in the main bucket array. If it had a valid 'next'
 		// element in the excess array, move that one to the main bucket array.
 		if (hashTable[outBlockIdx].offset >= 1) {
 			long nextIdx = SDF_BUCKET_NUM + hashTable[outBlockIdx].offset - 1;
-//			printf("No previous, but our block had a sucessor; putting succ in our slot. "
-//						   "current Idx: %d ; next idx: %d Hash val: %d\n", blockHashIdx, nextIdx, hashValue);
-
 			hashTable[outBlockIdx] = hashTable[nextIdx];
 
-			// Free up the slot we just copied into the main VBA.
+			// Free up the slot we just copied into the main VBA, in case there's still pointers
+			// to it in the visible list from some to-be-decayed frame.
 			// [RIP] Not doing this can mean the zombie block gets detected as valid in the future,
 			// even though it's in the excess area but nobody is pointing at it.
 			hashTable[nextIdx].offset = 0;
@@ -1092,8 +1116,8 @@ void deleteBlock(
 		// deleted it, so we're done.
 	}
 
-	// TODO(andrei): Enable this when everything else is working OK.
-//	atomicSub(&bucketLocks[hashValue], 1);
+	// Release the lock.
+	atomicSub(&locks[keyHash], 1);
 }
 
 // This kernel runs per-voxel, just like 'decay_full_device'.
@@ -1116,6 +1140,10 @@ void decay_device(TVoxel *localVBA,
 	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
 
 	if (currentHashEntry.ptr < 0) {
+		// This happens when we have a block in the visible list which we already deleted in the
+		// previous list. If that block happens to be in the excess list, our code won't be able
+		// to find it (since nobody points to it any more), so some sanity checks will fail.
+		// In any case, since the block is already deallocated, it's better to bail early.
 		return;
 	}
 
@@ -1125,9 +1153,6 @@ void decay_device(TVoxel *localVBA,
 
 	bool isExcess = false;
 	if (entryId > SDF_BUCKET_NUM) {
-//		printf("Visible list entry in excess list: idx = %d (regular buckets until %ld, total size "
-//			   "%ld == 0x%lx).\n", entryId, SDF_BUCKET_NUM,
-//			   SDF_GLOBAL_BLOCK_NUM, SDF_GLOBAL_BLOCK_NUM);
 		isExcess = true;
 	}
 
@@ -1146,9 +1171,6 @@ void decay_device(TVoxel *localVBA,
 		emptyVoxel = true;
 	}
 
-	// XXX: don't deallocate anything
-//	return;
-
 	// Prepare for counting the number of empty voxels in each block.
 	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
@@ -1160,6 +1182,11 @@ void decay_device(TVoxel *localVBA,
 
 	int emptyVoxels = countBuffer[0];
 	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
+
+//	// Paint the blocks which we would otherwise remove
+//	if (emptyBlock) {
+//		localVoxelBlock[locId].clr = Vector3u(120, 120, 250);
+//	}
 
 	if (locId == 0 && emptyBlock) {
 		deleteBlock<TVoxel>(hashTable,
