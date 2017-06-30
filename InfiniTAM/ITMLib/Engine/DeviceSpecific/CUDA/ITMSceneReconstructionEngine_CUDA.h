@@ -38,12 +38,14 @@ namespace ITMLib
 			int *blocksToDeallocate_device;
 			int *blocksToDeallocateCount_device;
 			int *lastFreeBlockId_device;
+			// Used to avoid data races when deleting elements from the hash table.
+			int *locks_device;
 
 			// The maximum number of blocks which can be deallocated in one operation.
 			const int maxBlocksToDeallocate = 16000;
 
 			long totalDecayedBlockCount = 0L;
-          size_t frameIdx = 0; // XXX: proper frame counting
+			size_t frameIdx = 0;	 // TODO: proper frame counting
 
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
