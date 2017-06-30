@@ -70,7 +70,7 @@ __global__ void decay_device(TVoxel *localVBA,
 
 /// \brief Used to perform voxel decay on all voxels in a volume.
 template<class TVoxel>
-__global__ void decay_full_device(
+__global__ void decayFull_device(
 		const Vector4s *visibleBlockGlobalPos,
 		TVoxel *localVBA,
 		ITMHashEntry *hashTable,
@@ -422,10 +422,10 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 	// We now know, for every block allocated in the VBA, whether it's in use, and what its
 	// global coordinates are.
 	dim3 gridSize(sdfLocalBlockNum);
-	fprintf(stderr, "Calling decay_full_device...: gs.x = %d\n", gridSize.x);
+	fprintf(stderr, "Calling decayFull_device...: gs.x = %d\n", gridSize.x);
 
 	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
-	decay_full_device <TVoxel> <<< gridSize, voxelBlockSize >>> (
+	decayFull_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 			visibleBlockGlobalPos_device,
 					localVBA,
 					hashTable,
@@ -434,14 +434,14 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 					voxelAllocationList);
 	ITMSafeCall(cudaDeviceSynchronize());
 	ITMSafeCall(cudaGetLastError());
-	printf("decay_full_device went OK\n\n");
+	printf("decayFull_device went OK\n\n");
 
 	ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
 				1 * sizeof(int),
 				cudaMemcpyDeviceToHost));
 	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
 
-	printf("decay_full_device deleted %d blocks\n\n", freedBlockCount);
+	printf("decayFull_device deleted %d blocks\n\n", freedBlockCount);
 
 	ITMSafeCall(cudaFree(visibleBlockGlobalPos_device));
 	return freedBlockCount;
@@ -539,7 +539,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 	}
 
 	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
-	printf("decay_full_device deleted %d blocks\n\n", freedBlockCount);
+	printf("decayFull_device deleted %d blocks\n\n", freedBlockCount);
 	totalDecayedBlockCount += freedBlockCount;
 
 	/*
@@ -1120,7 +1120,7 @@ void deleteBlock(
 	atomicSub(&locks[keyHash], 1);
 }
 
-// This kernel runs per-voxel, just like 'decay_full_device'.
+// This kernel runs per-voxel, just like 'decayFull_device'.
 template<class TVoxel>
 __global__
 void decay_device(TVoxel *localVBA,
@@ -1239,7 +1239,7 @@ __global__ void freeBlocks_device(
 
 template<class TVoxel>
 __global__
-void decay_full_device(
+void decayFull_device(
 		const Vector4s *visibleBlockGlobalPos,
 		TVoxel *localVBA,
 		ITMHashEntry *hashTable,
