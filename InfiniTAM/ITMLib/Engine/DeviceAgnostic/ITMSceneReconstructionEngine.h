@@ -215,22 +215,22 @@ inline void buildHashAllocAndVisibleTypePP(
 			isFound = true;
 		}
 
-//#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-//		int key = hashIdx;
-//		int contention = atomicAdd(&locks[key], 1);
-//		if (contention > 0) {
-////			if(key % 1000 == 42) {
-////				printf("Contention for key %d when allocating! Deferring allocation for some block\n", key);
-////			}
-//			// Fight me bro!
-//			goto loop_end;
-//		}
-//      else {
-////			if(key % 1000 == 42) {
-////				printf("No contention for key %d\n", key);
-////			}
-//      }
-//#endif
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+		int key = hashIdx;
+		int contention = atomicAdd(&locks[key], 1);
+		if (contention > 0) {
+//			if(key % 1000 == 42) {
+//				printf("Contention for key %d when allocating! Deferring allocation for some block\n", key);
+//			}
+			// Fight me bro!
+			goto loop_end;
+		}
+      else {
+//			if(key % 1000 == 42) {
+//				printf("No contention for key %d\n", key);
+//			}
+      }
+#endif
 
 		if (!isFound)
 		{
@@ -272,10 +272,10 @@ inline void buildHashAllocAndVisibleTypePP(
 			}
 		}
 
-//#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-//loop_end:
-//		atomicSub(&locks[key], 1);
-//#endif
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+loop_end:
+		atomicSub(&locks[key], 1);
+#endif
 		point += direction;
 	}
 }

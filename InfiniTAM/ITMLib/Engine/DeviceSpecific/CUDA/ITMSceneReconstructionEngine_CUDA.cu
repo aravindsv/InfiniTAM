@@ -1078,28 +1078,43 @@ void decay_device(TVoxel *localVBA,
 	// The local offset of the voxel in the current block.
 	int locId = threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
-	bool isExcess = false;
-	if (entryId > SDF_BUCKET_NUM) {
-		isExcess = true;
-	}
-
 	// The global position of the voxel block.
 	Vector3i globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 
 	// Possible bug here!!!!
-	// This code is bad and you should feel bad.
 	// Explanation: I'd fixed this shit in the decayFull_device kernel (which uses the proper
 	// findVoxel function), and thought I did here too. But I didn't.
-	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * voxelsPerBlock]);
+//	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * voxelsPerBlock]);
+  // This bug meant that every time we had a block in the excess list in the visible list, we would
+	// process the first element of its cell, not it, but then we passed the current hash entry's
+	// position to the delete code, which did the lookup correctly, deleting the wrong block...
+
+	bool isFound = false;
+	int blockHashIdx = -1;
+	int blockPrevHashIdx = -1;
+	int voxelIdx = findVoxel(hashTable, currentHashEntry.pos.toInt(), locId, isFound, blockHashIdx, blockPrevHashIdx);
+
+	if (-1 == blockHashIdx) {
+      // TODO(andrei): Investigate this. It may happen when we're trying to delete a now-unreachable
+		// bucket, which was e.g., moved up to the ordered list once its ancestor was deleted.
+		// No biggie, we can just hope it's placed again in the visible list with the right offset,
+		// and if we miss it it's no big loss.
+//		printf("ERROR: could not find bucket.\n");
+		return;
+	}
+
+	if (! isFound && locId == 0 && blockIdx.x % 1000 == 3) {
+		printf("ERROR: voxel not found? WTF.\n");
+		return;
+	}
 
 	bool emptyVoxel = false;
-
-	if (localVoxelBlock[locId].w_depth <= maxWeight && localVoxelBlock[locId].w_depth > 0) {
-		localVoxelBlock[locId].reset();
+	if (localVBA[voxelIdx].w_depth <= maxWeight && localVBA[voxelIdx].w_depth > 0) {
+		localVBA[voxelIdx].reset();
 		emptyVoxel = true;
 	}
 
-	if (localVoxelBlock[locId].w_depth == 0) {
+	if (localVBA[voxelIdx].w_depth == 0) {
 		emptyVoxel = true;
 	}
 
