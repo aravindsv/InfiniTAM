@@ -305,11 +305,39 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 
 	// Weight below which a voxel is considered noisy.
 	const int noiseThreshold = 3;
-
 	Vector4u overlay;
-	if (resn.w_depth == maxWeight) {
-		overlay.r = 45;
-		overlay.g = 45;
+
+	// XXX: do this properly. Visualize the excess blocks with some tint.
+	int outBlockIdx = -1;
+	int outPrevBlockIdx = -1;
+	isFound = false;
+	findVoxel(indexData, ipos, isFound, outBlockIdx, outPrevBlockIdx);
+	if (! isFound || outBlockIdx == -1) {
+      // This seems to happen sometimes, but not sure why
+//		if (threadIdx.x == 0  && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x % 10 == 3) {
+//			printf("FATAL ERROR IN VISUALIZATION.\n");
+//		}
+	}
+
+	if (outBlockIdx >= SDF_BUCKET_NUM || outPrevBlockIdx != -1) {
+      // Make voxels from blocks in the excess list custom-tinted.
+		if (resn.w_depth < noiseThreshold) {
+			// To-cull excess list blocks
+			overlay.r = 255;
+			overlay.g = 0;
+			overlay.b = 255;
+		}
+		else {
+			// Regular excess list blocks
+			overlay.r = intensity;
+			overlay.g = intensity;
+			overlay.b = 200;
+		}
+	}
+	else if (resn.w_depth == maxWeight) {
+		// The voxel is "saturated", i.e., very likely good.
+		overlay.r = 0;
+		overlay.g = 0;
 		overlay.b = 255;
 	}
 	else if (resn.w_depth < noiseThreshold){

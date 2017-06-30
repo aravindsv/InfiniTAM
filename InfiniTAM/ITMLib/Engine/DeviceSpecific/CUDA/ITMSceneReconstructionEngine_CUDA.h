@@ -13,7 +13,8 @@ namespace ITMLib
 	{
 		struct VisibleBlockInfo {
 			size_t count;
-		  	ORUtils::MemoryBlock<int> *blockIDs;
+			size_t frameIdx;
+			ORUtils::MemoryBlock<int> *blockIDs;
 		};
 
 		template<class TVoxel, class TIndex>
@@ -42,6 +43,7 @@ namespace ITMLib
 			const int maxBlocksToDeallocate = 16000;
 
 			long totalDecayedBlockCount = 0L;
+          size_t frameIdx = 0; // XXX: proper frame counting
 
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);

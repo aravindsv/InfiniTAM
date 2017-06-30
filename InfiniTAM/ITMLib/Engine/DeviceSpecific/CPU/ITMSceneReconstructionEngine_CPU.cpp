@@ -169,7 +169,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 		int x = locId - y * depthImgSize.x;
 		buildHashAllocAndVisibleTypePP(entriesAllocType, entriesVisibleType, x, y, blockCoords, depth, invM_d,
 			invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable, scene->sceneParams->viewFrustum_min,
-			scene->sceneParams->viewFrustum_max);
+			scene->sceneParams->viewFrustum_max, 0);	// XXX: remove the 0 or pass in real array
 	}
 
 	if (onlyUpdateVisibleList) useSwapping = false;

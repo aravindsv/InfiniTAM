@@ -101,6 +101,19 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 	return -1;
 }
 
+_CPU_AND_GPU_CODE_ inline int findVoxel(
+		const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
+		const THREADPTR(Vector3i) &point,
+		THREADPTR(bool) &isFound,
+		THREADPTR(int) &outHashIdx,
+		THREADPTR(int) &outPrevHashIdx
+) {
+	Vector3i blockPos;
+	int linearIdx = pointToVoxelBlockPos(point, blockPos);
+
+	return findVoxel(voxelIndex, blockPos, linearIdx, isFound, outHashIdx, outPrevHashIdx);
+}
+
 _CPU_AND_GPU_CODE_ inline int findVoxel(const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex, Vector3i point, THREADPTR(bool) &isFound)
 {
 	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
@@ -148,8 +161,7 @@ _CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, co
 
 	int hashIdx = hashIndex(blockPos);
 
-	// Walk the excess list, if necessary, until we find the right block.
-	while (true) 
+	while (true)
 	{
 		ITMHashEntry hashEntry = voxelIndex[hashIdx];
 
@@ -160,6 +172,7 @@ _CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, co
 			return voxelData[cache.blockPtr + linearIdx];
 		}
 
+		// Walk the excess list, if necessary, until we find the right block.
 		if (hashEntry.offset < 1) break;
 		hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
 	}

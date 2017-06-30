@@ -143,7 +143,9 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 	}
 };
 
-_CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
+// TODO(andrei): Change back to hybrid code. _CPU_AND_GPU_CODE_
+__device__
+inline void buildHashAllocAndVisibleTypePP(
 		DEVICEPTR(uchar) *entriesAllocType,
 		DEVICEPTR(uchar) *entriesVisibleType,
 		int x,
@@ -157,7 +159,8 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 		float oneOverVoxelSize,
 		const CONSTPTR(ITMHashEntry) *hashTable,
 		float viewFrustum_min,
-		float viewFrustum_max
+		float viewFrustum_max,
+		int *locks
 ) {
 	float depth_measure; unsigned int hashIdx; int noSteps;
 	Vector3f pt_camera_f, point_e, point, direction; Vector3s blockPos;
@@ -190,6 +193,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 
 	direction /= (float)(noSteps - 1);
 
+	// TODO(andrei): Inspect this code to see if you can go for finer-grained fusion by taking smaller steps.
 	//add neighbouring blocks
 	for (int i = 0; i < noSteps; i++)
 	{
@@ -205,16 +209,33 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 
 		if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= -1)
 		{
-			//entry has been streamed out but is visible or in memory and visible
+			//entry (has been streamed out but is visible) or (in memory and visible)
 			entriesVisibleType[hashIdx] = (hashEntry.ptr == -1) ? 2 : 1;
 
 			isFound = true;
 		}
 
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+		int key = hashIdx;
+		int contention = atomicAdd(&locks[key], 1);
+		if (contention > 0) {
+//			if(key % 1000 == 42) {
+//				printf("Contention for key %d when allocating! Deferring allocation for some block\n", key);
+//			}
+			// Fight me bro!
+			goto loop_end;
+		}
+      else {
+//			if(key % 1000 == 42) {
+//				printf("No contention for key %d\n", key);
+//			}
+      }
+#endif
+
 		if (!isFound)
 		{
 			bool isExcess = false;
-			if (hashEntry.ptr >= -1) //seach excess list only if there is no room in ordered part
+			if (hashEntry.ptr >= -1) // search excess list only if there is no room in ordered part
 			{
 				while (hashEntry.offset >= 1)
 				{
@@ -238,6 +259,11 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 
 			if (!isFound) //still not found
 			{
+				// TODO(andrei): It seems there may be a data race here. Namely, it seems that
+				// (albeit with low probability) it may be that two different blocks *think* they
+				// ought to be allocated in the VBA, when, in fact, one of them should be put in the
+				// VBA and one in the excess list, after it.
+
 				// TODO(andrei): Could we detect allocation failures here?
 				entriesAllocType[hashIdx] = isExcess ? 2 : 1; 		// needs allocation
 				if (!isExcess) entriesVisibleType[hashIdx] = 1; 	//new entry is visible
@@ -246,6 +272,10 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 			}
 		}
 
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+loop_end:
+		atomicSub(&locks[key], 1);
+#endif
 		point += direction;
 	}
 }
