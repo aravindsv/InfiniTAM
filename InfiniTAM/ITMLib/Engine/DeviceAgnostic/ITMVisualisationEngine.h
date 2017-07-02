@@ -319,7 +319,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 //		}
 	}
 
-	if (outBlockIdx >= SDF_BUCKET_NUM || outPrevBlockIdx != -1) {
+	if (outBlockIdx >= SDF_BUCKET_NUM) {
       // Make voxels from blocks in the excess list custom-tinted.
 		if (resn.w_depth <  noiseThreshold) {
 			// To-cull excess list blocks

@@ -39,7 +39,7 @@
 #define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
 
 //#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, should be 2^n and bigger than kDefaultSdfLocalBlockNum, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
-const long SDF_BUCKET_NUM = 0x200000;
+const long SDF_BUCKET_NUM = 0x10000;
 
 //#define SDF_HASH_MASK 0xfffff			// Used for get hashing value of the bucket index,  SDF_HASH_MASK = SDF_BUCKET_NUM - 1
 const long SDF_HASH_MASK = SDF_BUCKET_NUM - 1;
@@ -49,7 +49,7 @@ const long SDF_HASH_MASK = SDF_BUCKET_NUM - 1;
 // visualization engine. I'm not 100% sure why those happen; it may be some weird interplay between
 // this and MAX_RENDERING_BLOCKS. Or it may just be some other, even darker, bug which is otherwise
 // concealed by using smaller buffer sizes.
-#define SDF_EXCESS_LIST_SIZE 0x40000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
+#define SDF_EXCESS_LIST_SIZE 0x80000	// 0x20000 Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
 #define SDF_GLOBAL_BLOCK_NUM (SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE)	// Number of globally stored blocks: SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE
 
 //#define SDF_EXCESS_LIST_SIZE 0x10000
@@ -78,6 +78,8 @@ struct ITMHashEntry
 	    - <-1 identifies an unallocated block
 	*/
 	int ptr;
+	/** XXX \brief Experimental counter for avoiding double-deletions when voxel decay is enabled. */
+	int allocatedTime;
 };
 
 // TODO(andrei): make this an enum. Does it not play well with CUDA?

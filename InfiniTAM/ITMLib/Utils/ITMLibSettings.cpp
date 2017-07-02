@@ -56,8 +56,8 @@ ITMLibSettings::ITMLibSettings(void)
 
 	/// enable or disable bilateral depth filtering;
 	/// When used with stereo depth maps, it seems to increase reconstruction quality.
-//	useBilateralFilter = false;
-	useBilateralFilter = true;
+	useBilateralFilter = false;
+//	useBilateralFilter = true;
 
 //	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;
@@ -66,7 +66,7 @@ ITMLibSettings::ITMLibSettings(void)
 //	trackerType = TRACKER_WICP;
   trackerType = TRACKER_GROUND_TRUTH;
 
-	/// model the sensor noise as  the weight for weighted ICP
+	/// model the sensor noise as the weight for weighted ICP
 	modelSensorNoise = false;
 	if (trackerType == TRACKER_WICP) modelSensorNoise = true;
 

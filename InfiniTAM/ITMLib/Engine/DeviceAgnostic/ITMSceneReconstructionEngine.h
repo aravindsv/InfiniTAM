@@ -215,22 +215,22 @@ inline void buildHashAllocAndVisibleTypePP(
 			isFound = true;
 		}
 
-#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-		int key = hashIdx;
-		int contention = atomicAdd(&locks[key], 1);
-		if (contention > 0) {
-//			if(key % 1000 == 42) {
-//				printf("Contention for key %d when allocating! Deferring allocation for some block\n", key);
-//			}
-			// Fight me bro!
-			goto loop_end;
-		}
-      else {
-//			if(key % 1000 == 42) {
-//				printf("No contention for key %d\n", key);
-//			}
-      }
-#endif
+//#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+//		int key = hashIdx;
+//		int contention = atomicAdd(&locks[key], 1);
+//		if (contention > 0) {
+////			if(key % 1000 == 42) {
+////				printf("Contention for key %d when allocating! Deferring allocation for some block\n", key);
+////			}
+//			// Fight me bro!
+//			goto loop_end;
+//		}
+//      else {
+////			if(key % 1000 == 42) {
+////				printf("No contention for key %d\n", key);
+////			}
+//      }
+//#endif
 
 		if (!isFound)
 		{
@@ -262,7 +262,20 @@ inline void buildHashAllocAndVisibleTypePP(
 				// TODO(andrei): It seems there may be a data race here. Namely, it seems that
 				// (albeit with low probability) it may be that two different blocks *think* they
 				// ought to be allocated in the VBA, when, in fact, one of them should be put in the
-				// VBA and one in the excess list, after it.
+				// VBA and one in the excess list, after it. This is discussed in the InfiniTAM
+				// technical report.
+
+				// TODO(andrei): Remove this crap.
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+				if (hashEntry.ptr == -3 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+					printf("Allocating block (%d, %d, %d) into recycled %s hash table slot\n",
+						   static_cast<int>(blockPos.x),
+						   static_cast<int>(blockPos.y),
+						   static_cast<int>(blockPos.z),
+						   isExcess ? "excess" : "ordered"
+					);
+				}
+#endif
 
 				// TODO(andrei): Could we detect allocation failures here?
 				entriesAllocType[hashIdx] = isExcess ? 2 : 1; 		// needs allocation
@@ -272,10 +285,10 @@ inline void buildHashAllocAndVisibleTypePP(
 			}
 		}
 
-#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-loop_end:
-		atomicSub(&locks[key], 1);
-#endif
+//#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+//loop_end:
+//		atomicSub(&locks[key], 1);
+//#endif
 		point += direction;
 	}
 }

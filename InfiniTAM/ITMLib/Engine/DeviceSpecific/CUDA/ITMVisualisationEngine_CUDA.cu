@@ -532,14 +532,19 @@ __global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, co
 	Vector2i upperLeft, lowerRight;
 	Vector2f zRange;
 	bool validProjection = false;
-	if (in_offset < noVisibleEntries) if (blockData.ptr >= 0)
-		validProjection = ProjectSingleBlock(blockData.pos, pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
+	if (in_offset < noVisibleEntries) {
+		if (blockData.ptr >= 0) {
+			validProjection = ProjectSingleBlock(blockData.pos, pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
+		}
+	}
 
 	Vector2i requiredRenderingBlocks(ceilf((float)(lowerRight.x - upperLeft.x + 1) / renderingBlockSizeX),
 		ceilf((float)(lowerRight.y - upperLeft.y + 1) / renderingBlockSizeY));
 
 	size_t requiredNumBlocks = requiredRenderingBlocks.x * requiredRenderingBlocks.y;
-	if (!validProjection) requiredNumBlocks = 0;
+	if (!validProjection) {
+		requiredNumBlocks = 0;
+	}
 
 	int out_offset = computePrefixSum_device<uint>(requiredNumBlocks, noTotalBlocks, blockDim.x, threadIdx.x);
 	if (!validProjection) return;
