@@ -20,10 +20,12 @@ ITMLibSettings::ITMLibSettings(void)
 //	: sceneParams(0.02f, 100, 0.0050f, 0.2f, 3.0f, false)
 // Work well in most KITTI cases:
 //	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
+// 0.005 also works well for a voxel size, at least for the static map. Cars can be higher-res.
 // Current:
 // 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
 // 	to hack the translation scale when processing the ground truth.
-	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
+//	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
+: sceneParams(0.30f, 10, 0.035f, 0.1f, 300.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;

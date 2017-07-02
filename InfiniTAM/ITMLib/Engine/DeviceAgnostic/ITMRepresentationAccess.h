@@ -175,11 +175,6 @@ _CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, co
 		// Walk the excess list, if necessary, until we find the right block.
 		if (hashEntry.offset < 1) break;
 
-		// XXX remove this
-		if (hashEntry.ptr < -1) {
-			printf("JUST WALKED THROUGH ZOMBIE ENTRY!!!\n");
-		}
-
 		hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
 	}
 

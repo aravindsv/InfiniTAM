@@ -76,9 +76,12 @@ __global__ void decayFull_device(
 		const Vector4s *visibleBlockGlobalPos,
 		TVoxel *localVBA,
 		ITMHashEntry *hashTable,
+		int minAge,
 		int maxWeight,
+		int *voxelAllocationList,
 		int *lastFreeBlockId,
-		int *voxelAllocationList);
+		int *locks,
+		int currentFrame);
 
 
 // host methods
@@ -211,16 +214,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 				hashTable);
 	}
 
-	// TODO(andrei): If locking is useful, do it properly...
-	int *locks_device;
-	ITMSafeCall(cudaMalloc(&locks_device, sizeof(int) * SDF_BUCKET_NUM));
+	// TODO(andrei): Remove if still unused and unnecessary.
 	ITMSafeCall(cudaMemset( locks_device, 0, sizeof(int) * SDF_BUCKET_NUM));
 
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType,
 		blockCoords_device, depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max, locks_device);
-
-	ITMSafeCall(cudaFree(locks_device));
 
 	bool useSwapping = scene->useSwapping;
 	if (onlyUpdateVisibleList) useSwapping = false;
@@ -262,10 +261,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	size_t visibleBlockCount = static_cast<size_t>(tempData->noVisibleEntries);
 
 	size_t visibleEntryIDsByteCount = visibleBlockCount * sizeof(int);
-	auto *visibleEntryIDsCopy = new ORUtils::MemoryBlock<int>(
-			visibleEntryIDsByteCount, MEMORYDEVICE_CUDA);
 
+  	ORUtils::MemoryBlock<int> *visibleEntryIDsCopy = nullptr;
 	if (visibleEntryIDsByteCount > 0) {
+      ITMSafeCall(cudaDeviceSynchronize());
+		ITMSafeCall(cudaGetLastError());
+		visibleEntryIDsCopy = new ORUtils::MemoryBlock<int>(visibleEntryIDsByteCount, MEMORYDEVICE_CUDA);
 		ITMSafeCall(cudaMemcpy(visibleEntryIDsCopy->GetData(MEMORYDEVICE_CUDA),
 							   visibleEntryIDs,
 							   visibleEntryIDsByteCount,
@@ -308,7 +309,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			allocatedExcessEntries,
 			allocatedSizeMiB);
 
-	ITMHashEntry *entries = scene->index.GetEntries();
+//	ITMHashEntry *entries = scene->index.GetEntries();
 	if (scene->localVBA.lastFreeBlockId < 0) {
 		fprintf(stderr, "ERROR: Last free block ID was negative (%d). This may indicate an "
 				"allocation failure, causing your map to stop being able to grow.\n", scene->localVBA.lastFreeBlockId);
@@ -387,13 +388,13 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 
 template<class TVoxel>
 int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
-			   int maxWeight,
-			   int *lastFreeBlockId_device
+			  int minAge,
+			  int maxWeight,
+			  int *lastFreeBlockId_device,
+			  int *locks_device,
+			  int frameIdx
 ) {
-	// TODO(andrei): Use custom block cleanup buffer, since we DO expect to do lots of work
-	// here, and we're OK with the malloc overhead.
 	fprintf(stderr, "WILL now decay ALL voxels in the map...\n");
-  throw std::runtime_error("Don't use this now.");
 
 	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
@@ -414,7 +415,7 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 	dim3 hashTableVisitGridSize((noTotalEntries - 1) / hashTableVisitBlockSize.x + 1);
 
 	fprintf(stderr, "Launching findAllocatedBlocks with gs.x = %d\n", hashTableVisitGridSize.x);
-	fprintf(stderr, "total entries: %d %x\n", noTotalEntries, noTotalEntries);
+	fprintf(stderr, "total entries: %d (0x%x)\n", noTotalEntries, noTotalEntries);
 	ITMLib::Engine::findAllocatedBlocks<<<hashTableVisitGridSize, hashTableVisitBlockSize>>>(
 			visibleBlockGlobalPos_device, hashTable, noTotalEntries
 	);
@@ -425,16 +426,21 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 	// We now know, for every block allocated in the VBA, whether it's in use, and what its
 	// global coordinates are.
 	dim3 gridSize(sdfLocalBlockNum);
-	fprintf(stderr, "Calling decayFull_device...: gs.x = %d\n", gridSize.x);
+	fprintf(stderr, "Calling decayFull_device...: gs.x = %d, minAge = %d, maxWeight = %d\n",
+			gridSize.x, minAge, maxWeight);
 
+	ITMSafeCall(cudaMemset(locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
 	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
 	decayFull_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 			visibleBlockGlobalPos_device,
 					localVBA,
 					hashTable,
+					minAge,
 					maxWeight,
+					voxelAllocationList,
 					lastFreeBlockId_device,
-					voxelAllocationList);
+					locks_device,
+					frameIdx);
 	ITMSafeCall(cudaDeviceSynchronize());
 	ITMSafeCall(cudaGetLastError());
 	printf("decayFull_device went OK\n\n");
@@ -475,7 +481,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 	if (forceAllVoxels) {
 		// TODO(andrei): Make this function obey the 'deallocateEmptryBlocks' flag.
 		// TODO(andrei): Remove duplicate functionality for counting freed blocks.
-		fullDecay<TVoxel>(scene, maxWeight, this->lastFreeBlockId_device);
+		fullDecay<TVoxel>(scene, minAge, maxWeight, this->lastFreeBlockId_device, locks_device, frameIdx);
 	}
 	else if (frameVisibleBlocks.size() > minAge) {
 		VisibleBlockInfo visible = frameVisibleBlocks.front();
@@ -489,7 +495,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		// reconstructing individual objects which are too far from the camera for any
 		// meaningful depth to be estimated, so there's nothing to do for them.
 		if (visible.count > 0) {
-			ITMSafeCall(cudaMemset( locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
+			ITMSafeCall(cudaMemset(locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
 
 			dim3 gridSize(static_cast<uint32_t>(visible.count));
 			decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
@@ -1080,45 +1086,39 @@ void deleteBlock(
 	atomicSub(&locks[keyHash], 1);
 }
 
-// This kernel runs per-voxel, just like 'decayFull_device'.
+
+/// \brief Looks up a voxel, determines if it should be decayed, and then automatically deletes the
+///        blocks that become empty in the process.
 template<class TVoxel>
-__global__
-void decay_device(TVoxel *localVBA,
-				  ITMHashEntry *hashTable,
-				  int *visibleEntryIDs,
-				  int minAge,
-				  int maxWeight,
-				  int *voxelAllocationList,
-				  int *lastFreeBlockId,
-				  int *locks,
-				  int currentFrame
+__device__
+void decayVoxel(
+		Vector3i blockGridPos,
+		int locId,
+		TVoxel *localVBA,
+		ITMHashEntry *hashTable,
+		int minAge,
+		int maxWeight,
+		int *voxelAllocationList,
+		int *lastFreeBlockId,
+		int *locks,
+		int currentFrame
 ) {
-	// Note: there are no range checks because we launch exactly as many threads as we need.
-	int entryId = visibleEntryIDs[blockIdx.x];
-
-	// Possibly now points to the wrong place. We just take out the position, and re-look it up.
-	const ITMHashEntry &currentHashEntry = hashTable[entryId];
-	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
-
-	// The local offset of the voxel in the current block.
-	int locId = threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
-
-	Vector3i intPos = currentHashEntry.pos.toInt();
-	// The global position of the voxel block.
-	Vector3i globalPos = intPos * SDF_BLOCK_SIZE;
 	bool isFound = false;
 	int blockHashIdx = -1;
 	int blockPrevHashIdx = -1;
-	int voxelIdx = findVoxel(hashTable, intPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
+	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
+
+	// For debugging
+	Vector3i intPos = blockGridPos * SDF_BLOCK_SIZE3;
+	int hashVal = hashIndex(intPos);
 
 	if (-1 == blockHashIdx) {
 		// This happens when we, for instance, have an ID in the visible list whose target gets
 		// deleted from the hash table by a previous decay phase.
-//		if (locId == 0) {
-//			int hashVal = hashIndex(intPos);
-//			printf("ERROR: could not find bucket for (%d, %d, %d) @ hash ID %d.\n",
-//                   intPos.x, intPos.y, intPos.z, hashVal);
-//		}
+		if (locId == 0) {
+			printf("ERROR: could not find bucket for (%d, %d, %d) @ hash ID %d.\n",
+                   intPos.x, intPos.y, intPos.z, hashVal);
+		}
 		return;
 	}
 
@@ -1148,9 +1148,11 @@ void decay_device(TVoxel *localVBA,
 		}
 	}
 
+	// Count the empty voxels in the block, to determine if it's empty
+
 	// TODO(andrei): Try summing all the weights and empty == weightSum < k (==3-10). Niessner et
 	// al. do this.
-	// Prepare for counting the number of empty voxels in each block.
+	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
 	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
 	__syncthreads();
@@ -1162,18 +1164,6 @@ void decay_device(TVoxel *localVBA,
 	int emptyVoxels = countBuffer[0];
 	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
 
-	// If we decide to clear up the block, let's be REALLY sure it's blank.
-	if (emptyBlock) {
-		if (localVBA[voxelIdx].w_depth != 0) {
-			printf("SANITY CHECK ERROR FAIL: depth weight != 0\n");
-		}
-		if (localVBA[voxelIdx].sdf != localVBA[voxelIdx].SDF_initialValue()) {
-			printf("SANITY CHECK FAIL: sdf nonzero somewhere in this here block..\n");
-		}
-		localVBA[voxelIdx].reset();
-	}
-	__syncthreads();
-
 	if (locId == 0 && emptyBlock && safeToClear) {
 		// Not recycling memory at the moment due to bugs.
 //		deleteBlock<TVoxel>(hashTable,
@@ -1184,6 +1174,38 @@ void decay_device(TVoxel *localVBA,
 	}
 }
 
+// This kernel runs per-voxel, just like 'decayFull_device'.
+template<class TVoxel>
+__global__
+void decay_device(TVoxel *localVBA,
+				  ITMHashEntry *hashTable,
+				  int *visibleEntryIDs,
+				  int minAge,
+				  int maxWeight,
+				  int *voxelAllocationList,
+				  int *lastFreeBlockId,
+				  int *locks,
+				  int currentFrame
+) {
+	// Note: there are no range checks because we launch exactly as many threads as we need.
+	int entryId = visibleEntryIDs[blockIdx.x];
+
+	// Possibly now points to the wrong place. We just take out the position, and re-look it up.
+	const ITMHashEntry &currentHashEntry = hashTable[entryId];
+
+	// The local offset of the voxel in the current block.
+	int locId = threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
+
+	// XXX: This WONT work as a proper key you dumbo. If you have the wrong ID in the
+	// visibleEntryIDs list, you will never be able to find the "correct" block by redoing the
+	// lookup, since you'll always end up at the same spot.
+	// Note: STILL doesn't explain why we get errors when not deleting stuff from the excess list...
+	Vector3i blockGridPos = currentHashEntry.pos.toInt();
+
+	decayVoxel<TVoxel>(blockGridPos, locId, localVBA, hashTable, minAge, maxWeight,
+					   voxelAllocationList, lastFreeBlockId, locks, currentFrame);
+}
+
 
 template<class TVoxel>
 __global__
@@ -1191,9 +1213,12 @@ void decayFull_device(
 		const Vector4s *visibleBlockGlobalPos,
 		TVoxel *localVBA,
 		ITMHashEntry *hashTable,
+		int minAge,
 		int maxWeight,
+		int *voxelAllocationList,
 		int *lastFreeBlockId,
-		int *voxelAllocationList
+		int *locks,
+		int currentFrame
 ) {
 	const int voxelBlockIdx = blockIdx.x;
 	const Vector4s blockGridPos_4s = visibleBlockGlobalPos[voxelBlockIdx];
@@ -1203,61 +1228,12 @@ void decayFull_device(
 		return;
 	}
 
-	const Vector3i localVoxPos(threadIdx.x, threadIdx.y, threadIdx.z);
 	// Note: this also acts as the key for the voxel block hash.
 	const Vector3i blockGridPos = Vector3i(blockGridPos_4s.x, blockGridPos_4s.y, blockGridPos_4s.z);
-	const Vector3i blockPos = blockGridPos * SDF_BLOCK_SIZE;
-	const Vector3i globalVoxPos = blockPos + localVoxPos;
 	int locId = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.y * blockDim.x;
 
-	bool isFound = false;
-	// Note: since we're operating on allocated blocks exclusively, then we must always FIND the
-	// voxel. TODO(andrei): Should we assert that here?
-	int blockHashIdx = -1;
-	int blockPrevHashIdx = -1;
-	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
-
-	if (-1 == blockHashIdx) {
-		printf("ERROR: could not find bucket.\n");
-		return;
-	}
-
-	if (! isFound && locId == 0 && blockIdx.x % 1000 == 3) {
-		printf("ERROR: voxel not found? WTF.\n");
-		return;
-	}
-
-	// TODO(andrei): Unconstantify weight threshold.
-	bool emptyVoxel = false;
-	if (localVBA[voxelIdx].w_depth <= 3 && localVBA[voxelIdx].w_depth > 0) {
-//		if (localVoxPos.x == 0 && localVoxPos.y == 0 && localVoxPos.z == 0) {
-//		}
-		localVBA[voxelIdx].reset();
-		emptyVoxel = true;
-	}
-
-	if (localVBA[voxelIdx].w_depth == 0) {
-		emptyVoxel = true;
-	}
-
-	const int voxelsPerBlock = SDF_BLOCK_SIZE3;
-
-	// Prepare for counting the number of empty voxels in each block.
-	__shared__ int countBuffer[voxelsPerBlock];
-	countBuffer[locId] = static_cast<int>(emptyVoxel);
-	__syncthreads();
-
-	// Block-level sum for counting non-empty voxels in this block.
-	blockReduce(countBuffer, voxelsPerBlock, locId);
-	__syncthreads();
-	int emptyVoxelCount = countBuffer[0];
-	// TODO(andrei): Use the tips from the original Niessner paper for GC: Min-SDF and max-weight thresholds.
-
-	// TODO(andrei): Re-add once deleting is sync'd properly.
-//	bool blockEmpty = (emptyVoxelCount == voxelsPerBlock);
-//	if (locId == 0 && blockEmpty) {
-//		deleteEntry<TVoxel>(hashTable, blockHashIdx, blockPrevHashIdx, lastFreeBlockId, voxelAllocationList);
-//	}
+	decayVoxel<TVoxel>(blockGridPos, locId, localVBA, hashTable, minAge, maxWeight, voxelAllocationList,
+					 lastFreeBlockId, locks, currentFrame);
 }
 
 
