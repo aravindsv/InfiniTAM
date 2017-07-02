@@ -67,12 +67,13 @@ void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImag
 
 	if (useBilateralFilter)
 	{
-		//5 steps of bilateral filtering
+		// 5 steps of bilateral filtering
 		this->DepthFiltering(this->floatImage, view->depth);
 		this->DepthFiltering(view->depth, this->floatImage);
 		this->DepthFiltering(this->floatImage, view->depth);
 		this->DepthFiltering(view->depth, this->floatImage);
 		this->DepthFiltering(this->floatImage, view->depth);
+
 		view->depth->SetFrom(this->floatImage, MemoryBlock<float>::CUDA_TO_CUDA);
 	}
 
@@ -95,7 +96,7 @@ void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImag
 
 void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImage, ITMShortImage *depthImage, bool useBilateralFilter, ITMIMUMeasurement *imuMeasurement)
 {
-	if (*view_ptr == NULL) 
+	if (*view_ptr == NULL)
 	{
 		*view_ptr = new ITMViewIMU(calib, rgbImage->noDims, depthImage->noDims, true);
 		if (this->shortImage != NULL) delete this->shortImage;
@@ -198,11 +199,13 @@ __global__ void filterDepth_device(float *imageData_out, const float *imageData_
 {
 	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
 
-	// TODO XXX(andrei): Could this also be causing the artifacts when using dispnet depth maps?
-	// It seems like 'filterDepth' only causes access violations when used in conjunction with
-	// dispnet's maps. Could it be because they're float maps originally, as opposed to converted
-	// short ones?
-	if (x < 2 || x > imgDims.x - 2 || y < 2 || y > imgDims.y - 2) return;
+	// [RIP] InfiniTAM (as of July 2017) had an off-by-one bug here in the upper limits (> instead
+	// of >=) which caused artifacts in some depth maps. Found using `cuda-memcheck`. Using image
+	// dimensions which were multiples of the block size (16x16) hid this issue because x and y just
+	// so happened never to get too big, because of the grid structure, but once you plugged in
+	// arbitrary values for the depth size, reads would start to happen from outside the array
+	// bounds, leading to undefined behavior.
+	if (x < 2 || x >= imgDims.x - 2 || y < 2 || y >= imgDims.y - 2) return;
 
 	filterDepth(imageData_out, imageData_in, x, y, imgDims);
 }
