@@ -56,8 +56,8 @@ ITMLibSettings::ITMLibSettings(void)
 
 	/// enable or disable bilateral depth filtering;
 	/// When used with stereo depth maps, it seems to increase reconstruction quality.
-	useBilateralFilter = false;
-//	useBilateralFilter = true;
+//	useBilateralFilter = false;
+	useBilateralFilter = true;
 
 //	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;

@@ -459,7 +459,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 ) {
 	// TODO(andrei): Refactor this method once the functionality is more or less complete.
 
-	const bool deallocateEmptyBlocks = false;	// This could be a config param of the recon engine.
+//	const bool deallocateEmptyBlocks = false;	// This could be a config param of the recon engine.
 	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
 
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
@@ -470,18 +470,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						   1 * sizeof(int),
 						   cudaMemcpyHostToDevice));
 
-//	int freedBlockCount = 0;
 	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 
 	if (forceAllVoxels) {
 		// TODO(andrei): Make this function obey the 'deallocateEmptryBlocks' flag.
 		// TODO(andrei): Remove duplicate functionality for counting freed blocks.
-//		int freedBlockCount =
 		fullDecay<TVoxel>(scene, maxWeight, this->lastFreeBlockId_device);
-//		totalDecayedBlockCount += freedBlockCount;
-
-		// TODO(andrei): Do this flow properly.
-		return;
 	}
 	else if (frameVisibleBlocks.size() > minAge) {
 		VisibleBlockInfo visible = frameVisibleBlocks.front();
@@ -522,7 +516,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 	}
 
 	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
-	printf("decayFull_device deleted %d blocks\n\n", freedBlockCount);
 	totalDecayedBlockCount += freedBlockCount;
 
 	// TODO(andrei): New benchmarks once the complete implementation is in place!
@@ -1168,6 +1161,18 @@ void decay_device(TVoxel *localVBA,
 
 	int emptyVoxels = countBuffer[0];
 	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
+
+	// If we decide to clear up the block, let's be REALLY sure it's blank.
+	if (emptyBlock) {
+		if (localVBA[voxelIdx].w_depth != 0) {
+			printf("SANITY CHECK ERROR FAIL: depth weight != 0\n");
+		}
+		if (localVBA[voxelIdx].sdf != localVBA[voxelIdx].SDF_initialValue()) {
+			printf("SANITY CHECK FAIL: sdf nonzero somewhere in this here block..\n");
+		}
+		localVBA[voxelIdx].reset();
+	}
+	__syncthreads();
 
 	if (locId == 0 && emptyBlock && safeToClear) {
 		// Not recycling memory at the moment due to bugs.
