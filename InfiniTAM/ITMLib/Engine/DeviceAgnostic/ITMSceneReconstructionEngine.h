@@ -207,6 +207,21 @@ inline void buildHashAllocAndVisibleTypePP(
 
 		ITMHashEntry hashEntry = hashTable[hashIdx];
 
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+      int key = hashIdx;
+		int contention = atomicExch(&locks[key], 1);
+		if (contention != 0) {
+			if(key % 100 == 33) {
+//				printf("Contention for key %d when allocating! Deferring allocation for block (%d, %d, %d)\n",
+//				key,
+//				static_cast<int>(blockPos.x),
+//				static_cast<int>(blockPos.y),
+//				static_cast<int>(blockPos.z));
+			}
+			// Fight me bro!
+			goto loop_end;
+		}
+#endif
 		if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= -1)
 		{
 			//entry (has been streamed out but is visible) or (in memory and visible)
@@ -214,23 +229,6 @@ inline void buildHashAllocAndVisibleTypePP(
 
 			isFound = true;
 		}
-
-//#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-//		int key = hashIdx;
-//		int contention = atomicAdd(&locks[key], 1);
-//		if (contention > 0) {
-////			if(key % 1000 == 42) {
-////				printf("Contention for key %d when allocating! Deferring allocation for some block\n", key);
-////			}
-//			// Fight me bro!
-//			goto loop_end;
-//		}
-//      else {
-////			if(key % 1000 == 42) {
-////				printf("No contention for key %d\n", key);
-////			}
-//      }
-//#endif
 
 		if (!isFound)
 		{
@@ -285,10 +283,11 @@ inline void buildHashAllocAndVisibleTypePP(
 			}
 		}
 
-//#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-//loop_end:
-//		atomicSub(&locks[key], 1);
-//#endif
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
+	// Release the lock on the bucket
+	atomicExch(&locks[key], 0);
+loop_end:
+#endif
 		point += direction;
 	}
 }

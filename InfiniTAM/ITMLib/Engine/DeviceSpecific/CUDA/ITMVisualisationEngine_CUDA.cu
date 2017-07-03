@@ -220,11 +220,6 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 			// fill minmaxData
 			dim3 blockSize(16, 16);
 			dim3 gridSize((unsigned int) ceil((float) noTotalBlocks / 4.0f), 4);
-//			fprintf(stderr, "Calling fillBlocks_device gs = (%d %d %d) for %d total blocks.\n",
-//					gridSize.x, gridSize.y, gridSize.z, noTotalBlocks);
-//			fprintf(stderr, "MAX_RENDERING_BLOCKS = %d\n", MAX_RENDERING_BLOCKS);
-//			fprintf(stderr, "imgSize [%d x %d]\n", imgSize[0], imgSize[1]);
-
 			fillBlocks_device << < gridSize, blockSize >> > (
 				noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
 		}
@@ -525,34 +520,37 @@ __global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, co
 {
 	int in_offset = threadIdx.x + blockDim.x * blockIdx.x;
 
-	if (in_offset >= noVisibleBlocks) {
-		return;
-	}
+	// Note: quitting early seems to cause some issue with the visible block computation, leading to
+	// flickering in the visualization.
 
-	// TODO(andrei): Remove this; it only fires off if the bounds check for in_offset is missing
+//	// TODO(andrei): Remove this; it only fires off if the bounds check for in_offset is missing
 	bool isFound = false;
 	int hashIdx = findBlock(hashEntries, visibleBlocks[in_offset], isFound);
-	if (!isFound || hashIdx < 0) {
-		if (in_offset % 100 == 33) {
-			printf("FATAL ERROR in projectAndSplitBlocks: isFound = %d, hashIdx = %d, for block (%d, %d, %d) at offset in visible block list %d\n",
-				   isFound,
-				   hashIdx,
-				   visibleBlocks[in_offset].x,
-				   visibleBlocks[in_offset].y,
-				   visibleBlocks[in_offset].z,
-				   in_offset);
-		}
-      	return;
-	}
+//	if (!isFound || hashIdx < 0) {
+//		if (in_offset % 100 == 33) {
+//			printf("FATAL ERROR in projectAndSplitBlocks: isFound = %d, hashIdx = %d, for block (%d, %d, %d) at offset in visible block list %d\n",
+//				   isFound,
+//				   hashIdx,
+//				   visibleBlocks[in_offset].x,
+//				   visibleBlocks[in_offset].y,
+//				   visibleBlocks[in_offset].z,
+//				   in_offset);
+//		}
+//      	return;
+//	}
 
-	const ITMHashEntry & blockData(hashEntries[hashIdx]);
+  // TODO(andrei): Clean up this code; it seems to also have to run when the block is not found/valid.
+  // But make sure you don't segfault.
 
 	Vector2i upperLeft, lowerRight;
 	Vector2f zRange;
 	bool validProjection = false;
 	if (in_offset < noVisibleBlocks) {
-		if (blockData.ptr >= 0) {
-			validProjection = ProjectSingleBlock(blockData.pos, pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
+		if (isFound) {
+			const ITMHashEntry & blockData(hashEntries[hashIdx]);
+			if(blockData.ptr >= 0) {
+				validProjection = ProjectSingleBlock(blockData.pos, pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
+			}
 		}
 	}
 
