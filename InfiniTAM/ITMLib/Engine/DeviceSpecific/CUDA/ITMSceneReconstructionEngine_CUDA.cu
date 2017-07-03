@@ -1050,6 +1050,7 @@ void deleteBlock(
 		int *lastFreeBlockId
 ) {
 	int keyHash = hashIndex(blockPos);
+  // TODO use exchange for locking
 	int contention = atomicAdd(&locks[keyHash], 1);
 	if (contention > 0) {
 		printf("Contention on bucket of hash value %d. Not going further with deletion of block "
@@ -1122,6 +1123,10 @@ void deleteBlock(
 		);
 	}
 
+	// XXXX: YES, this makes the difference. Investigate this further on 4.07.2017 (Tuesday). When
+	// we deallocate VBA slots, we see broken blocks. When we don't, we don't see them. There's
+	// likely an off-by-one error in this code.
+	// XXX: only invalidate the hash table entry, NOT the voxel block!
 	// First, deallocate the VBA slot.
 	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
 	voxelAllocationList[freeListIdx] = hashTable[outBlockIdx].ptr;
@@ -1274,18 +1279,19 @@ void decay_device(TVoxel *localVBA,
 	int hashIdx = findBlock(hashTable, visibleBlocks[blockIdx.x], isFound);
 
 	if (!isFound || hashIdx < 0) {
-		if(locId == 0) {
-			printf("FATAL ERROR in decay_device (isFound = %d, hashIdx = %d, "
-						   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
-				   static_cast<int>(isFound),
-				   hashIdx,
-				   blockIdx.x,
-				   locId,
-				   visibleBlocks[blockIdx.x].x,
-				   visibleBlocks[blockIdx.x].y,
-				   visibleBlocks[blockIdx.x].z
-			);
-		}
+//		if(locId == 0) {
+//			printf("FATAL ERROR in decay_device (isFound = %d, hashIdx = %d, "
+//						   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
+//				   static_cast<int>(isFound),
+//				   hashIdx,
+//				   blockIdx.x,
+//				   locId,
+//				   visibleBlocks[blockIdx.x].x,
+//				   visibleBlocks[blockIdx.x].y,
+//				   visibleBlocks[blockIdx.x].z
+//			);
+//		}
+		// Not really fatal; just the visible block was likely deallocated in a previous frame.
 		return;
 	}
 

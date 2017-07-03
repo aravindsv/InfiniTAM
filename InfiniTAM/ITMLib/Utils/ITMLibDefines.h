@@ -39,7 +39,7 @@
 #define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
 
 //#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, should be 2^n and bigger than kDefaultSdfLocalBlockNum, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
-const long SDF_BUCKET_NUM = 0x100000;
+const long SDF_BUCKET_NUM = 0x10000;
 
 //#define SDF_HASH_MASK 0xfffff			// Used for get hashing value of the bucket index,  SDF_HASH_MASK = SDF_BUCKET_NUM - 1
 const long SDF_HASH_MASK = SDF_BUCKET_NUM - 1;

@@ -492,7 +492,7 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 		const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
 		Vector3f lightSource,
 		int maxWeight,
-		float overlayWeight = 0.5
+		float overlayWeight = 1.0
 ) {
 	Vector3f outNormal;
 	float angle;
