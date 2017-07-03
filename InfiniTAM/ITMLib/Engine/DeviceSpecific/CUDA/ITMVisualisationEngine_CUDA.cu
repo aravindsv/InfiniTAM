@@ -20,9 +20,9 @@ inline dim3 getGridSize(Vector2i taskSize, dim3 blockSize) { return getGridSize(
 // declaration of device functions
 
 __global__ void buildVisibleList_device(const ITMHashEntry *hashTable, /*ITMHashCacheState *cacheStates, bool useSwapping,*/ int noTotalEntries,
-	int *visibleEntryIDs, int *noVisibleEntries, uchar *entriesVisibleType, Matrix4f M, Vector4f projParams, Vector2i imgSize, float voxelSize);
+	Vector3i *visibleBlocks, int *noVisibleBlocks, uchar *entriesVisibleType, Matrix4f M, Vector4f projParams, Vector2i imgSize, float voxelSize);
 
-__global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, const int *visibleEntryIDs, int noVisibleEntries,
+__global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, const Vector3i *visibleBlocks, int noVisibleBlocks,
 	const Matrix4f pose_M, const Vector4f intrinsics, const Vector2i imgSize, float voxelSize, RenderingBlock *renderingBlocks,
 	uint *noTotalBlocks);
 
@@ -153,16 +153,17 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::FindVisibleBlocks(c
 	dim3 cudaBlockSizeAL(256, 1);
 	dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
 	buildVisibleList_device << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, /*cacheStates, this->scene->useSwapping,*/ noTotalEntries,
-		renderState_vh->GetVisibleEntryIDs(), noVisibleEntries_device, renderState_vh->GetEntriesVisibleType(), M, projParams, 
+		renderState_vh->GetVisibleBlocks(), noVisibleEntries_device, renderState_vh->GetEntriesVisibleType(), M, projParams,
 		imgSize, voxelSize);
 
 	/*	if (this->scene->useSwapping)
 			{
+			// Hmm, could this allow proper full visualizations even when swapping is on?
 			reAllocateSwappedOutVoxelBlocks_device << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, hashTable, noTotalEntries,
 			noAllocatedVoxelEntries_device, entriesVisibleType);
 			}*/
 
-	ITMSafeCall(cudaMemcpy(&renderState_vh->noVisibleEntries, noVisibleEntries_device, sizeof(int), cudaMemcpyDeviceToHost));
+	ITMSafeCall(cudaMemcpy(&renderState_vh->noVisibleBlocks, noVisibleEntries_device, sizeof(int), cudaMemcpyDeviceToHost));
 }
 
 template<class TVoxel, class TIndex>
@@ -194,16 +195,16 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 	// go through list of visible 8x8x8 blocks, unless none are visible
 	{
 		const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
-		const int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
-		int noVisibleEntries = renderState_vh->noVisibleEntries;
+		const Vector3i *visbleBlocks = renderState_vh->GetVisibleBlocks();
+		int noVisibleBlocks = renderState_vh->noVisibleBlocks;
 
-		if (noVisibleEntries > 0) {
+		if (noVisibleBlocks > 0) {
 			dim3 blockSize(256);
-			dim3 gridSize((int) ceil((float) noVisibleEntries / (float) blockSize.x));
+			dim3 gridSize((int) ceil((float) noVisibleBlocks / (float) blockSize.x));
 			ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
 
 			projectAndSplitBlocks_device << < gridSize, blockSize >> > (
-				hash_entries, visibleEntryIDs, noVisibleEntries, pose->GetM(),
+				hash_entries, visbleBlocks, noVisibleBlocks, pose->GetM(),
 				intrinsics->projectionParamsSimple.all, imgSize, voxelSize,
 				renderingBlockList_device, noTotalBlocks_device);
 		}
@@ -226,11 +227,6 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 
 			fillBlocks_device << < gridSize, blockSize >> > (
 				noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
-
-          	// TODO(andrei): Remove this once bug is completely fixed. Right now it seems the above
-			// fillBlocks kernel is trying to access negative coords.
-			ITMSafeCall(cudaDeviceSynchronize());
-			ITMSafeCall(cudaGetLastError());
 		}
 	}
 }
@@ -486,16 +482,17 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::ForwardRender(const
 
 //device implementations
 
+// Runs over all hash table entries
 __global__ void buildVisibleList_device(const ITMHashEntry *hashTable, /*ITMHashCacheState *cacheStates, bool useSwapping,*/ int noTotalEntries,
-	int *visibleEntryIDs, int *noVisibleEntries, uchar *entriesVisibleType, Matrix4f M, Vector4f projParams, Vector2i imgSize, float voxelSize)
+	Vector3i *visibleBlocks, int *noVisibleBlocks, uchar *entriesVisibleType, Matrix4f M, Vector4f projParams, Vector2i imgSize, float voxelSize)
 {
-	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
-	if (targetIdx > noTotalEntries - 1) return;
+	int hashIdx = threadIdx.x + blockIdx.x * blockDim.x;
+	if (hashIdx > noTotalEntries - 1) return;
 
 	__shared__ bool shouldPrefix;
 
 	unsigned char hashVisibleType = 0; //entriesVisibleType[targetIdx];
-	const ITMHashEntry &hashEntry = hashTable[targetIdx];
+	const ITMHashEntry &hashEntry = hashTable[hashIdx];
 
 	shouldPrefix = false;
 	__syncthreads();
@@ -516,23 +513,44 @@ __global__ void buildVisibleList_device(const ITMHashEntry *hashTable, /*ITMHash
 
 	if (shouldPrefix)
 	{
-		int offset = computePrefixSum_device<int>(hashVisibleType > 0, noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
-		if (offset != -1) visibleEntryIDs[offset] = targetIdx;
+		int offset = computePrefixSum_device<int>(hashVisibleType > 0, noVisibleBlocks, blockDim.x * blockDim.y, threadIdx.x);
+		if (offset != -1) visibleBlocks[offset] = hashEntry.pos.toInt();
 	}
 }
 
-__global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, const int *visibleEntryIDs, int noVisibleEntries,
+// Runs over the visible list => need to look keys up
+__global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, const Vector3i* visibleBlocks, int noVisibleBlocks,
 	const Matrix4f pose_M, const Vector4f intrinsics, const Vector2i imgSize, float voxelSize, RenderingBlock *renderingBlocks,
 	uint *noTotalBlocks)
 {
 	int in_offset = threadIdx.x + blockDim.x * blockIdx.x;
 
-	const ITMHashEntry & blockData(hashEntries[visibleEntryIDs[in_offset]]);
+	if (in_offset >= noVisibleBlocks) {
+		return;
+	}
+
+	// TODO(andrei): Remove this; it only fires off if the bounds check for in_offset is missing
+	bool isFound = false;
+	int hashIdx = findBlock(hashEntries, visibleBlocks[in_offset], isFound);
+	if (!isFound || hashIdx < 0) {
+		if (in_offset % 100 == 33) {
+			printf("FATAL ERROR in projectAndSplitBlocks: isFound = %d, hashIdx = %d, for block (%d, %d, %d) at offset in visible block list %d\n",
+				   isFound,
+				   hashIdx,
+				   visibleBlocks[in_offset].x,
+				   visibleBlocks[in_offset].y,
+				   visibleBlocks[in_offset].z,
+				   in_offset);
+		}
+      	return;
+	}
+
+	const ITMHashEntry & blockData(hashEntries[hashIdx]);
 
 	Vector2i upperLeft, lowerRight;
 	Vector2f zRange;
 	bool validProjection = false;
-	if (in_offset < noVisibleEntries) {
+	if (in_offset < noVisibleBlocks) {
 		if (blockData.ptr >= 0) {
 			validProjection = ProjectSingleBlock(blockData.pos, pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
 		}

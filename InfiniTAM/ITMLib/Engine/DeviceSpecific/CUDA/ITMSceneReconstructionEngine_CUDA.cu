@@ -9,13 +9,13 @@
 struct AllocationTempData {
 	int noAllocatedVoxelEntries;
 	int noAllocatedExcessEntries;
-	int noVisibleEntries;
+	int noVisibleBlocks;
 };
 
 using namespace ITMLib::Engine;
 
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
-__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, int *noVisibleEntryIDs,
+__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, Vector3i *visibleBlocks,
 	const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i imgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d, 
 	Vector4f projParams_rgb, float _voxelSize, float mu, int maxW);
 
@@ -41,11 +41,12 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList,
 __global__ void reAllocateSwappedOutVoxelBlocks_device(int *voxelAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
 	AllocationTempData *allocData, uchar *entriesVisibleType);
 
-__global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int noVisibleEntries, ITMHashEntry *hashTable);
+__global__ void setToType3(uchar *entriesVisibleType, Vector3i *visibleBlocks, int noVisibleBlocks,
+						   ITMHashEntry *hashTable);
 
 template<bool useSwapping>
-__global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapState *swapStates, int noTotalEntries,
-	int *visibleEntryIDs, AllocationTempData *allocData, uchar *entriesVisibleType,
+__global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapState *swapStates, int noTotalBlocks,
+	Vector3i *visibleBlocks, AllocationTempData *allocData, uchar *entriesVisibleType,
 	Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize);
 
 // TODO(andrei): Redo documentation after you finish implementing this.
@@ -125,7 +126,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITM
 	totalDecayedBlockCount = 0;
 	// Clean up the visible frame queue used in voxel decay.
 	while (! frameVisibleBlocks.empty()) {
-		delete frameVisibleBlocks.front().blockIDs;
+		delete frameVisibleBlocks.front().blockCoords;
 		frameVisibleBlocks.pop();
 	}
 
@@ -178,7 +179,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	// The sum of the nr of buckets, plus the excess list size
 	int noTotalEntries = scene->index.noTotalEntries;
-	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
+	Vector3i *visibleBlocks = renderState_vh->GetVisibleBlocks();
 	uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 
 	dim3 cudaBlockSizeHV(16, 16);
@@ -188,14 +189,14 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
 
 	dim3 cudaBlockSizeVS(256, 1);
-	dim3 gridSizeVS((int)ceil((float)renderState_vh->noVisibleEntries / (float)cudaBlockSizeVS.x));
+	dim3 gridSizeVS((int)ceil((float)renderState_vh->noVisibleBlocks / (float)cudaBlockSizeVS.x));
 
 	float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
 	AllocationTempData *tempData = static_cast<AllocationTempData*>(allocationTempData_host);
 	tempData->noAllocatedVoxelEntries = scene->localVBA.lastFreeBlockId;
 	tempData->noAllocatedExcessEntries = scene->index.GetLastFreeExcessListId();
-	tempData->noVisibleEntries = 0;
+	tempData->noVisibleBlocks = 0;
 	ITMSafeCall(cudaMemcpyAsync(allocationTempData_device, tempData, sizeof(AllocationTempData), cudaMemcpyHostToDevice));
 
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
@@ -213,8 +214,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		//
 		setToType3<<<gridSizeVS, cudaBlockSizeVS>>>(
 				entriesVisibleType,
-				visibleEntryIDs,
-				renderState_vh->noVisibleEntries,
+				visibleBlocks,
+				renderState_vh->noVisibleBlocks,
 				hashTable);
 	}
 
@@ -226,7 +227,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max, locks_device);
 
 	bool useSwapping = scene->useSwapping;
-	if (onlyUpdateVisibleList) useSwapping = false;
+	if (onlyUpdateVisibleList) {
+		useSwapping = false;
+	}
+
 	if (!onlyUpdateVisibleList)
 	{
 		allocateVoxelBlocksList_device<<<gridSizeAL, cudaBlockSizeAL>>>(
@@ -241,11 +245,20 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	}
 
 	if (useSwapping) {
-		buildVisibleList_device<true> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleEntryIDs,
-			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
+		buildVisibleList_device<true> << <gridSizeAL, cudaBlockSizeAL >> >(
+				hashTable,
+				swapStates,
+				noTotalEntries,
+				visibleBlocks,
+				(AllocationTempData *) allocationTempData_device,
+				entriesVisibleType,
+				M_d,
+				projParams_d,
+				depthImgSize,
+				voxelSize);
 	}
 	else {
-		buildVisibleList_device<false> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleEntryIDs,
+		buildVisibleList_device<false> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleBlocks,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 	}
 
@@ -256,24 +269,26 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	}
 
 	ITMSafeCall(cudaMemcpy(tempData, allocationTempData_device, sizeof(AllocationTempData), cudaMemcpyDeviceToHost));
-	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
+	renderState_vh->noVisibleBlocks = tempData->noVisibleBlocks;
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
 	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
 
 	// visibleEntryIDs is now populated with block IDs which are visible.
 	int totalBlockCount = scene->index.getNumAllocatedVoxelBlocks();
-	size_t visibleBlockCount = static_cast<size_t>(tempData->noVisibleEntries);
+	size_t visibleBlockCount = static_cast<size_t>(tempData->noVisibleBlocks);
 
-	size_t visibleEntryIDsByteCount = visibleBlockCount * sizeof(int);
+	size_t visibleBlocksByteCount = visibleBlockCount * sizeof(Vector3i);
 
-  	ORUtils::MemoryBlock<int> *visibleEntryIDsCopy = nullptr;
-	if (visibleEntryIDsByteCount > 0) {
-      ITMSafeCall(cudaDeviceSynchronize());
+  	ORUtils::MemoryBlock<Vector3i> *visibleEntryIDsCopy = nullptr;
+	if (visibleBlocksByteCount > 0) {
+		// TODO remove debug code here
+		ITMSafeCall(cudaDeviceSynchronize());
 		ITMSafeCall(cudaGetLastError());
-		visibleEntryIDsCopy = new ORUtils::MemoryBlock<int>(visibleEntryIDsByteCount, MEMORYDEVICE_CUDA);
+
+		visibleEntryIDsCopy = new ORUtils::MemoryBlock<Vector3i>(visibleBlocksByteCount, MEMORYDEVICE_CUDA);
 		ITMSafeCall(cudaMemcpy(visibleEntryIDsCopy->GetData(MEMORYDEVICE_CUDA),
-							   visibleEntryIDs,
-							   visibleEntryIDsByteCount,
+							   visibleBlocks,
+							   visibleBlocksByteCount,
 							   cudaMemcpyDeviceToDevice));
 	}
 	VisibleBlockInfo visibleBlockInfo = {
@@ -281,8 +296,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		frameIdx,
 		visibleEntryIDsCopy,
 	};
-	frameIdx++,
 	frameVisibleBlocks.push(visibleBlockInfo);
+	frameIdx++;
 
 	// This just returns the size of the pre-allocated buffer.
 	long allocatedBlocks = scene->index.getNumAllocatedVoxelBlocks();
@@ -305,7 +320,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	float allocatedSizeMiB = scene->localVBA.allocatedSize * sizeof(ITMVoxel) / 1024.0f / 1024.0f;
 	printf("[Visible: %6d | Used blocks (primary): %8ld/%ld (%.2f%% free)\n"
 			" Used excess list slots: %8ld/%ld | Total allocated size: %.2fMiB]\n",
-			tempData->noVisibleEntries,
+			tempData->noVisibleBlocks,
 			usedBlocks,
 			allocatedBlocks,
 			percentFree,
@@ -315,10 +330,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 //	ITMHashEntry *entries = scene->index.GetEntries();
 	if (scene->localVBA.lastFreeBlockId < 0) {
-		fprintf(stderr, "ERROR: Last free block ID was negative (%d). This may indicate an "
-				"allocation failure, causing your map to stop being able to grow.\n", scene->localVBA.lastFreeBlockId);
 		throw std::runtime_error(
-				"Invalid free voxel block ID. InfiniTAM has likely run out of GPU memory.");
+				"Invalid free voxel block ID. InfiniTAM has run out of space in the Voxel Block Array.");
 	}
 }
 
@@ -334,7 +347,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	Vector4f projParams_d, projParams_rgb;
 
 	ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)renderState;
-	if (renderState_vh->noVisibleEntries == 0) {
+	if (renderState_vh->noVisibleBlocks == 0) {
 		// Our view has no useful data, so there's nothing to allocate. This happens, e.g., when
 		// we fuse frames belonging to object instances, in which the actual instance is too far
 		// away. Its depth values are over the max depth threshold (and, likely too noisy) and
@@ -355,10 +368,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
-	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
+//	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
+	Vector3i *visibleBlocks = renderState_vh->GetVisibleBlocks();
 
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-	dim3 gridSize(renderState_vh->noVisibleEntries);
+	dim3 gridSize(renderState_vh->noVisibleBlocks);
 
 	// These kernels are launched over ALL visible blocks, whose IDs are placed conveniently as the
 	// first `renderState_vh->noVisibleEntries` elements of the `visibleEntryIDs` array, which could,
@@ -366,11 +380,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	if (scene->sceneParams->stopIntegratingAtMaxW) {
 		if (trackingState->requiresFullRendering) {
 			integrateIntoScene_device<TVoxel, true, false> << < gridSize, cudaBlockSize >> > (
-				localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+				localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
 				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		} else {
 			integrateIntoScene_device<TVoxel, true, true> << < gridSize, cudaBlockSize >> > (
-				localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+				localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
 				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 	}
@@ -378,12 +392,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 		if (trackingState->requiresFullRendering) {
 			// While developing dynslam, this is the version that is run.
 			integrateIntoScene_device<TVoxel, false, false> << < gridSize, cudaBlockSize >> > (
-					localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+					localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
 						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 		else {
 			integrateIntoScene_device<TVoxel, false, true> << < gridSize, cudaBlockSize >> > (
-				localVBA, hashTable, visibleEntryIDs, rgb, rgbImgSize, depth, depthImgSize,
+				localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
 						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 	}
@@ -437,14 +451,14 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
 	decayFull_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 			visibleBlockGlobalPos_device,
-					localVBA,
-					hashTable,
-					minAge,
-					maxWeight,
-					voxelAllocationList,
-					lastFreeBlockId_device,
-					locks_device,
-					frameIdx);
+			localVBA,
+			hashTable,
+			minAge,
+			maxWeight,
+			voxelAllocationList,
+			lastFreeBlockId_device,
+			locks_device,
+			frameIdx);
 	ITMSafeCall(cudaDeviceSynchronize());
 	ITMSafeCall(cudaGetLastError());
 	printf("decayFull_device went OK\n\n");
@@ -468,7 +482,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		bool forceAllVoxels
 ) {
 	// TODO(andrei): Refactor this method once the functionality is more or less complete.
-
+	throw std::runtime_error("Unsupported");
 //	const bool deallocateEmptyBlocks = false;	// This could be a config param of the recon engine.
 	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
 
@@ -505,7 +519,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 					localVBA,
 					hashTable,
-					visible.blockIDs->GetData(MEMORYDEVICE_CUDA),
+//					visible.blockCoords->GetData(MEMORYDEVICE_CUDA),
+                    nullptr,
 					minAge,
 					maxWeight,
 					voxelAllocationList,
@@ -521,7 +536,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 								   1 * sizeof(int),
 								   cudaMemcpyDeviceToHost));
 
-			delete visible.blockIDs;
+			delete visible.blockCoords;
 		}
 	}
 
@@ -692,7 +707,7 @@ __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxe
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
 __global__ void integrateIntoScene_device(TVoxel *localVBA,
 										  const ITMHashEntry *hashTable,
-										  int *visibleEntryIDs,
+										  Vector3i *visibleBlocks,
 										  const Vector4u *rgb,
 										  Vector2i rgbImgSize,
 										  const float *depth, Vector2i depthImgSize,
@@ -704,14 +719,19 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 										  int maxW)
 {
 	Vector3i globalPos;
-	int entryId = visibleEntryIDs[blockIdx.x];
+	bool isFound = false;
+	int entryId = findBlock(hashTable, visibleBlocks[blockIdx.x], isFound);
 
-	/// XXX: should we re-look it up in the hash table just to be sure?
+	if (!isFound || entryId < 0) {
+		printf("FATAL ERROR in integrateIntoScene_device!\n");
+		return;
+	}
+
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
-
 	// What error message could we show here for mistakes in integration?
-
-	if (currentHashEntry.ptr < 0) return;
+	if (currentHashEntry.ptr < 0) {
+		return;
+	}
 
 	globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 
@@ -757,25 +777,36 @@ __global__ void buildHashAllocAndVisibleType_device(
 		projParams_d, mu, _imgSize, _voxelSize, hashTable, viewFrustum_min, viewFrustum_max, locks);
 }
 
-__global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int noVisibleEntries,
+__global__ void setToType3(uchar *entriesVisibleType, Vector3i *visibleBlocks, int noVisibleBlocks,
 						   ITMHashEntry *hashTable)
 {
 	int entryId = threadIdx.x + blockIdx.x * blockDim.x;
-	if (entryId > noVisibleEntries - 1) return;
-
-	if (hashTable[visibleEntryIDs[entryId]].ptr < -1) {
-		if (entryId % 100 == 17) {
-			printf("Was trying to set entry ID #%d as visible type 3 but it had been deallocated!\n",
-				   entryId);
-			// TODO should we make it 0 or something? Or type #4 == recycled?
-		}
-
-		/// XXX: is this sensible?
-		entriesVisibleType[visibleEntryIDs[entryId]] = 0;
+	if (entryId >= noVisibleBlocks) {
+		return;
 	}
-	else {
-		entriesVisibleType[visibleEntryIDs[entryId]] = 3;
+
+	bool isFound = false;
+	int hashIdx = -1;
+	int prevHashIdx = -1;
+	findVoxel(hashTable, visibleBlocks[entryId], 0, isFound, hashIdx, prevHashIdx);
+
+	if (isFound) {
+		entriesVisibleType[hashIdx] = 3;
 	}
+
+//	if (hashTable[visibleEntryIDs[entryId]].ptr < -1) {
+//		if (entryId % 100 == 17) {
+//			printf("Was trying to set entry ID #%d as visible type 3 but it had been deallocated!\n",
+//				   entryId);
+//			// TODO should we make it 0 or something? Or type #4 == recycled?
+//		}
+//
+//		/// XXX: is this sensible?
+//		entriesVisibleType[visibleEntryIDs[entryId]] = 0;
+//	}
+//	else {
+//		entriesVisibleType[visibleEntryIDs[entryId]] = 3;
+//	}
 }
 
 __global__ void allocateVoxelBlocksList_device(
@@ -891,12 +922,14 @@ __global__ void reAllocateSwappedOutVoxelBlocks_device(int *voxelAllocationList,
 	}
 }
 
+// Gets called for EVERY block in the hash table (ordered + excess).
 template<bool useSwapping>
 __global__ void buildVisibleList_device(
 		ITMHashEntry *hashTable,
 		ITMHashSwapState *swapStates,
 		int noTotalEntries,
-		int *visibleEntryIDs,
+        Vector3i *visibleBlocks,
+//		int *visibleEntryIDs,
 		AllocationTempData *allocData,
 		uchar *entriesVisibleType,
 		Matrix4f M_d,
@@ -943,10 +976,10 @@ __global__ void buildVisibleList_device(
 	if (shouldPrefix)
 	{
 		int offset = computePrefixSum_device<int>(hashVisibleType > 0,
-												  &allocData->noVisibleEntries,
+												  &allocData->noVisibleBlocks,
 												  blockDim.x * blockDim.y,
 												  threadIdx.x);
-		if (offset != -1) visibleEntryIDs[offset] = targetIdx;
+		if (offset != -1) visibleBlocks[offset] = hashEntry.pos.toInt();
 	}
 
 #if 0
@@ -1181,6 +1214,7 @@ void decayVoxel(
 	}
 }
 
+// TODO(andrei): Once your new vect3i-based indexing works, re-enable this.
 // This kernel runs per-voxel, just like 'decayFull_device'.
 template<class TVoxel>
 __global__

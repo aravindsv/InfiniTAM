@@ -37,7 +37,6 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 		return cache.blockPtr + linearIdx;
 	}
 
-	// Look for the voxel in the excess list by walking it.
 	int hashIdx = hashIndex(blockPos);
 
 	while (true) 
@@ -51,11 +50,37 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 			return cache.blockPtr + linearIdx;
 		}
 
+		// Advance to the next element in the bucket, if it exists.
 		if (hashEntry.offset < 1) break;
 		hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
 	}
 
 	isFound = false;
+	return -1;
+}
+
+_CPU_AND_GPU_CODE_ inline int findBlock(
+		const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *hashMap,
+		const THREADPTR(Vector3i) &blockPos,
+        THREADPTR(bool) &isFound
+) {
+	int idx = hashIndex(blockPos);
+
+	while (true) {
+		ITMHashEntry hashEntry = hashMap[idx];
+		if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= 0)
+		{
+			isFound = true;
+			return idx;
+		}
+
+		if (hashEntry.offset < 1) {
+			break;
+		}
+
+		idx = static_cast<int>(SDF_BUCKET_NUM) + hashEntry.offset - 1;
+	}
+
 	return -1;
 }
 
@@ -83,7 +108,7 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 		if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= 0)
 		{
 			isFound = true;
-			// Return the offset (in the buckets or excess list of the entry where we found the block).
+			// Return the offset of the voxel in the VBA.
 			outHashIdx = hashIdx;
 			return (hashEntry.ptr * SDF_BLOCK_SIZE3) + linearIdx;
 		}

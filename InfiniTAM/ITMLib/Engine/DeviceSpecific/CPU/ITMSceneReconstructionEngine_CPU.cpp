@@ -70,6 +70,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
+	/*
 	int *visibleEntryIds = renderState_vh->GetVisibleEntryIDs();
 	int noVisibleEntries = renderState_vh->noVisibleEntries;
 
@@ -111,6 +112,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
 				projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 		}
 	}
+	 //*/
 }
 
 template<class TVoxel>
@@ -138,6 +140,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
 	int *excessAllocationList = scene->index.GetExcessAllocationList();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
+  /*
 	ITMHashSwapState *swapStates = scene->useSwapping ? scene->globalCache->GetSwapStates(false) : 0;
 	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
 	uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
@@ -288,6 +291,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 
 	scene->localVBA.lastFreeBlockId = lastFreeVoxelBlockId;
 	scene->index.SetLastFreeExcessListId(lastFreeExcessListId);
+   */
 }
 
 template<class TVoxel>

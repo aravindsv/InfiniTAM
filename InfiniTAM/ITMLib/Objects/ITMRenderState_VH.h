@@ -23,7 +23,7 @@ namespace ITMLib
 			/** A list of "visible entries", that are currently
 			being processed by the tracker.
 			*/
-			ORUtils::MemoryBlock<int> *visibleEntryIDs;
+			ORUtils::MemoryBlock<Vector3i> *visibleBlocks;
 
 			/** A list of "visible entries", that are
 			currently being processed by integration
@@ -33,30 +33,35 @@ namespace ITMLib
             
 		public:
 			/** Number of entries in the live list. */
-			int noVisibleEntries;
+			int noVisibleBlocks;
             
 			ITMRenderState_VH(int noTotalEntries, const Vector2i & imgSize, float vf_min, float vf_max, long sdfLocalBlockNum, MemoryDeviceType memoryType = MEMORYDEVICE_CPU)
 				: ITMRenderState(imgSize, vf_min, vf_max, memoryType)
             {
 				this->memoryType = memoryType;
 
-				visibleEntryIDs = new ORUtils::MemoryBlock<int>(sdfLocalBlockNum, memoryType);
+//				visibleEntryIDs = new ORUtils::MemoryBlock<int>(sdfLocalBlockNum, memoryType);
+				visibleBlocks = new ORUtils::MemoryBlock<Vector3i>(sdfLocalBlockNum, memoryType);
 				entriesVisibleType = new ORUtils::MemoryBlock<uchar>(noTotalEntries, memoryType);
 				
-				noVisibleEntries = 0;
+				noVisibleBlocks = 0;
             }
             
 			~ITMRenderState_VH()
             {
-				delete visibleEntryIDs;
+				delete visibleBlocks;
 				delete entriesVisibleType;
             }
 
-			/** Get the list of "visible entries", that are currently
-			processed by the tracker.
+          // TODO remove this once it's no longer needed
+			/** \brief Get sthe list of visible blocks, that are currently processed by the tracker.
 			*/
-			const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs->GetData(memoryType); }
-			int *GetVisibleEntryIDs(void) { return visibleEntryIDs->GetData(memoryType); }
+//			const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs->GetData(memoryType); }
+//			int *GetVisibleEntryIDs(void) { return visibleEntryIDs->GetData(memoryType); }
+
+			// TODO maybe rename to visibleBlockPositions/keys/etc.
+			const Vector3i* GetVisibleBlocks() const { return visibleBlocks->GetData(memoryType); }
+			Vector3i* GetVisibleBlocks() { return visibleBlocks->GetData(memoryType); }
 
 			/** Get the list of "visible entries", that are
 			currently processed by integration and tracker.

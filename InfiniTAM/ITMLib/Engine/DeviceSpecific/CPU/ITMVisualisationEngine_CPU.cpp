@@ -40,6 +40,7 @@ template<class TVoxel>
 void ITMVisualisationEngine_CPU<TVoxel,ITMVoxelBlockHash>::FindVisibleBlocks(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
 	ITMRenderState *renderState) const
 {
+	/*
 	const ITMHashEntry *hashTable = this->scene->index.GetEntries();
 	int noTotalEntries = this->scene->index.noTotalEntries;
 	float voxelSize = this->scene->sceneParams->voxelSize;
@@ -74,6 +75,7 @@ void ITMVisualisationEngine_CPU<TVoxel,ITMVoxelBlockHash>::FindVisibleBlocks(con
 	}
 
 	renderState_vh->noVisibleEntries = noVisibleEntries;
+	 */
 }
 
 template<class TVoxel, class TIndex>
@@ -108,6 +110,7 @@ void ITMVisualisationEngine_CPU<TVoxel,ITMVoxelBlockHash>::CreateExpectedDepths(
 	std::vector<RenderingBlock> renderingBlocks(MAX_RENDERING_BLOCKS);
 	int numRenderingBlocks = 0;
 
+	/*
 	ITMRenderState_VH* renderState_vh = (ITMRenderState_VH*)renderState;
 
 	const int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
@@ -149,6 +152,7 @@ void ITMVisualisationEngine_CPU<TVoxel,ITMVoxelBlockHash>::CreateExpectedDepths(
 			}
 		}
 	}
+	 */
 }
 
 template<class TVoxel, class TIndex>

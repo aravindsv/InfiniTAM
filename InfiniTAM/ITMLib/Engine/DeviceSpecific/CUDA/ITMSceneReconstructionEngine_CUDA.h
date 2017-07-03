@@ -14,7 +14,7 @@ namespace ITMLib
 		struct VisibleBlockInfo {
 			size_t count;
 			size_t frameIdx;
-			ORUtils::MemoryBlock<int> *blockIDs;
+			ORUtils::MemoryBlock<Vector3i> *blockCoords;
 		};
 
 		template<class TVoxel, class TIndex>
