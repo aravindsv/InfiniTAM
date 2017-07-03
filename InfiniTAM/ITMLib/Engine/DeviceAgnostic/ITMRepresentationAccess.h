@@ -37,7 +37,7 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 		return cache.blockPtr + linearIdx;
 	}
 
-	// Look for the voxel in the excess list, by walking it until the end of the "chain".
+	// Look for the voxel in the excess list by walking it.
 	int hashIdx = hashIndex(blockPos);
 
 	while (true) 

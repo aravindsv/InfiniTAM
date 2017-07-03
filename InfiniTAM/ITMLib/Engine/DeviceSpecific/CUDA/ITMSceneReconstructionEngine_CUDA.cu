@@ -207,6 +207,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		// 1 = visible and in memory
 		// 2 = visible but swapped out
 		// 3 = visible at previous frame and in memory
+		//
+		// Note: we could have a kernel map from visible keys to visible IDs here, or simply pass
+		//       the keys to 'setToType3'.
+		//
 		setToType3<<<gridSizeVS, cudaBlockSizeVS>>>(
 				entriesVisibleType,
 				visibleEntryIDs,
@@ -767,7 +771,7 @@ __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int 
 		}
 
 		/// XXX: is this sensible?
-//		entriesVisibleType[visibleEntryIDs[entryId]] = 42;
+		entriesVisibleType[visibleEntryIDs[entryId]] = 0;
 	}
 	else {
 		entriesVisibleType[visibleEntryIDs[entryId]] = 3;
@@ -1037,16 +1041,19 @@ void deleteBlock(
 		return;
 	}
 
-//	if (blockPos.x % 100 == 17) {
-//		printf("Will delete block with hash idx %d (prev = %d); (%d, %d, %d); %s\n",
-//			   outBlockIdx,
-//			   outPrevBlockIdx,
-//			   blockPos.x,
-//			   blockPos.y,
-//			   blockPos.z,
-//			   isExcess ? "excess" : "non-excess"
-//		);
-//	}
+	if (keyHash % 100 < 4) {
+		printf("Will delete block with hash idx %d / %ld (prev = %d, hashVal = %d), offset = %d; (%d, %d, %d); %s\n",
+			   outBlockIdx,
+			   SDF_BUCKET_NUM,
+			   outPrevBlockIdx,
+			   keyHash,
+			   hashTable[outBlockIdx].offset,
+			   blockPos.x,
+			   blockPos.y,
+			   blockPos.z,
+			   isExcess ? "excess" : "non-excess"
+		);
+	}
 
 	// First, deallocate the VBA slot.
 	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
@@ -1106,23 +1113,24 @@ void decayVoxel(
 	bool isFound = false;
 	int blockHashIdx = -1;
 	int blockPrevHashIdx = -1;
+
 	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
 
 	// For debugging
-	Vector3i intPos = blockGridPos * SDF_BLOCK_SIZE3;
-	int hashVal = hashIndex(intPos);
+//	Vector3i intPos = blockGridPos * SDF_BLOCK_SIZE3;
+	int hashVal = hashIndex(blockGridPos);
 
 	if (-1 == blockHashIdx) {
 		// This happens when we, for instance, have an ID in the visible list whose target gets
 		// deleted from the hash table by a previous decay phase.
 		if (locId == 0) {
 			printf("ERROR: could not find bucket for (%d, %d, %d) @ hash ID %d.\n",
-                   intPos.x, intPos.y, intPos.z, hashVal);
+                   blockGridPos.x, blockGridPos.y, blockGridPos.z, hashVal);
 		}
 		return;
 	}
 
-	if (! isFound && locId == 0 && blockIdx.x % 100 == 3) {
+	if (! isFound && locId == 0 && blockIdx.x % 10 == 3) {
 		printf("ERROR: voxel not found? WTF.\n");
 		return;
 	}
@@ -1164,10 +1172,9 @@ void decayVoxel(
 	int emptyVoxels = countBuffer[0];
 	bool emptyBlock = (emptyVoxels == voxelsPerBlock);
 
-	if (locId == 0 && emptyBlock && safeToClear) {
-		// Not recycling memory at the moment due to bugs.
+	if (locId == 0 && emptyBlock && safeToClear && blockHashIdx < SDF_BUCKET_NUM) {
 //		deleteBlock<TVoxel>(hashTable,
-//							currentHashEntry.pos.toInt(),
+//							hashTable[blockHashIdx].pos.toInt(),
 //							locks,
 //							voxelAllocationList,
 //							lastFreeBlockId);
@@ -1190,11 +1197,27 @@ void decay_device(TVoxel *localVBA,
 	// Note: there are no range checks because we launch exactly as many threads as we need.
 	int entryId = visibleEntryIDs[blockIdx.x];
 
+	// XXX: skip anything which is in the excess list.
+//	if (entryId >= SDF_BUCKET_NUM) {
+//		return;
+//	}
+
 	// Possibly now points to the wrong place. We just take out the position, and re-look it up.
+	// XXX: Yes, but if that entry is stale, you're screwed... you will end up looking something
+	// else up.
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
 
 	// The local offset of the voxel in the current block.
 	int locId = threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
+
+	if (currentHashEntry.ptr < -1) {
+      // Deallocated entry in ordered list.
+//		if (locId == 0) {
+//			printf("Warning, stumbled upon an invalid ordered hash entry in the visible list.\n");
+//		}
+
+		return;
+	}
 
 	// XXX: This WONT work as a proper key you dumbo. If you have the wrong ID in the
 	// visibleEntryIDs list, you will never be able to find the "correct" block by redoing the
