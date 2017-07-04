@@ -472,11 +472,13 @@ _CPU_AND_GPU_CODE_ inline void processPixelColour(
 ) {
 	Vector3f outNormal;
 	float angle;
+	// TODO(andrei): Make this customizable.
+	const Vector4u backgroundColor(30, 30, 180, 255);
 
 	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
 
 	if (foundPoint) drawPixelColour<TVoxel, TIndex>(outRendering, point, voxelData, voxelIndex);
-	else outRendering = Vector4u((uchar)0);
+	else outRendering = backgroundColor;
 }
 
 

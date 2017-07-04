@@ -1,5 +1,6 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
+#include <thread>
 #include "ITMMainEngine.h"
 
 using namespace ITMLib::Engine;
@@ -124,7 +125,11 @@ void ITMMainEngine::SaveSceneToMesh(const char *objFileName)
 	// streaming manner, instead of running marching cubes on everything at once.
 	meshingEngine->MeshScene(mesh, scene);
 //	mesh->WriteSTL(objFileName);
-	mesh->WriteOBJ(objFileName);
+
+	std::thread obj_writer_async([&] {
+	  mesh->WriteOBJ(objFileName);
+	});
+	printf("Launched mesh writing thread...\n");
 }
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement)

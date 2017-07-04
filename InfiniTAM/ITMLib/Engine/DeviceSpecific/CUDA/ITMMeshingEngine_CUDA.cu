@@ -86,7 +86,7 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 				noTriangles_device,
 				1 * sizeof(unsigned int),
 				cudaMemcpyDeviceToHost));
-		printf("%d/%d triangles in mesh.\n", mesh->noTotalTriangles, mesh->noMaxTriangles);
+		printf("Meshing done: %d/%d triangles in mesh.\n", mesh->noTotalTriangles, mesh->noMaxTriangles);
 	}
 }
 

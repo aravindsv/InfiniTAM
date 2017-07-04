@@ -6,6 +6,9 @@
 #include "../../../Objects/ITMRenderState_VH.h"
 #include "../../../ITMLib.h"
 
+const int BUCKET_FREE = 0;
+const int BUCKET_LOCKED = 1;
+
 struct AllocationTempData {
 	int noAllocatedVoxelEntries;
 	int noAllocatedExcessEntries;
@@ -1050,12 +1053,10 @@ void deleteBlock(
 		int *lastFreeBlockId
 ) {
 	int keyHash = hashIndex(blockPos);
-  // TODO use exchange for locking
-	int contention = atomicAdd(&locks[keyHash], 1);
-	if (contention > 0) {
+	int status = atomicExch(&locks[keyHash], BUCKET_LOCKED);
+	if (status == BUCKET_LOCKED) {
 		printf("Contention on bucket of hash value %d. Not going further with deletion of block "
 					   "(%d, %d, %d).\n", keyHash, blockPos.x, blockPos.y, blockPos.z);
-		atomicSub(&locks[keyHash], 1);
 		return;
 	}
 
@@ -1087,8 +1088,7 @@ void deleteBlock(
 		// than one element. However, if our hash table's size is large enough, this happens quite
 		// rarely, so we ignore it for now, since we save enough memory by deleting single-block
 		// buckets anyway.
-		// TODO(andrei): See if you can isolate the issue to ONLY 'isExcess' or 'hasNext'.
-		atomicSub(&locks[keyHash], 1);
+		atomicExch(&locks[keyHash], BUCKET_FREE);
 		return;
 	}
 
@@ -1105,7 +1105,7 @@ void deleteBlock(
 				   isExcess ? "excess" : "non-excess"
 			);
 //		}
-		atomicSub(&locks[keyHash], 1);
+		atomicExch(&locks[keyHash], BUCKET_FREE);
 		return;
 	}
 
@@ -1123,17 +1123,12 @@ void deleteBlock(
 		);
 	}
 
-	// XXXX: YES, this makes the difference. Investigate this further on 4.07.2017 (Tuesday). When
-	// we deallocate VBA slots, we see broken blocks. When we don't, we don't see them. There's
-	// likely an off-by-one error in this code.
-	// XXX: only invalidate the hash table entry, NOT the voxel block!
 	// First, deallocate the VBA slot.
 	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
-	voxelAllocationList[freeListIdx] = hashTable[outBlockIdx].ptr;
+	voxelAllocationList[freeListIdx + 1] = hashTable[outBlockIdx].ptr;
 
-	// Finally, do bookkeeping for buckets with more than one element.
 	// TODO(andrei): Update excess freelist! (Should work without doing it but leak memory.)
-
+	// Second, clear out the hash table entry, and do bookkeeping for buckets with more than one element.
 	if (outPrevBlockIdx != -1) {
 		// In excess list with a successor or not.
 		hashTable[outPrevBlockIdx].offset = hashTable[outBlockIdx].offset;
@@ -1144,7 +1139,6 @@ void deleteBlock(
 		if (hashTable[outBlockIdx].offset >= 1) {
 			// In ordered list, with a successor.
 			long nextIdx = SDF_BUCKET_NUM + hashTable[outBlockIdx].offset - 1;
-			// Note: this invalidates the visible ID list by moving stuff around.
 			hashTable[outBlockIdx] = hashTable[nextIdx];
 
 			// Free up the slot we just copied into the main VBA, in case there's still pointers
@@ -1161,10 +1155,11 @@ void deleteBlock(
 		}
 	}
 
+	// TODO(andrei): Remove sanity check.
 	// Release the lock.
-	int result = atomicSub(&locks[keyHash], 1);
-	if (result != 1) {
-		printf("FATAL LOCK ERROR\n");
+	int result = atomicExch(&locks[keyHash], BUCKET_FREE);
+	if (result != BUCKET_LOCKED) {
+		printf("FATAL LOCK ERROR IN BLOCK DELETION\n");
 	}
 }
 

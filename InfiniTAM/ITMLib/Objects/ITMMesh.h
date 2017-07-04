@@ -5,6 +5,7 @@
 #include "../Utils/ITMLibDefines.h"
 #include "../../ORUtils/Image.h"
 
+#include <fstream>
 #include <sstream>
 #include <stdlib.h>
 
@@ -31,17 +32,19 @@ namespace ITMLib
 			explicit ITMMesh(MemoryDeviceType memoryType, long sdfLocalBlockNum)
 				: memoryType(memoryType),
 				  noTotalTriangles(0),
-				  noMaxTriangles(sdfLocalBlockNum * 32)
+				  noMaxTriangles(sdfLocalBlockNum * SDF_BLOCK_SIZE3 / 16)
 			{
 				printf("Allocating memory block for mesh triangles. noMaxTriangles=%d.\n", noMaxTriangles);
 				triangles = new ORUtils::MemoryBlock<Triangle>(noMaxTriangles, memoryType);
 			}
 
+			/// \brief Writes the mesh as a Wavefront OBJ file with color support.
+			/// \note The Wavefront OBJ format does not officially support voxel color information,
+			///       so some viewers (e.g., Blender) may not display it. Other viewers, such as
+			///       MeshLab can display per-voxel colors for OBJ files.
+			/// TODO(andrei): Use the `ply` format, which does support color information officially.
 			void WriteOBJ(const char *fileName)
 			{
-				// TODO(andrei): The obj format doesn't support color officially. The best
-				// alternative is to use the ply format, which is easy to parse AND supports
-				// per-vertex color information officially.
 				ORUtils::MemoryBlock<Triangle> *cpu_triangles;
 				bool shouldDelete = false;
 				if (memoryType == MEMORYDEVICE_CUDA)
@@ -54,7 +57,6 @@ namespace ITMLib
 
 				Triangle *triangleArray = cpu_triangles->GetData(MEMORYDEVICE_CPU);
 
-				FILE *f = fopen(fileName, "w+");
 				if (noTotalTriangles > noMaxTriangles) {
 					std::stringstream ss;
 					ss << "Unable to save mesh to file [" << fileName << "]. Too many triangles: "
@@ -62,12 +64,12 @@ namespace ITMLib
 					throw std::runtime_error(ss.str());
 				}
 
+				FILE *f = fopen(fileName, "w+");
+
 				if (f != NULL)
 				{
+					printf("Starting to write mesh...\n");
 					for (uint i = 0; i < noTotalTriangles; i++) {
-						// TODO(andrei): Suport color dumping in STL models as well, if possible (may
-						// be unsupported officialy by the format...).
-
 						const Vector3f &c0 = triangleArray[i].c0;
 						const Vector3f &c1 = triangleArray[i].c1;
 						const Vector3f &c2 = triangleArray[i].c2;
@@ -97,8 +99,12 @@ namespace ITMLib
 								c2.b);
 					}
 
-					for (uint i = 0; i<noTotalTriangles; i++) fprintf(f, "f %d %d %d\n", i * 3 + 2 + 1, i * 3 + 1 + 1, i * 3 + 0 + 1);
+					for (uint i = 0; i<noTotalTriangles; i++) {
+						fprintf(f, "f %d %d %d\n", i * 3 + 2 + 1, i * 3 + 1 + 1, i * 3 + 0 + 1);
+					}
 					fclose(f);
+
+					printf("Mesh file writing complete.\n");
 				}
 
 				if (shouldDelete) delete cpu_triangles;
