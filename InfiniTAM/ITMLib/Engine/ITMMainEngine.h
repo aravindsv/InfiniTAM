@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <future>
 #include "../ITMLib.h"
 #include "../Utils/ITMLibSettings.h"
 
@@ -58,7 +59,7 @@ namespace ITMLib
 			ITMMeshingEngine<ITMVoxel, ITMVoxelIndex> *meshingEngine;
 			ITMMesh *mesh;
 
-			ITMViewBuilder *viewBuilder;		
+			ITMViewBuilder *viewBuilder;
 			ITMDenseMapper<ITMVoxel, ITMVoxelIndex> *denseMapper;
 			ITMTrackingController *trackingController;
 
@@ -71,6 +72,8 @@ namespace ITMLib
 			ITMScene<ITMVoxel, ITMVoxelIndex> *scene;
 			ITMRenderState *renderState_live;
 			ITMRenderState *renderState_freeview;
+
+			std::future<void> write_result;
 
 		public:
 			enum GetImageType

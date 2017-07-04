@@ -6,9 +6,6 @@
 #include "../../../Objects/ITMRenderState_VH.h"
 #include "../../../ITMLib.h"
 
-const int BUCKET_FREE = 0;
-const int BUCKET_LOCKED = 1;
-
 struct AllocationTempData {
 	int noAllocatedVoxelEntries;
 	int noAllocatedExcessEntries;
@@ -816,20 +813,6 @@ __global__ void setToType3(uchar *entriesVisibleType, Vector3i *visibleBlocks, i
 	else {
 		entriesVisibleType[hashIdx] = 3;
 	}
-
-//	if (hashTable[visibleEntryIDs[entryId]].ptr < -1) {
-//		if (entryId % 100 == 17) {
-//			printf("Was trying to set entry ID #%d as visible type 3 but it had been deallocated!\n",
-//				   entryId);
-//			// TODO should we make it 0 or something? Or type #4 == recycled?
-//		}
-//
-//		/// XXX: is this sensible?
-//		entriesVisibleType[visibleEntryIDs[entryId]] = 0;
-//	}
-//	else {
-//		entriesVisibleType[visibleEntryIDs[entryId]] = 3;
-//	}
 }
 
 __global__ void allocateVoxelBlocksList_device(
@@ -1088,7 +1071,7 @@ void deleteBlock(
 		// than one element. However, if our hash table's size is large enough, this happens quite
 		// rarely, so we ignore it for now, since we save enough memory by deleting single-block
 		// buckets anyway.
-		atomicExch(&locks[keyHash], BUCKET_FREE);
+		atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
 		return;
 	}
 
@@ -1105,7 +1088,7 @@ void deleteBlock(
 				   isExcess ? "excess" : "non-excess"
 			);
 //		}
-		atomicExch(&locks[keyHash], BUCKET_FREE);
+		atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
 		return;
 	}
 
@@ -1129,15 +1112,10 @@ void deleteBlock(
 
 	// TODO(andrei): Update excess freelist! (Should work without doing it but leak memory.)
 	// Second, clear out the hash table entry, and do bookkeeping for buckets with more than one element.
-	if (outPrevBlockIdx != -1) {
-		// In excess list with a successor or not.
-		hashTable[outPrevBlockIdx].offset = hashTable[outBlockIdx].offset;
-		hashTable[outBlockIdx].offset = 0;
-		hashTable[outBlockIdx].ptr = -2;
-	}
-	else {
+	if (outPrevBlockIdx == -1) {
+		// In the ordered list
 		if (hashTable[outBlockIdx].offset >= 1) {
-			// In ordered list, with a successor.
+			// In the ordered list, with a successor.
 			long nextIdx = SDF_BUCKET_NUM + hashTable[outBlockIdx].offset - 1;
 			hashTable[outBlockIdx] = hashTable[nextIdx];
 
@@ -1149,15 +1127,21 @@ void deleteBlock(
 			hashTable[nextIdx].ptr = -2;
 		}
 		else {
-			// In ordered list, and no successor.
+			// In the ordered list, and no successor.
 			hashTable[outBlockIdx].offset = 0;
 			hashTable[outBlockIdx].ptr = -2;
 		}
 	}
+	else {
+		// In the excess list with a successor or not.
+		hashTable[outPrevBlockIdx].offset = hashTable[outBlockIdx].offset;
+		hashTable[outBlockIdx].offset = 0;
+		hashTable[outBlockIdx].ptr = -2;
+	}
 
 	// TODO(andrei): Remove sanity check.
 	// Release the lock.
-	int result = atomicExch(&locks[keyHash], BUCKET_FREE);
+	int result = atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
 	if (result != BUCKET_LOCKED) {
 		printf("FATAL LOCK ERROR IN BLOCK DELETION\n");
 	}

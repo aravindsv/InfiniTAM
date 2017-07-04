@@ -1,6 +1,7 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
 #include <thread>
+#include <future>
 #include "ITMMainEngine.h"
 
 using namespace ITMLib::Engine;
@@ -121,15 +122,27 @@ void ITMMainEngine::SaveSceneToMesh(const char *objFileName)
 				objFileName);
       return;
     }
-	// TODO(andrei): This seems to be memory-intensive. One could maybe also do this in a
-	// streaming manner, instead of running marching cubes on everything at once.
-	meshingEngine->MeshScene(mesh, scene);
-//	mesh->WriteSTL(objFileName);
 
-	std::thread obj_writer_async([&] {
-	  mesh->WriteOBJ(objFileName);
-	});
-	printf("Launched mesh writing thread...\n");
+	std::string fname(objFileName);
+
+	if (!write_result.valid() ||
+		 write_result.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready
+	) {
+		// TODO(andrei): This seems to be memory-intensive. One could maybe also do this in a
+		// streaming manner, instead of running marching cubes on everything at once.
+		meshingEngine->MeshScene(mesh, scene);
+
+		// Mesh generation is fast (less than a second), but writing stuff to the disk can take
+		// minutes, so we do it asynchronously.
+		write_result = std::async(std::launch::async, [=] {
+			mesh->WriteOBJ(fname.c_str());
+			printf(" >>> Async mesh writing completed OK.\n");
+		});
+	}
+	else {
+		printf("Please wait until the previous write is finished...\n");
+	}
+
 }
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement)

@@ -6,6 +6,10 @@
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
 
+// Used by the bucket locking when allocating and deleting voxel blocks.
+const int BUCKET_UNLOCKED = 0;
+const int BUCKET_LOCKED = 1;
+
 template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 		DEVICEPTR(TVoxel) &voxel,
@@ -208,18 +212,11 @@ inline void buildHashAllocAndVisibleTypePP(
 		ITMHashEntry hashEntry = hashTable[hashIdx];
 
 #if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-      int key = hashIdx;
-		int contention = atomicExch(&locks[key], 1);
-		if (contention != 0) {
-			if(key % 100 == 33) {
-//				printf("Contention for key %d when allocating! Deferring allocation for block (%d, %d, %d)\n",
-//				key,
-//				static_cast<int>(blockPos.x),
-//				static_cast<int>(blockPos.y),
-//				static_cast<int>(blockPos.z));
-			}
-			// Fight me bro!
-			goto loop_end;
+		int key = hashIdx;
+		int contention = atomicExch(&locks[key], BUCKET_LOCKED);
+		if (contention == BUCKET_LOCKED) {
+			point += direction;
+			continue;
 		}
 #endif
 		if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= -1)
@@ -263,18 +260,6 @@ inline void buildHashAllocAndVisibleTypePP(
 				// VBA and one in the excess list, after it. This is discussed in the InfiniTAM
 				// technical report.
 
-				// TODO(andrei): Remove this crap.
-#if defined(__CUDACC__) && defined(__CUDA_ARCH__)
-				if (hashEntry.ptr == -3 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-					printf("Allocating block (%d, %d, %d) into recycled %s hash table slot\n",
-						   static_cast<int>(blockPos.x),
-						   static_cast<int>(blockPos.y),
-						   static_cast<int>(blockPos.z),
-						   isExcess ? "excess" : "ordered"
-					);
-				}
-#endif
-
 				// TODO(andrei): Could we detect allocation failures here?
 				entriesAllocType[hashIdx] = isExcess ? 2 : 1; 		// needs allocation
 				if (!isExcess) entriesVisibleType[hashIdx] = 1; 	//new entry is visible
@@ -285,8 +270,7 @@ inline void buildHashAllocAndVisibleTypePP(
 
 #if defined(__CUDACC__) && defined(__CUDA_ARCH__)
 	// Release the lock on the bucket
-	atomicExch(&locks[key], 0);
-loop_end:
+	atomicExch(&locks[key], BUCKET_UNLOCKED);
 #endif
 		point += direction;
 	}

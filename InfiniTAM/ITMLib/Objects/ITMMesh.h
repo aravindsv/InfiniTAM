@@ -104,7 +104,10 @@ namespace ITMLib
 					}
 					fclose(f);
 
-					printf("Mesh file writing complete.\n");
+					printf("Mesh file writing to [%s] complete.\n", fileName);
+				}
+				else {
+					throw std::runtime_error("Could not open file for writing the mesh.\n");
 				}
 
 				if (shouldDelete) delete cpu_triangles;
