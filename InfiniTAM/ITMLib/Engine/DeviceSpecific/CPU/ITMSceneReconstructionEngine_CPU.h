@@ -28,7 +28,9 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
-			void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, int maxWeight, int minAge, bool forceAllVoxels) override;
+			void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+                       const ITMRenderState *renderState,
+					   int maxWeight, int minAge, bool forceAllVoxels) override;
 
 			size_t GetDecayedBlockCount() override;
 
@@ -48,7 +50,9 @@ namespace ITMLib
 			void IntegrateIntoScene(ITMScene<TVoxel, ITMPlainVoxelArray> *scene, const ITMView *view, const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
-			void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene, int maxWeight, int minAge, bool forceAllVoxels) override;
+			void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene,
+                       const ITMRenderState *renderState,
+					   int maxWeight, int minAge, bool forceAllVoxels) override;
 
 			size_t GetDecayedBlockCount() override;
 

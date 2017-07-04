@@ -39,7 +39,7 @@
 #define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
 
 //#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, should be 2^n and bigger than kDefaultSdfLocalBlockNum, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
-const long SDF_BUCKET_NUM = 0x200000;
+const long SDF_BUCKET_NUM = 0x20000;
 
 //#define SDF_HASH_MASK 0xfffff			// Used for get hashing value of the bucket index,  SDF_HASH_MASK = SDF_BUCKET_NUM - 1
 const long SDF_HASH_MASK = SDF_BUCKET_NUM - 1;
@@ -78,7 +78,8 @@ struct ITMHashEntry
 	    - <-1 identifies an unallocated block
 	*/
 	int ptr;
-	/** XXX \brief Experimental counter for avoiding double-deletions when voxel decay is enabled. */
+	/** \brief Indicates the frame when this hash entry was most recently allocated.
+	 * This is used for avoiding double-deletions when voxel decay is enabled. */
 	int allocatedTime;
 };
 

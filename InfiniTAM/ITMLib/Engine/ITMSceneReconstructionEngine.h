@@ -48,7 +48,11 @@ namespace ITMLib
 				const ITMRenderState *renderState) = 0;
 
 			/** See: ITMDenseMapper::Decay. */
-			virtual void Decay(ITMScene<TVoxel, TIndex> *scene, int maxWeight, int minAge, bool forceAllVoxels) = 0;
+			virtual void Decay(ITMScene<TVoxel, TIndex> *scene,
+							   const ITMRenderState *renderState,
+							   int maxWeight,
+							   int minAge,
+							   bool forceAllVoxels) = 0;
 
 			/** Returns the total number of decayed and deallocated voxel blocks. */
 			virtual size_t GetDecayedBlockCount() = 0;

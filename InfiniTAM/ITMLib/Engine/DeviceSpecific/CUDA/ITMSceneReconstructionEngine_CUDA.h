@@ -57,6 +57,7 @@ namespace ITMLib
 				const ITMRenderState *renderState);
 
 			void Decay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+					   const ITMRenderState *renderState,
 					   int maxWeight,
 					   int minAge,
 					   bool forceAllVoxels) override;
@@ -81,6 +82,7 @@ namespace ITMLib
 				const ITMRenderState *renderState);
 
 		  void Decay(ITMScene<TVoxel, ITMPlainVoxelArray> *scene,
+					 const ITMRenderState *renderState,
 					 int maxWeight,
 					 int minAge,
 					 bool forceAllVoxels) override;

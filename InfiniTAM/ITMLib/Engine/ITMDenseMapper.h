@@ -41,7 +41,7 @@ namespace ITMLib
 			/// map, which can be rather slow. Otherwise, the system operates on the list of voxels
 			/// visible `minAge` frames ago, which is not 100% accurate, but orders of magnitude
 			/// faster for large maps.
-			void Decay(ITMScene<TVoxel, TIndex> *scene, int maxWeight, int minAge, bool forceAllVoxels = false);
+			void Decay(ITMScene<TVoxel, TIndex> *scene, ITMRenderState *renderState, int maxWeight, int minAge, bool forceAllVoxels = false);
 
 			size_t GetDecayedBlockCount() const;
 

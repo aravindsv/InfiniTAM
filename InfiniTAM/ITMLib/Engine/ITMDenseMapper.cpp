@@ -77,11 +77,12 @@ void ITMDenseMapper<TVoxel,TIndex>::UpdateVisibleList(const ITMView *view, const
 template<class TVoxel, class TIndex>
 void ITMDenseMapper<TVoxel, TIndex>::Decay(
 		ITMScene<TVoxel, TIndex> *scene,
+		ITMRenderState *renderState,
 		int maxWeight,
 		int minAge,
 		bool forceAllVoxels
 ) {
-	sceneRecoEngine->Decay(scene, maxWeight, minAge, forceAllVoxels);
+	sceneRecoEngine->Decay(scene, renderState, maxWeight, minAge, forceAllVoxels);
 }
 
 template<class TVoxel, class TIndex>
