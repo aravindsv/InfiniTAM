@@ -40,7 +40,6 @@ namespace ITMLib
             {
 				this->memoryType = memoryType;
 
-//				visibleEntryIDs = new ORUtils::MemoryBlock<int>(sdfLocalBlockNum, memoryType);
 				visibleBlocks = new ORUtils::MemoryBlock<Vector3i>(sdfLocalBlockNum, memoryType);
 				entriesVisibleType = new ORUtils::MemoryBlock<uchar>(noTotalEntries, memoryType);
 				
@@ -53,15 +52,8 @@ namespace ITMLib
 				delete entriesVisibleType;
             }
 
-          // TODO remove this once it's no longer needed
-			/** \brief Get sthe list of visible blocks, that are currently processed by the tracker.
-			*/
-//			const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs->GetData(memoryType); }
-//			int *GetVisibleEntryIDs(void) { return visibleEntryIDs->GetData(memoryType); }
-
-			// TODO maybe rename to visibleBlockPositions/keys/etc.
-			const Vector3i* GetVisibleBlocks() const { return visibleBlocks->GetData(memoryType); }
-			Vector3i* GetVisibleBlocks() { return visibleBlocks->GetData(memoryType); }
+			const Vector3i* GetVisibleBlockPositions() const { return visibleBlocks->GetData(memoryType); }
+			Vector3i* GetVisibleBlockPositions() { return visibleBlocks->GetData(memoryType); }
 
 			/** Get the list of "visible entries", that are
 			currently processed by integration and tracker.

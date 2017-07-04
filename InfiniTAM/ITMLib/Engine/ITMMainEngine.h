@@ -97,7 +97,7 @@ namespace ITMLib
 			/// Gives access to the internal world representation
 			ITMScene<ITMVoxel, ITMVoxelIndex>* GetScene(void) { return scene; }
 
-      /// Process a frame with rgb and depth images and optionally a corresponding imu measurement
+			/// Process a frame with rgb and depth images and optionally a corresponding imu measurement
 			virtual void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement = NULL);
 
 			// Gives access to the data structure used internally to store any created meshes

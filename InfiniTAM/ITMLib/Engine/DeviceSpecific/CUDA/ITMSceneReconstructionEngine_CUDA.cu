@@ -15,9 +15,20 @@ struct AllocationTempData {
 using namespace ITMLib::Engine;
 
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
-__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, Vector3i *visibleBlocks,
-	const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i imgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d, 
-	Vector4f projParams_rgb, float _voxelSize, float mu, int maxW);
+__global__ void integrateIntoScene_device(TVoxel *localVBA,
+										  const ITMHashEntry *hashTable,
+										  Vector3i *visibleBlockPositions,
+										  const Vector4u *rgb,
+										  Vector2i rgbImgSize,
+										  const float *depth,
+										  Vector2i imgSize,
+										  Matrix4f M_d,
+										  Matrix4f M_rgb,
+										  Vector4f projParams_d,
+										  Vector4f projParams_rgb,
+										  float _voxelSize,
+										  float mu,
+										  int maxW);
 
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
 __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxelArray::ITMVoxelArrayInfo *arrayInfo,
@@ -41,28 +52,38 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList,
 __global__ void reAllocateSwappedOutVoxelBlocks_device(int *voxelAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
 	AllocationTempData *allocData, uchar *entriesVisibleType);
 
-__global__ void setToType3(uchar *entriesVisibleType, Vector3i *visibleBlocks, int noVisibleBlocks,
+__global__ void setToType3(uchar *entriesVisibleType,
+						   Vector3i *visibleBlockPositions,
+						   int noVisibleBlocks,
 						   ITMHashEntry *hashTable);
 
 template<bool useSwapping>
 __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapState *swapStates, int noTotalBlocks,
-	Vector3i *visibleBlocks, AllocationTempData *allocData, uchar *entriesVisibleType,
+	Vector3i *visibleBlockPositions, AllocationTempData *allocData, uchar *entriesVisibleType,
 	Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize);
 
-// TODO(andrei): Redo documentation after you finish implementing this.
 /// \brief Erases blocks whose weight is smaller than 'maxWeight', and marks blocks which become
 ///        empty in the process as pending deallocation in `outBlocksToDeallocate`.
 /// \tparam TVoxel The type of voxel representation to operate on (grayscale/color, float/short, etc.)
 /// \param localVBA The raw storage where the hash map entries reside.
 /// \param hashTable Maps entry IDs to addresses in the local VBA.
-/// \param visibleEntryIDs A list of blocks on which to operate (typically, this is the list
-///                        containing the visible blocks $k$ frames ago. The size of the list should
-///                        be known in advance, and be implicitly range-checked by setting the grid
-///                        size's x dimension to it.
+/// \param visibleBlockPositions A list of blocks on which to operate (typically, this is the list
+///                        containing the visible blocks $k$ frames ago). The size of the list
+///                        should be known in advance, and be implicitly range-checked by setting
+///                        the grid size's x-dimension to it.
+/// \param minAge The minimum age for a voxel to be considered for decay.
+/// \param maxWeight All voxels above `minAge` with depth weight smaller than or equal to this are
+///                  decayed.
+/// \param voxelAllocationList Freelist containing IDs of free voxel blocks in `localVBA`.
+/// \param lastFreeBlockId Index of the last free block in `voxelAllocationList`.
+/// \param locks Used for locking buckets when performing block deletion.
+/// \param currentFrame The index of the current frame being processed by the SLAM system.
+/// \param entriesVisibleType Maps hash table indices to an enum symbolizing whether a particular
+///                           block is visible.
 template<class TVoxel>
 __global__ void decay_device(TVoxel *localVBA,
 							 ITMHashEntry *hashTable,
-							 Vector3i *visibleEntryIDs,
+							 Vector3i *visibleBlockPositions,
 							 int minAge,
 							 int maxWeight,
 							 int *voxelAllocationList,
@@ -73,9 +94,11 @@ __global__ void decay_device(TVoxel *localVBA,
 );
 
 /// \brief Used to perform voxel decay on all voxels in a volume.
+/// Similar to `decay_device`, but operates on an entire volume of voxels, instead of a lits of
+/// blocks visible at some point in time.
 template<class TVoxel>
 __global__ void decayFull_device(
-		const Vector4s *visibleBlockGlobalPos,
+		const Vector4s *usedBlockPositions,
 		TVoxel *localVBA,
 		ITMHashEntry *hashTable,
 		int minAge,
@@ -180,9 +203,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 	ITMHashSwapState *swapStates = scene->useSwapping ? scene->globalCache->GetSwapStates(true) : 0;
 
-	// The sum of the nr of buckets, plus the excess list size
+	// The sum of the nr. of buckets, plus and the excess list size.
 	int noTotalEntries = scene->index.noTotalEntries;
-	Vector3i *visibleBlocks = renderState_vh->GetVisibleBlocks();
+	Vector3i *visibleBlockPositions = renderState_vh->GetVisibleBlockPositions();
 	uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 
 	dim3 cudaBlockSizeHV(16, 16);
@@ -215,17 +238,14 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		// Note: we could have a kernel map from visible keys to visible IDs here, or simply pass
 		//       the keys to 'setToType3'.
 		//
-		printf("setToType3 with grid size %d and block size %d\n", gridSizeVS.x, cudaBlockSizeVS.x);
 		setToType3<<<gridSizeVS, cudaBlockSizeVS>>>(
 				entriesVisibleType,
-				visibleBlocks,
+				visibleBlockPositions,
 				renderState_vh->noVisibleBlocks,
 				hashTable);
 	}
 
-	// TODO(andrei): Remove if still unused and unnecessary.
 	ITMSafeCall(cudaMemset( locks_device, 0, sizeof(int) * SDF_BUCKET_NUM));
-
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType,
 		blockCoords_device, depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max, locks_device);
@@ -253,7 +273,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 				hashTable,
 				swapStates,
 				noTotalEntries,
-				visibleBlocks,
+				visibleBlockPositions,
 				(AllocationTempData *) allocationTempData_device,
 				entriesVisibleType,
 				M_d,
@@ -262,7 +282,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 				voxelSize);
 	}
 	else {
-		buildVisibleList_device<false> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleBlocks,
+		buildVisibleList_device<false> << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, swapStates, noTotalEntries, visibleBlockPositions,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 	}
 
@@ -277,21 +297,15 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
 	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
 
-	// visibleEntryIDs is now populated with block IDs which are visible.
 	int totalBlockCount = scene->index.getNumAllocatedVoxelBlocks();
 	size_t visibleBlockCount = static_cast<size_t>(tempData->noVisibleBlocks);
-
 	size_t visibleBlocksByteCount = visibleBlockCount * sizeof(Vector3i);
 
   	ORUtils::MemoryBlock<Vector3i> *visibleEntryIDsCopy = nullptr;
 	if (visibleBlocksByteCount > 0) {
-		// TODO remove debug code here
-		ITMSafeCall(cudaDeviceSynchronize());
-		ITMSafeCall(cudaGetLastError());
-
 		visibleEntryIDsCopy = new ORUtils::MemoryBlock<Vector3i>(visibleBlocksByteCount, MEMORYDEVICE_CUDA);
 		ITMSafeCall(cudaMemcpy(visibleEntryIDsCopy->GetData(MEMORYDEVICE_CUDA),
-							   visibleBlocks,
+							   visibleBlockPositions,
 							   visibleBlocksByteCount,
 							   cudaMemcpyDeviceToDevice));
 	}
@@ -332,10 +346,15 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 			allocatedExcessEntries,
 			allocatedSizeMiB);
 
-//	ITMHashEntry *entries = scene->index.GetEntries();
 	if (scene->localVBA.lastFreeBlockId < 0) {
-		throw std::runtime_error(
-				"Invalid free voxel block ID. InfiniTAM has run out of space in the Voxel Block Array.");
+		throw std::runtime_error("Invalid free voxel block ID. InfiniTAM has run out of space in "
+								 "the Voxel Block Array.");
+	}
+
+	if (scene->index.GetLastFreeExcessListId() < 0) {
+		throw std::runtime_error("Invalid free excess list slot ID. InfiniTAM has run out of slots "
+								 "in the hash table excess list. Consider increasing the size of "
+								 "the excess list or the number of buckets.");
 	}
 }
 
@@ -372,36 +391,35 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
-//	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
-	Vector3i *visibleBlocks = renderState_vh->GetVisibleBlocks();
+	Vector3i *visibleBlockPositions = renderState_vh->GetVisibleBlockPositions();
 
-	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-	dim3 gridSize(renderState_vh->noVisibleBlocks);
+	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
+	dim3 visibleBlockGrid(renderState_vh->noVisibleBlocks);
 
 	// These kernels are launched over ALL visible blocks, whose IDs are placed conveniently as the
 	// first `renderState_vh->noVisibleEntries` elements of the `visibleEntryIDs` array, which could,
 	// in theory, accommodate ALL possible blocks, but usually contains O(10k) blocks.
 	if (scene->sceneParams->stopIntegratingAtMaxW) {
 		if (trackingState->requiresFullRendering) {
-			integrateIntoScene_device<TVoxel, true, false> << < gridSize, cudaBlockSize >> > (
-				localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
+			integrateIntoScene_device<TVoxel, true, false> <<<visibleBlockGrid, voxelBlockSize>>> (
+				localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
 				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		} else {
-			integrateIntoScene_device<TVoxel, true, true> << < gridSize, cudaBlockSize >> > (
-				localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
+			integrateIntoScene_device<TVoxel, true, true> <<<visibleBlockGrid, voxelBlockSize>>> (
+				localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
 				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 	}
 	else {
 		if (trackingState->requiresFullRendering) {
 			// While developing dynslam, this is the version that is run.
-			integrateIntoScene_device<TVoxel, false, false> << < gridSize, cudaBlockSize >> > (
-					localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
+			integrateIntoScene_device<TVoxel, false, false> <<<visibleBlockGrid, voxelBlockSize>>> (
+					localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
 						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 		else {
-			integrateIntoScene_device<TVoxel, false, true> << < gridSize, cudaBlockSize >> > (
-				localVBA, hashTable, visibleBlocks, rgb, rgbImgSize, depth, depthImgSize,
+			integrateIntoScene_device<TVoxel, false, true> <<<visibleBlockGrid, voxelBlockSize>>> (
+				localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
 						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 		}
 	}
@@ -409,7 +427,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 
 
 template<class TVoxel>
-int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+void fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 			  const ITMRenderState *renderState,
 			  int minAge,
 			  int maxWeight,
@@ -417,8 +435,6 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 			  int *locks_device,
 			  int frameIdx
 ) {
-	fprintf(stderr, "WILL now decay ALL voxels in the map...\n");
-
 	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
@@ -430,32 +446,23 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 	// this array corresponds to a VBA element.
 	long sdfLocalBlockNum = scene->index.getNumAllocatedVoxelBlocks();
 	int noTotalEntries = scene->index.noTotalEntries;
-	Vector4s *visibleBlockGlobalPos_device;
-	ITMSafeCall(cudaMalloc((void**)&visibleBlockGlobalPos_device, sdfLocalBlockNum * sizeof(Vector4s)));
-	ITMSafeCall(cudaMemset(visibleBlockGlobalPos_device, 0, sizeof(Vector4s) * sdfLocalBlockNum));
+	Vector4s *allocatedBlockPositions_device;
+	ITMSafeCall(cudaMalloc((void**)&allocatedBlockPositions_device, sdfLocalBlockNum * sizeof(Vector4s)));
+	ITMSafeCall(cudaMemset(allocatedBlockPositions_device, 0, sizeof(Vector4s) * sdfLocalBlockNum));
 
 	dim3 hashTableVisitBlockSize(256);
 	dim3 hashTableVisitGridSize((noTotalEntries - 1) / hashTableVisitBlockSize.x + 1);
 
-	fprintf(stderr, "Launching findAllocatedBlocks with gs.x = %d\n", hashTableVisitGridSize.x);
-	fprintf(stderr, "total entries: %d (0x%x)\n", noTotalEntries, noTotalEntries);
 	ITMLib::Engine::findAllocatedBlocks<<<hashTableVisitGridSize, hashTableVisitBlockSize>>>(
-			visibleBlockGlobalPos_device, hashTable, noTotalEntries
+			allocatedBlockPositions_device, hashTable, noTotalEntries
 	);
-	ITMSafeCall(cudaDeviceSynchronize());
-	ITMSafeCall(cudaGetLastError());
-	printf("Aight, computed allocated blocks OK...\n");
 
 	// We now know, for every block allocated in the VBA, whether it's in use, and what its
 	// global coordinates are.
 	dim3 gridSize(sdfLocalBlockNum);
-	fprintf(stderr, "Calling decayFull_device...: gs.x = %d, minAge = %d, maxWeight = %d\n",
-			gridSize.x, minAge, maxWeight);
-
 	ITMSafeCall(cudaMemset(locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
-	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
 	decayFull_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
-			visibleBlockGlobalPos_device,
+			allocatedBlockPositions_device,
 			localVBA,
 			hashTable,
 			minAge,
@@ -466,19 +473,10 @@ int fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 			frameIdx,
 			((ITMRenderState_VH*)renderState)->GetEntriesVisibleType()
 	);
-	ITMSafeCall(cudaDeviceSynchronize());
-	ITMSafeCall(cudaGetLastError());
-	printf("decayFull_device went OK\n\n");
 
 	ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
 				1 * sizeof(int),
 				cudaMemcpyDeviceToHost));
-	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
-
-	printf("decayFull_device deleted %d blocks\n\n", freedBlockCount);
-
-	ITMSafeCall(cudaFree(visibleBlockGlobalPos_device));
-	return freedBlockCount;
 }
 
 template<class TVoxel>
@@ -501,14 +499,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 						   1 * sizeof(int),
 						   cudaMemcpyHostToDevice));
 
-	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-
 	if (forceAllVoxels) {
 		// TODO(andrei): Make this function obey the 'deallocateEmptyBlocks' flag.
-		// TODO(andrei): Remove duplicate functionality for counting freed blocks.
 		fullDecay<TVoxel>(scene, renderState, minAge, maxWeight, this->lastFreeBlockId_device, locks_device, frameIdx);
 	}
-	else if (frameVisibleBlocks.size() > minAge) {
+	else if (static_cast<long>(frameVisibleBlocks.size()) > minAge) {
 		VisibleBlockInfo visible = frameVisibleBlocks.front();
 		frameVisibleBlocks.pop();
 
@@ -522,6 +517,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		if (visible.count > 0) {
 			ITMSafeCall(cudaMemset(locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
 
+			dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 			dim3 gridSize(static_cast<uint32_t>(visible.count));
 			decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
 					localVBA,
@@ -538,14 +534,14 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 			ITMSafeCall(cudaDeviceSynchronize());
 			ITMSafeCall(cudaGetLastError());
 
-			// This is important for ensuring ITM "knows" about the freed up blocks in the VBA.
-			ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
-								   1 * sizeof(int),
-								   cudaMemcpyDeviceToHost));
-
 			delete visible.blockCoords;
 		}
 	}
+
+	// This is important for ensuring ITM "knows" about the freed up blocks in the VBA.
+	ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
+						   1 * sizeof(int),
+						   cudaMemcpyDeviceToHost));
 
 	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
 	totalDecayedBlockCount += freedBlockCount;
@@ -715,7 +711,7 @@ __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxe
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
 __global__ void integrateIntoScene_device(TVoxel *localVBA,
 										  const ITMHashEntry *hashTable,
-										  Vector3i *visibleBlocks,
+										  Vector3i *visibleBlockPositions,
 										  const Vector4u *rgb,
 										  Vector2i rgbImgSize,
 										  const float *depth, Vector2i depthImgSize,
@@ -728,35 +724,29 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 {
 	Vector3i globalPos;
 	bool isFound = false;
-	int entryId = findBlock(hashTable, visibleBlocks[blockIdx.x], isFound);
+	int entryId = findBlock(hashTable, visibleBlockPositions[blockIdx.x], isFound);
 
 	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
 	int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
 	if (!isFound || entryId < 0) {
-      if (locId == 0) {
+		if (locId == 0) {
 			printf("FATAL ERROR in integrateIntoScene_device (isFound = %d, entryId = %d, "
 				   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
 				   static_cast<int>(isFound),
 				   entryId,
 				   blockIdx.x,
 				   locId,
-				   visibleBlocks[blockIdx.x].x,
-				   visibleBlocks[blockIdx.x].y,
-				   visibleBlocks[blockIdx.x].z
+				   visibleBlockPositions[blockIdx.x].x,
+				   visibleBlockPositions[blockIdx.x].y,
+				   visibleBlockPositions[blockIdx.x].z
 			);
-	  }
+		}
+
 		return;
 	}
 
 	const ITMHashEntry &currentHashEntry = hashTable[entryId];
-	if (currentHashEntry.ptr < 0) {
-      if(locId == 0) {
-		  printf("Found entry with no voxel block!!\n");
-	  }
-		return;
-	}
-
 	globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 
 	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
@@ -798,7 +788,9 @@ __global__ void buildHashAllocAndVisibleType_device(
 }
 
 // Runs for every block in the visible list => needs lookup.
-__global__ void setToType3(uchar *entriesVisibleType, Vector3i *visibleBlocks, int noVisibleBlocks,
+__global__ void setToType3(uchar *entriesVisibleType,
+						   Vector3i *visibleBlockPositions,
+						   int noVisibleBlocks,
 						   ITMHashEntry *hashTable)
 {
 	int entryId = threadIdx.x + blockIdx.x * blockDim.x;
@@ -807,27 +799,25 @@ __global__ void setToType3(uchar *entriesVisibleType, Vector3i *visibleBlocks, i
 	}
 
 	bool isFound = false;
-	int hashIdx = findBlock(hashTable, visibleBlocks[entryId], isFound);
+	int hashIdx = findBlock(hashTable, visibleBlockPositions[entryId], isFound);
 
 	if (! isFound || hashIdx < 0) {
-      int hashVal = hashIndex(visibleBlocks[entryId]);
-		if (hashVal % 100 < 40) {
-			// TODO(andrei): Resolve this fully.
-			// The block (which was in sight last frame) was cleared out by the decay. Not an error, but
-			// may lead to artifacts in the map.
-			printf("FATAL ERROR in setToType3 visibleBlocks[%d]: (isFound = %d, hashIdx = %d"
-						   ")! | (%d, %d, %d) @ hashVal = %d\n",
-				   entryId,
-				   static_cast<int>(isFound),
-				   hashIdx,
-				   visibleBlocks[entryId].x,
-				   visibleBlocks[entryId].y,
-				   visibleBlocks[entryId].z,
-				   hashVal
-			);
-		}
-//      entriesVisibleType[hashIdx] = 0;
-		return;
+		// The block (which was in sight last frame) was cleared out by the decay. Not an error, but
+		// may lead to artifacts in the map. This can happen if the decay "catches up" with the
+		// active reconstruction.
+//      int hashVal = hashIndex(visibleBlocks[entryId]);
+//		if (hashVal % 100 < 40) {
+//			printf("FATAL ERROR in setToType3 visibleBlocks[%d]: (isFound = %d, hashIdx = %d"
+//						   ")! | (%d, %d, %d) @ hashVal = %d\n",
+//				   entryId,
+//				   static_cast<int>(isFound),
+//				   hashIdx,
+//				   visibleBlocks[entryId].x,
+//				   visibleBlocks[entryId].y,
+//				   visibleBlocks[entryId].z,
+//				   hashVal
+//			);
+//		}
 	}
 	else {
 		entriesVisibleType[hashIdx] = 3;
@@ -867,8 +857,6 @@ __global__ void allocateVoxelBlocksList_device(
 			hashEntry.offset = 0;
 			hashEntry.allocatedTime = currentFrame;
 
-			// TODO(andrei): What if there are multiple blocks which think they belong in the
-			// ordered list?
 			hashTable[targetIdx] = hashEntry;
 		}
 		else
@@ -953,7 +941,7 @@ __global__ void buildVisibleList_device(
 		ITMHashEntry *hashTable,
 		ITMHashSwapState *swapStates,
 		int noTotalEntries,
-        Vector3i *visibleBlocks,
+        Vector3i *visibleBlockPositions,
 		AllocationTempData *allocData,
 		uchar *entriesVisibleType,
 		Matrix4f M_d,
@@ -961,23 +949,14 @@ __global__ void buildVisibleList_device(
 		Vector2i depthImgSize,
 		float voxelSize
 ) {
-	// TODO(andrei): In any case, the 'dummy' bool leads to spaghetti code. Fix that stuff, or, much
-	// more likely, get rid of it because it's not helping.
-  // Could this cause an error if we need this worker to compute the prefix sum even if its contribution would be 0?
 	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
-
-	bool dummy = false;
 	unsigned char hashVisibleType = 0;
-
-	if (targetIdx > noTotalEntries - 1) {
-		dummy = true;
-	}
 
 	__shared__ bool shouldPrefix;
 	shouldPrefix = false;
 	__syncthreads();
 
-	if (! dummy) {
+	if (targetIdx < noTotalEntries) {
 		hashVisibleType = entriesVisibleType[targetIdx];
 		const ITMHashEntry & hashEntry = hashTable[targetIdx];
 
@@ -1007,7 +986,7 @@ __global__ void buildVisibleList_device(
 
 	__syncthreads();
 
-	// Computes the correct offsets for the visible blocks in the output visibleBlocks array.
+	// Computes the correct offsets for the visible blocks in the output visibleBlockPositions array.
 	if (shouldPrefix)
 	{
 		int offset = computePrefixSum_device<int>(hashVisibleType > 0,
@@ -1017,7 +996,7 @@ __global__ void buildVisibleList_device(
 		if (offset != -1) {
 			// -1 is returned for entries which contribute a 'false' so don't need to be written to
 			// the visible list.
-			visibleBlocks[offset] = hashTable[targetIdx].pos.toInt();
+			visibleBlockPositions[offset] = hashTable[targetIdx].pos.toInt();
 		}
 	}
 
@@ -1034,18 +1013,18 @@ __global__ void buildVisibleList_device(
 #endif
 }
 
-// TODO(andrei): Get rid of code duplication.
-
 /// \brief Deletes a block from the hash table, deallocating its VBA entry.
 /// \param hashTable
 /// \param blockPos             The position of the block in the voxel grid, i.e., the key.
 /// \param locks                Array used for locking in order to prevent data races when
 ///                             attempting to delete multiple elements with the same key.
-/// \param lastFreeBlockId      Index in the voxel allocation list (free list).
 /// \param voxelAllocationList  List of free voxels.
+/// \param lastFreeBlockId      Index in the voxel allocation list (free list).
+/// \param entriesVisibleType   For every entry in the hash table, keeps track of whether it's
+///                             visible in the last/current frame.
 ///
 /// \note Does not support swapping.
-template<class TVoxel>
+template<class TVoxel, bool paranoid=false>
 __device__
 void deleteBlock(
 		ITMHashEntry *hashTable,
@@ -1056,6 +1035,8 @@ void deleteBlock(
 		uchar *entriesVisibleType
 ) {
 	int keyHash = hashIndex(blockPos);
+
+	// Lock the bucket for the operation, to ensure the lists stay consistent
 	int status = atomicExch(&locks[keyHash], BUCKET_LOCKED);
 	if (status != BUCKET_UNLOCKED) {
 		printf("Contention on bucket of hash value %d. Not going further with deletion of block "
@@ -1069,54 +1050,47 @@ void deleteBlock(
 	findVoxel(hashTable, blockPos, 0, isFound, outBlockIdx, outPrevBlockIdx);
 
 	bool isExcess = (outBlockIdx >= SDF_BUCKET_NUM);
-	// Paranoid sanity check
-	if (outPrevBlockIdx == -1) {
-		if (isExcess) {
-			printf("\n[ERROR] Found entity in excess list with no previous element (%d, %d, %d)!\n",
-				   blockPos.x,
-				   blockPos.y,
-				   blockPos.z);
-		}
-	}
-	else {
-		if (! isExcess) {
-			printf("\n[ERROR] Found entity in bucket list with a previous guy!\n");
-		}
-	}
 
-//	bool hasNext = (hashTable[outBlockIdx].offset >= 1);
-//	if (isExcess || hasNext) {
-		// Even after tons of careful debugging, there still seem to be a few Heisenbugs around
-		// causing the wrong blocks to disappear when deleting an element from a bucket with more
-		// than one element. However, if our hash table's size is large enough, this happens quite
-		// rarely, so we ignore it for now, since we save enough memory by deleting single-block
-		// buckets anyway.
-//		atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
-//		return;
-//	}
+	// Paranoid sanity checks
+	if (paranoid) {
+		if (outPrevBlockIdx == -1) {
+			if (isExcess) {
+				printf("\n[ERROR] Found entity in excess list with no previous element (%d, %d, %d)!\n",
+					   blockPos.x,
+					   blockPos.y,
+					   blockPos.z);
+			}
+		} else {
+			if (!isExcess) {
+				printf("\n[ERROR] Found entity in bucket list with a previous guy!\n");
+			}
+		}
 
-	// Some paranoid sanity checks. TODO(andrei): Consider adding flag for toggling.
-	if (!isFound || outBlockIdx < 0) {
-//		if (blockPos.x % 10 == 3) {
-			printf("\n\nFATAL ERROR: sanity check failed in 'decay_device' voxel (block) "
-						   "found = %d, outBlockIdx = %d (%d, %d, %d) ; %s.\n",
-				   static_cast<int>(isFound),
-				   outBlockIdx,
-				   blockPos.x,
-				   blockPos.y,
-				   blockPos.z,
-				   isExcess ? "excess" : "non-excess"
-			);
-//		}
-		atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
-		return;
+		if (!isFound || outBlockIdx < 0) {
+			if (blockPos.x % 10 == 3) {
+				printf("\n\nFATAL ERROR: sanity check failed in 'decay_device' voxel (block) "
+							   "found = %d, outBlockIdx = %d (%d, %d, %d) ; %s.\n",
+					   static_cast<int>(isFound),
+					   outBlockIdx,
+					   blockPos.x,
+					   blockPos.y,
+					   blockPos.z,
+					   isExcess ? "excess" : "non-excess"
+				);
+			}
+			atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
+			return;
+		}
 	}
 
 	// First, deallocate the VBA slot.
 	int freeListIdx = atomicAdd(&lastFreeBlockId[0], 1);
 	voxelAllocationList[freeListIdx + 1] = hashTable[outBlockIdx].ptr;
 
-	// TODO(andrei): Update excess freelist! (Should work without doing it but leak memory.)
+	// TODO(andrei): Update excess freelist! (Should work without doing it but leak excess slots.)
+	// If updating the excess free list, make sure you also sync back the proper 'last excess slot
+	// index' index.
+
 	// Second, clear out the hash table entry, and do bookkeeping for buckets with more than one element.
 	if (outPrevBlockIdx == -1) {
 		// In the ordered list
@@ -1124,27 +1098,6 @@ void deleteBlock(
 			// In the ordered list, with a successor.
 			long nextIdx = SDF_BUCKET_NUM + hashTable[outBlockIdx].offset - 1;
 			hashTable[outBlockIdx] = hashTable[nextIdx];
-
-			if (hashTable[nextIdx].ptr < 0) {
-				printf("FATAL ERROR AGAIN: valid block with valid-looking offset was pointing to garbage...\n");
-			}
-
-//			if (keyHash % 100 < 10) {
-//				printf("Will delete block with hash idx %d / %ld (prev = %d, hashVal = %d), offset (new) = %d; (%d, %d, %d); %s | Promoting excess list block back into VBA | Neighbor pos I wrote into myself: %d, %d, %d.\n",
-//					   outBlockIdx,
-//					   SDF_BUCKET_NUM,
-//					   outPrevBlockIdx,
-//					   keyHash,
-//					   hashTable[outBlockIdx].offset,
-//					   blockPos.x,
-//					   blockPos.y,
-//					   blockPos.z,
-//					   isExcess ? "excess" : "non-excess",
-//					   hashTable[outBlockIdx].pos.x,
-//					   hashTable[outBlockIdx].pos.y,
-//					   hashTable[outBlockIdx].pos.z
-//				);
-//			}
 
 			entriesVisibleType[outBlockIdx] = entriesVisibleType[nextIdx];
 			entriesVisibleType[nextIdx] = 0;
@@ -1158,40 +1111,11 @@ void deleteBlock(
 		}
 		else {
 			// In the ordered list, and no successor.
-//			hashTable[outBlockIdx].offset = 0;
 			hashTable[outBlockIdx].ptr = -2;
 			entriesVisibleType[outBlockIdx] = 0;
-
-//			if (keyHash % 100 < 10) {
-//				printf("Will delete block with hash idx %d / %ld (prev = %d, hashVal = %d), offset = %d; (%d, %d, %d); %s | Boring lonely element delete.\n",
-//					   outBlockIdx,
-//					   SDF_BUCKET_NUM,
-//					   outPrevBlockIdx,
-//					   keyHash,
-//					   hashTable[outBlockIdx].offset,
-//					   blockPos.x,
-//					   blockPos.y,
-//					   blockPos.z,
-//					   isExcess ? "excess" : "non-excess"
-//				);
-//			}
 		}
 	}
 	else {
-//		if (keyHash % 100 < 10) {
-//			printf("Will delete block with hash idx %d / %ld (prev = %d, hashVal = %d), offset = %d; (%d, %d, %d); %s | Deletion of excess list element, by pointing previous to next.\n",
-//				   outBlockIdx,
-//				   SDF_BUCKET_NUM,
-//				   outPrevBlockIdx,
-//				   keyHash,
-//				   hashTable[outBlockIdx].offset,
-//				   blockPos.x,
-//				   blockPos.y,
-//				   blockPos.z,
-//				   isExcess ? "excess" : "non-excess"
-//			);
-//		}
-
 		// In the excess list with a successor or not.
 		hashTable[outPrevBlockIdx].offset = hashTable[outBlockIdx].offset;
 		hashTable[outBlockIdx].offset = 0;
@@ -1201,12 +1125,8 @@ void deleteBlock(
 		entriesVisibleType[outBlockIdx] = 0;
 	}
 
-	// TODO(andrei): Remove sanity check.
 	// Release the lock.
-	int result = atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
-	if (result != BUCKET_LOCKED) {
-		printf("FATAL LOCK ERROR IN BLOCK DELETION\n");
-	}
+	atomicExch(&locks[keyHash], BUCKET_UNLOCKED);
 }
 
 
@@ -1215,9 +1135,9 @@ void deleteBlock(
 template<class TVoxel>
 __device__
 void decayVoxel(
-		Vector3i blockGridPos,
+		Vector3i blockPos,
 		int locId,
-		TVoxel *localVBA,				// could wrap
+		TVoxel *localVBA,				// could wrap in HashMap struct
 		ITMHashEntry *hashTable,		// could wrap
 		int minAge,
 		int maxWeight,
@@ -1225,26 +1145,19 @@ void decayVoxel(
 		int *lastFreeBlockId,			// could wrap
 		int *locks,
 		int currentFrame,
-		uchar *entriesVisibleType		// could wrap in HashMap struct
+		uchar *entriesVisibleType		// could wrap
 ) {
 	bool isFound = false;
 	int blockHashIdx = -1;
 	int blockPrevHashIdx = -1;
 
-	int voxelIdx = findVoxel(hashTable, blockGridPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
+	int voxelIdx = findVoxel(hashTable, blockPos, locId, isFound, blockHashIdx, blockPrevHashIdx);
 
 	if (-1 == blockHashIdx) {
-		// This happens when we, for instance, have an ID in the visible list whose target gets
-		// deleted from the hash table by a previous decay phase.
 		if (locId == 0) {
 			printf("ERROR: could not find bucket for (%d, %d, %d) @ hash ID %d.\n",
-				   blockGridPos.x, blockGridPos.y, blockGridPos.z, hashIndex(blockGridPos));
+				   blockPos.x, blockPos.y, blockPos.z, hashIndex(blockPos));
 		}
-		return;
-	}
-
-	if (! isFound && locId == 0 && blockIdx.x % 10 == 3) {
-		printf("ERROR: voxel not found? WTF.\n");
 		return;
 	}
 
@@ -1287,7 +1200,7 @@ void decayVoxel(
 
 	if (locId == 0 && emptyBlock && safeToClear) {
 		deleteBlock<TVoxel>(hashTable,
-							hashTable[blockHashIdx].pos.toInt(),
+							blockPos,
 							locks,
 							voxelAllocationList,
 							lastFreeBlockId,
@@ -1295,13 +1208,13 @@ void decayVoxel(
 	}
 }
 
-// This kernel runs per-voxel, just like 'decayFull_device', for every block in the visible list
-// (so we need to perform lookups).
+/// This kernel runs per-voxel, just like 'decayFull_device', for every block in the visible list
+/// (so we need to perform lookups).
 template<class TVoxel>
 __global__
 void decay_device(TVoxel *localVBA,
 				  ITMHashEntry *hashTable,
-				  Vector3i *visibleBlocks,
+				  Vector3i *visibleBlockPositions,
 				  int minAge,
 				  int maxWeight,
 				  int *voxelAllocationList,
@@ -1315,35 +1228,14 @@ void decay_device(TVoxel *localVBA,
 	int locId = threadIdx.x + threadIdx.y * SDF_BLOCK_SIZE + threadIdx.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
 	bool isFound = false;
-	int hashIdx = findBlock(hashTable, visibleBlocks[blockIdx.x], isFound);
+	int hashIdx = findBlock(hashTable, visibleBlockPositions[blockIdx.x], isFound);
 
 	if (!isFound || hashIdx < 0) {
-//		if(locId == 0) {
-//			printf("FATAL ERROR in decay_device (isFound = %d, hashIdx = %d, "
-//						   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
-//				   static_cast<int>(isFound),
-//				   hashIdx,
-//				   blockIdx.x,
-//				   locId,
-//				   visibleBlocks[blockIdx.x].x,
-//				   visibleBlocks[blockIdx.x].y,
-//				   visibleBlocks[blockIdx.x].z
-//			);
-//		}
-		// Not really fatal; just the visible block was likely deallocated in a previous frame.
+		// The block was already de-allocated.
 		return;
 	}
 
 	const ITMHashEntry &currentHashEntry = hashTable[hashIdx];
-
-	if (currentHashEntry.ptr < -1) {
-      // Deallocated entry in ordered list.
-//		if (locId == 0) {
-//			printf("Warning, stumbled upon an invalid ordered hash entry in the visible list.\n");
-//		}
-
-		return;
-	}
 
 	Vector3i blockGridPos = currentHashEntry.pos.toInt();
 	decayVoxel<TVoxel>(blockGridPos, locId, localVBA, hashTable, minAge, maxWeight,
@@ -1354,7 +1246,7 @@ void decay_device(TVoxel *localVBA,
 template<class TVoxel>
 __global__
 void decayFull_device(
-		const Vector4s *visibleBlockGlobalPos,
+		const Vector4s *usedBlockPositions,
 		TVoxel *localVBA,
 		ITMHashEntry *hashTable,
 		int minAge,
@@ -1366,7 +1258,7 @@ void decayFull_device(
 		uchar *entriesVisibleType
 ) {
 	const int voxelBlockIdx = blockIdx.x;
-	const Vector4s blockGridPos_4s = visibleBlockGlobalPos[voxelBlockIdx];
+	const Vector4s blockGridPos_4s = usedBlockPositions[voxelBlockIdx];
 
 	if (blockGridPos_4s.w == 0) {
 		// A zero means no hash table entry points to this block.
@@ -1374,10 +1266,10 @@ void decayFull_device(
 	}
 
 	// Note: this also acts as the key for the voxel block hash.
-	const Vector3i blockGridPos = Vector3i(blockGridPos_4s.x, blockGridPos_4s.y, blockGridPos_4s.z);
+	const Vector3i blockPos = Vector3i(blockGridPos_4s.x, blockGridPos_4s.y, blockGridPos_4s.z);
 	int locId = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.y * blockDim.x;
 
-	decayVoxel<TVoxel>(blockGridPos, locId, localVBA, hashTable, minAge, maxWeight, voxelAllocationList,
+	decayVoxel<TVoxel>(blockPos, locId, localVBA, hashTable, minAge, maxWeight, voxelAllocationList,
 					 lastFreeBlockId, locks, currentFrame, entriesVisibleType);
 }
 

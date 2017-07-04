@@ -153,7 +153,7 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::FindVisibleBlocks(c
 	dim3 cudaBlockSizeAL(256, 1);
 	dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
 	buildVisibleList_device << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, /*cacheStates, this->scene->useSwapping,*/ noTotalEntries,
-		renderState_vh->GetVisibleBlocks(), noVisibleEntries_device, renderState_vh->GetEntriesVisibleType(), M, projParams,
+			renderState_vh->GetVisibleBlockPositions(), noVisibleEntries_device, renderState_vh->GetEntriesVisibleType(), M, projParams,
 		imgSize, voxelSize);
 
 	/*	if (this->scene->useSwapping)
@@ -195,7 +195,7 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepth
 	// go through list of visible 8x8x8 blocks, unless none are visible
 	{
 		const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
-		const Vector3i *visbleBlocks = renderState_vh->GetVisibleBlocks();
+		const Vector3i *visbleBlocks = renderState_vh->GetVisibleBlockPositions();
 		int noVisibleBlocks = renderState_vh->noVisibleBlocks;
 
 		if (noVisibleBlocks > 0) {
