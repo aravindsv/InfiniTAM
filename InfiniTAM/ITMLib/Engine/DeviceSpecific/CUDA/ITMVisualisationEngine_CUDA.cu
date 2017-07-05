@@ -74,7 +74,7 @@ __global__ void renderColourFromWeight_device(
 		const typename TIndex::IndexData *voxelIndex,
 		Vector2i imgSize,
 		Vector3f lightSource,
-		int maxW);
+		WeightRenderingParams params);
 
 // class implementation
 
@@ -283,10 +283,25 @@ static void RenderImage_common(
 		renderColourFromNormal_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
 			scene->index.getIndexData(), imgSize, lightSource);
 		break;
-	case IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT:
-		renderColourFromWeight_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
-				scene->index.getIndexData(), imgSize, lightSource, scene->sceneParams->maxW);
+	case IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT: {
+		// TODO-LOW(andrei): Pass this value from the GUI or ITMMainEngine.
+		int maxNoiseWeight = 2;
+		WeightRenderingParams params(
+				1.0,
+				true,
+				scene->sceneParams->maxW,
+				maxNoiseWeight
+		);
+		renderColourFromWeight_device<TVoxel, TIndex> << < gridSize, cudaBlockSize >> > (
+				outRendering,
+				pointsRay,
+				scene->localVBA.GetVoxelBlocks(),
+				scene->index.getIndexData(),
+				imgSize,
+				lightSource,
+				params);
 		break;
+	}
 
 	case IITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
 	default:
@@ -728,7 +743,7 @@ __global__ void renderColourFromWeight_device(
 		const typename TIndex::IndexData *voxelIndex,
 		Vector2i imgSize,
 		Vector3f lightSource,
-		int maxW
+		WeightRenderingParams params
 ) {
 	int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
 	if (x >= imgSize.x || y >= imgSize.y) {
@@ -744,7 +759,7 @@ __global__ void renderColourFromWeight_device(
 			voxelData,
 			voxelIndex,
 			lightSource,
-			maxW);
+			params);
 }
 
 template<class TVoxel, class TIndex>

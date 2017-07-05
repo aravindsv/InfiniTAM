@@ -280,7 +280,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelColour(DEVICEPTR(Vector4u) & dest, const
 	dest.w = 255;
 }
 
-/// \brief Renders a voxel based on the weight associated with its depth.
+/// \brief Renders a voxel based on the weight associated with its depth and allocation spot.
 /// Saturated (max-weight) voxels are rendered as blue, while single-measurement ones (weight 1) are
 /// colored red.
 template<class TVoxel, class TIndex>
@@ -289,75 +289,57 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 	const CONSTPTR(Vector3f) & point,
 	const CONSTPTR(TVoxel) *voxelBlockData,
 	const CONSTPTR(typename TIndex::IndexData) *indexData,
-	int maxWeight,
-	float overlayWeight
+	const CONSTPTR(ITMLib::Engine::WeightRenderingParams) &params
 ) {
-	// TODO(andrei): Support interpolated reads of the weights (w_depth, w_color), if useful. Not
-	// interpolating things causes flickering artifacts.
 	drawPixelColour<TVoxel, TIndex>(dest, point, voxelBlockData, indexData);
 
-	// Dummy variables
 	bool isFound = false;
 	typename TIndex::IndexCache cache;
 	Vector3i ipos(point.x, point.y, point.z);
 	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
-	uchar intensity = (uchar)(255.0f * (((float)resn.w_depth) / maxWeight));
+	uchar intensity = (uchar)(255.0f * (((float)resn.w_depth) / params.maxWeight));
 
-	// Weight below which a voxel is considered noisy.
-	const int noiseThreshold = 3;
-	Vector4u overlay;
-
-	// XXX: do this properly. Visualize the excess blocks with some tint.
-	int outBlockIdx = -1;
+	int blockIdx = -1;
 	int outPrevBlockIdx = -1;
 	isFound = false;
-	findVoxel(indexData, ipos, isFound, outBlockIdx, outPrevBlockIdx);
-	if (! isFound || outBlockIdx == -1) {
-      // This seems to happen sometimes, but not sure why
-//		if (threadIdx.x == 0  && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x % 10 == 3) {
-//			printf("FATAL ERROR IN VISUALIZATION.\n");
-//		}
-	}
+	findVoxel(indexData, ipos, isFound, blockIdx, outPrevBlockIdx);
 
-	if (outBlockIdx >= SDF_BUCKET_NUM) {
-      // Make voxels from blocks in the excess list custom-tinted.
-		if (resn.w_depth <  noiseThreshold) {
-			// To-cull excess list blocks
-			overlay.r = 255;
-			overlay.g = 255;
-			overlay.b = 10;
-		}
-		else {
-			// Regular excess list blocks
-			overlay.r = 10;
-			overlay.g = intensity;
-			overlay.b = 200;
-		}
+	// Whether the block is in the excess list AND we care about coloring it differently because of it.
+	bool isExcess = (blockIdx >= SDF_BUCKET_NUM) && params.differentiateOrderedExcess;
+	Vector4u saturatedColor = isExcess ? Vector4u(128, 0, 0, 255) : Vector4u(0, 0, 255, 255);
+	Vector4u noisyColor = isExcess ? Vector4u(255, 255, 0, 255) : Vector4u(255, 0, 0, 255);
+	Vector4u gradualColor = isExcess ? Vector4u(50, intensity, 255, 255) : Vector4u(intensity, intensity, intensity, 255);
+	Vector4u invalidColor(255, 255, 255, 255);
+
+	Vector4u overlay;
+	if (blockIdx < 0) {
+		overlay = invalidColor;
 	}
-	else if (resn.w_depth == maxWeight) {
+	else if(resn.w_depth <= params.maxNoiseWeight) {
+		// Voxels which should be decayed if they're old enough
+		overlay = noisyColor;
+	}
+	else if (resn.w_depth == params.maxWeight) {
 		// The voxel is "saturated", i.e., very likely good.
-		overlay.r = 0;
-		overlay.g = 0;
-		overlay.b = 255;
-	}
-	else if (resn.w_depth < noiseThreshold){
-		overlay.r = 255;
-		overlay.g = 0;
-		overlay.b = 0;
+		overlay = saturatedColor;
 	}
 	else {
-		overlay.r = intensity;
-		overlay.g = intensity;
-		overlay.b = intensity;
+		overlay = gradualColor;
 	}
 
+	/* Ideas for further visualizations:
+	 *  - Block patterns using the in-block coords for more visibility for certain blocks.
+	 *  - Visualize block age
+	 *  - Visualize "recycled" blocks
+	 */
+
 	// Operate with float vectors to support correct multiplication with scalar floats.
-   Vector4f destf = (Vector4f(dest.r, dest.g, dest.b, dest.a) * (1.0 - overlayWeight)) +
-		            (Vector4f(overlay.r, overlay.g, overlay.b, overlay.a) * (overlayWeight));
+   Vector4f destf = (Vector4f(dest.r, dest.g, dest.b, dest.a) * (1.0 - params.overlayWeight)) +
+		            (Vector4f(overlay.r, overlay.g, overlay.b, overlay.a) * (params.overlayWeight));
 	dest.r = (uchar) destf.r;
 	dest.g = (uchar) destf.g;
 	dest.b = (uchar) destf.b;
-	dest.a = 255;
+	dest.a = (uchar) destf.a;
 };
 
 
@@ -484,7 +466,6 @@ _CPU_AND_GPU_CODE_ inline void processPixelColour(
 
 /// \brief Like 'processPixelColor', but with the option of overlaying information about the voxel
 ///        weight, i.e., the number of measurements that were fused in.
-/// \param overlayWeight Specifies the intensity of the blended voxel weight information.
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 		DEVICEPTR(Vector4u) &outRendering,
@@ -493,8 +474,7 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 		const CONSTPTR(TVoxel) *voxelData,
 		const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
 		Vector3f lightSource,
-		int maxWeight,
-		float overlayWeight = 1.0
+		const ITMLib::Engine::WeightRenderingParams &weightRenderingParams
 ) {
 	Vector3f outNormal;
 	float angle;
@@ -504,7 +484,7 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 	if (foundPoint) {
 		drawPixelWeight<TVoxel, TIndex>(outRendering, point,
 										voxelData, voxelIndex,
-										maxWeight, overlayWeight);
+										weightRenderingParams);
 	}
 	else {
 		outRendering = Vector4u((uchar)0);

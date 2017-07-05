@@ -118,5 +118,28 @@ namespace ITMLib
 			/** Override */
 			virtual typename IndexToRenderState<TIndex>::type *CreateRenderState(const Vector2i & imgSize) const = 0;
 		};
+
+		/// \brief Specifies the parameters used when rendering voxel weight information for
+		///        debugging.
+		struct WeightRenderingParams {
+			/// \brief Specifies the intensity of the blended voxel weight information.
+			float overlayWeight;
+			/// \brief Whether to use different tints for objects allocated in the ordered part of
+			///        the hash table, and those in the excess list.
+			bool differentiateOrderedExcess;
+			/// \brief The maximum weight of a voxel (InfiniTAM config parameter).
+			int maxWeight;
+			/// \brief Voxels with the depth weight less than or equal to this are considered noisy.
+			int maxNoiseWeight;
+
+			WeightRenderingParams(float overlayWeight,
+								bool differentiateOrderedExcess,
+								int maxWeight,
+								int maxNoiseWeight)
+				  : overlayWeight(overlayWeight),
+					differentiateOrderedExcess(differentiateOrderedExcess),
+					maxWeight(maxWeight),
+					maxNoiseWeight(maxNoiseWeight) {}
+		};
 	}
 }
