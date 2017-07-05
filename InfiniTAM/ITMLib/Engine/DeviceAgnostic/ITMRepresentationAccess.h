@@ -84,8 +84,13 @@ _CPU_AND_GPU_CODE_ inline int findBlock(
 	return -1;
 }
 
-// TODO(andrei): If it works, document the params and clean up.
-/// \brief Tweaked version used by the voxel decay code.
+/// \brief Finds a voxel based on its linear in-block coords (linearIdx) and block location
+///        (blockGridCoords).
+/// \params outHashIdx If the voxel is found (isFound == true), this is set to the index of the
+///         voxel's entry in the hash table.
+/// \params outPrevHashIdx If the voxel is found (isFound == true), and its block is in the excess
+///         list, this will be the index of the block's predecessor in the hash table. Otherwise,
+///         this will be set to -1.
 _CPU_AND_GPU_CODE_ inline int findVoxel(
 		const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
 		const THREADPTR(Vector3i) &blockGridCoords,
@@ -94,7 +99,6 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 		THREADPTR(int) &outHashIdx,
 		THREADPTR(int) &outPrevHashIdx
 ) {
-	// blockPos == blockGridCoords
 	Vector3i blockPos = blockGridCoords;
 	outPrevHashIdx = -1;
 
