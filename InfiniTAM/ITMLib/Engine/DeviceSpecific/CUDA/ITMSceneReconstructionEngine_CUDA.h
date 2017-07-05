@@ -11,6 +11,8 @@ namespace ITMLib
 {
 	namespace Engine
 	{
+		/// \brief A snapshot of what blocks were visible at some point in time. Used for the voxel
+		///        decay.
 		struct VisibleBlockInfo {
 			size_t count;
 			size_t frameIdx;
@@ -33,19 +35,29 @@ namespace ITMLib
 
 			// Keeps track of recent lists of visible block IDs. Used by the voxel decay.
 			std::queue<VisibleBlockInfo> frameVisibleBlocks;
-			// Used by the voxel decay code to keep track of empty blocks which can be safely
-			// deleted and reused.
-			int *blocksToDeallocate_device;
-			int *blocksToDeallocateCount_device;
 			int *lastFreeBlockId_device;
 			// Used to avoid data races when deleting elements from the hash table.
 			int *locks_device;
-
-			// The maximum number of blocks which can be deallocated in one operation.
-			const int maxBlocksToDeallocate = 16000;
+			// Used by the full-volume decay code.
+			Vector4s *allocatedBlockPositions_device;
 
 			long totalDecayedBlockCount = 0L;
-			size_t frameIdx = 0;	 // TODO: proper frame counting
+			size_t frameIdx = 0;
+
+			/// \brief Runs a voxel decay process on the blocks specified in `visibleBlockInfo`.
+			void PartialDecay(
+				ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+				const ITMRenderState *renderState,
+				const VisibleBlockInfo &visibleBlockInfo,
+				int minAge,
+				int maxWeight);
+
+			/// \brief Runs a voxel decay process on the entire volume.
+			void FullDecay(
+				ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+				const ITMRenderState *renderState,
+				int minAge,
+				int maxWeight);
 
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
@@ -64,7 +76,7 @@ namespace ITMLib
 
 			size_t GetDecayedBlockCount() override;
 
-			ITMSceneReconstructionEngine_CUDA(void);
+			ITMSceneReconstructionEngine_CUDA(long sdfLocalBlockNum);
 			~ITMSceneReconstructionEngine_CUDA(void);
 		};
 

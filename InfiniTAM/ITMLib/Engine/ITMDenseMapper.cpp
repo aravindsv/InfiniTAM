@@ -21,7 +21,7 @@ ITMDenseMapper<TVoxel, TIndex>::ITMDenseMapper(const ITMLibSettings *settings)
 		break;
 	case ITMLibSettings::DEVICE_CUDA:
 #ifndef COMPILE_WITHOUT_CUDA
-		sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA<TVoxel,TIndex>();
+		sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA<TVoxel,TIndex>(settings->sdfLocalBlockNum);
 		if (settings->useSwapping) {
 			swappingEngine = new ITMSwappingEngine_CUDA<TVoxel,TIndex>(settings->sdfLocalBlockNum);
 		}

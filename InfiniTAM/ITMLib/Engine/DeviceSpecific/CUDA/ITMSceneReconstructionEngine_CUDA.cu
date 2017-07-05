@@ -68,9 +68,9 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 /// \param localVBA The raw storage where the hash map entries reside.
 /// \param hashTable Maps entry IDs to addresses in the local VBA.
 /// \param visibleBlockPositions A list of blocks on which to operate (typically, this is the list
-///                        containing the visible blocks $k$ frames ago). The size of the list
-///                        should be known in advance, and be implicitly range-checked by setting
-///                        the grid size's x-dimension to it.
+///                              containing the visible blocks $k$ frames ago). The size of the list
+///                              should be known in advance, and be implicitly range-checked by
+///                              setting the grid size's x-dimension to it.
 /// \param minAge The minimum age for a voxel to be considered for decay.
 /// \param maxWeight All voxels above `minAge` with depth weight smaller than or equal to this are
 ///                  decayed.
@@ -90,11 +90,10 @@ __global__ void decay_device(TVoxel *localVBA,
 							 int *lastFreeBlockId,
 							 int *locks,
 							 int currentFrame,
-							 uchar *entriesVisibleType
-);
+							 uchar *entriesVisibleType);
 
 /// \brief Used to perform voxel decay on all voxels in a volume.
-/// Similar to `decay_device`, but operates on an entire volume of voxels, instead of a lits of
+/// Similar to `decay_device`, but operates on an entire volume of voxels, instead of a list of
 /// blocks visible at some point in time.
 template<class TVoxel>
 __global__ void decayFull_device(
@@ -107,15 +106,15 @@ __global__ void decayFull_device(
 		int *lastFreeBlockId,
 		int *locks,
 		int currentFrame,
-		uchar *entriesVisibleType
-);
+		uchar *entriesVisibleType);
 
 
 // host methods
 
 template<class TVoxel>
-ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstructionEngine_CUDA(void) 
-{
+ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstructionEngine_CUDA(
+		long sdfLocalBlockNum
+) {
 	ITMSafeCall(cudaMalloc((void**)&allocationTempData_device, sizeof(AllocationTempData)));
 	ITMSafeCall(cudaMallocHost((void**)&allocationTempData_host, sizeof(AllocationTempData)));
 
@@ -123,10 +122,9 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstruct
 	ITMSafeCall(cudaMalloc((void**)&entriesAllocType_device, noTotalEntries));
 	ITMSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
 
-	ITMSafeCall(cudaMalloc((void**)&blocksToDeallocate_device, maxBlocksToDeallocate * sizeof(int)));
-	ITMSafeCall(cudaMalloc((void**)&blocksToDeallocateCount_device, 1 * sizeof(int)));
 	ITMSafeCall(cudaMalloc((void**)&lastFreeBlockId_device, 1 * sizeof(int)));
 	ITMSafeCall(cudaMalloc(&locks_device, SDF_BUCKET_NUM * sizeof(int)));
+	ITMSafeCall(cudaMalloc((void**)&allocatedBlockPositions_device, sdfLocalBlockNum * sizeof(Vector4s)));
 }
 
 template<class TVoxel>
@@ -137,10 +135,9 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMSceneReconstruc
 	ITMSafeCall(cudaFree(entriesAllocType_device));
 	ITMSafeCall(cudaFree(blockCoords_device));
 
-	ITMSafeCall(cudaFree(blocksToDeallocate_device));
-	ITMSafeCall(cudaFree(blocksToDeallocateCount_device));
 	ITMSafeCall(cudaFree(lastFreeBlockId_device));
 	ITMSafeCall(cudaFree(locks_device));
+	ITMSafeCall(cudaFree(allocatedBlockPositions_device));
 }
 
 template<class TVoxel>
@@ -425,29 +422,23 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	}
 }
 
-
 template<class TVoxel>
-void fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
-			  const ITMRenderState *renderState,
-			  int minAge,
-			  int maxWeight,
-			  int *lastFreeBlockId_device,
-			  int *locks_device,
-			  int frameIdx
+void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::FullDecay(
+		ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+		const ITMRenderState *renderState,
+		int minAge,
+		int maxWeight
 ) {
 	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
-	// TODO(andrei): Don't malloc anything in this method.
 	// First, we check every bucket and see if it's allocated, populating each index
 	// in `visibleBlockGlobalPos` with the block's position, whereby every element in
 	// this array corresponds to a VBA element.
 	long sdfLocalBlockNum = scene->index.getNumAllocatedVoxelBlocks();
 	int noTotalEntries = scene->index.noTotalEntries;
-	Vector4s *allocatedBlockPositions_device;
-	ITMSafeCall(cudaMalloc((void**)&allocatedBlockPositions_device, sdfLocalBlockNum * sizeof(Vector4s)));
 	ITMSafeCall(cudaMemset(allocatedBlockPositions_device, 0, sizeof(Vector4s) * sdfLocalBlockNum));
 
 	dim3 hashTableVisitBlockSize(256);
@@ -480,6 +471,37 @@ void fullDecay(ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 }
 
 template<class TVoxel>
+void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::PartialDecay(
+		ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+		const ITMRenderState *renderState,
+		const VisibleBlockInfo &visibleBlockInfo,
+		int minAge,
+		int maxWeight
+) {
+	int *voxelAllocationList = scene->localVBA.GetAllocationList();
+	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
+	ITMHashEntry *hashTable = scene->index.GetEntries();
+
+	ITMSafeCall(cudaMemset(locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
+
+	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
+	dim3 gridSize(static_cast<uint32_t>(visibleBlockInfo.count));
+	decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
+			localVBA,
+			hashTable,
+			visibleBlockInfo.blockCoords->GetData(MEMORYDEVICE_CUDA),
+			minAge,
+			maxWeight,
+			voxelAllocationList,
+			lastFreeBlockId_device,
+			locks_device,
+			frameIdx,
+			((ITMRenderState_VH*)renderState)->GetEntriesVisibleType());
+
+	delete visibleBlockInfo.blockCoords;
+}
+
+template<class TVoxel>
 void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
 		const ITMRenderState *renderState,
@@ -487,80 +509,35 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::Decay(
 		int minAge,
 		bool forceAllVoxels
 ) {
-	// TODO(andrei): Refactor this method once the functionality is more or less complete.
-//	const bool deallocateEmptyBlocks = false;	// This could be a config param of the recon engine.
 	int oldLastFreeBlockId = scene->localVBA.lastFreeBlockId;
-
-	int *voxelAllocationList = scene->localVBA.GetAllocationList();
-	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
-	ITMHashEntry *hashTable = scene->index.GetEntries();
-
 	ITMSafeCall(cudaMemcpy(lastFreeBlockId_device, &(scene->localVBA.lastFreeBlockId),
 						   1 * sizeof(int),
 						   cudaMemcpyHostToDevice));
 
 	if (forceAllVoxels) {
-		// TODO(andrei): Make this function obey the 'deallocateEmptyBlocks' flag.
-		fullDecay<TVoxel>(scene, renderState, minAge, maxWeight, this->lastFreeBlockId_device, locks_device, frameIdx);
+		FullDecay(scene, renderState, minAge, maxWeight);
 	}
 	else if (static_cast<long>(frameVisibleBlocks.size()) > minAge) {
+		// No full decay, just operate on the voxel blocks seen 'minAge' frames ago.
 		VisibleBlockInfo visible = frameVisibleBlocks.front();
 		frameVisibleBlocks.pop();
-
-		printf("Running decay_device on the %lu blocks visible at frame %lu.\n",
-			   visible.count,
-			   visible.frameIdx);
 
 		// Ensure there are voxels to work with. We can often encounter empty frames when
 		// reconstructing individual objects which are too far from the camera for any
 		// meaningful depth to be estimated, so there's nothing to do for them.
 		if (visible.count > 0) {
-			ITMSafeCall(cudaMemset(locks_device, 0, SDF_BUCKET_NUM * sizeof(int)));
-
-			dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-			dim3 gridSize(static_cast<uint32_t>(visible.count));
-			decay_device<TVoxel> <<< gridSize, voxelBlockSize >>> (
-					localVBA,
-					hashTable,
-					visible.blockCoords->GetData(MEMORYDEVICE_CUDA),
-					minAge,
-					maxWeight,
-					voxelAllocationList,
-					lastFreeBlockId_device,
-					locks_device,
-					frameIdx,
-					((ITMRenderState_VH*)renderState)->GetEntriesVisibleType()
-			);
-			ITMSafeCall(cudaDeviceSynchronize());
-			ITMSafeCall(cudaGetLastError());
-
-			delete visible.blockCoords;
+          PartialDecay(scene, renderState, visible, minAge, maxWeight);
 		}
 	}
 
-	// This is important for ensuring ITM "knows" about the freed up blocks in the VBA.
+	// This is important for ensuring ITM "knows" about the freed up blocks in the VBA. We also use
+	// it for measuring how many voxel blocks were freed.
 	ITMSafeCall(cudaMemcpy(&(scene->localVBA.lastFreeBlockId), lastFreeBlockId_device,
 						   1 * sizeof(int),
 						   cudaMemcpyDeviceToHost));
 
 	int freedBlockCount = scene->localVBA.lastFreeBlockId - oldLastFreeBlockId;
 	totalDecayedBlockCount += freedBlockCount;
-
-	// TODO(andrei): New benchmarks once the complete implementation is in place!
-	// Note: no explicit cleanup was done at the end of the sequences!
-	// Mini-bench: 50 frames starting with 3900 in odometry sequence 08.
-	// sdfLocalBlockNum: 0x80000
-	// With 			ELAS no pruning: 90.50% free
-	// With (w=1, a=3)  ELAS pruning:    95.35% free
-	// With (w=3, a=10) ELAS pruning:    95.57% free
-	// With (w=5, a=10) ELAS extreme:    96.92% free
-	//
-	// 75 frames now, 0x40000 (old InfiniTAM default)
-	// With 			dispnet no pruning: 51.04% free
-	// With (w=1, a=3)  dispnet pruning:    68.89% free
-	// With (w=2, a=10) dispnet pruning:    71.40% free (visually this seems the best)
-	// With (w=3, a=10) dispnet pruning:    75.63% free (a little harsh, but looks OK)
-	// With (w=5, a=15) dispnet extreme:    79.22% free (extreme)
 
 	if (freedBlockCount > 0) {
 		size_t savings = sizeof(TVoxel) * SDF_BLOCK_SIZE3 * freedBlockCount;
@@ -807,7 +784,7 @@ __global__ void setToType3(uchar *entriesVisibleType,
 		// active reconstruction.
 //      int hashVal = hashIndex(visibleBlocks[entryId]);
 //		if (hashVal % 100 < 40) {
-//			printf("FATAL ERROR in setToType3 visibleBlocks[%d]: (isFound = %d, hashIdx = %d"
+//			printf("WARNING in setToType3 visibleBlocks[%d]: (isFound = %d, hashIdx = %d"
 //						   ")! | (%d, %d, %d) @ hashVal = %d\n",
 //				   entryId,
 //				   static_cast<int>(isFound),
@@ -1013,7 +990,7 @@ __global__ void buildVisibleList_device(
 #endif
 }
 
-/// \brief Deletes a block from the hash table, deallocating its VBA entry.
+/// \brief Deletes a block from the hash table and de-allocates its VBA entry.
 /// \param hashTable
 /// \param blockPos             The position of the block in the voxel grid, i.e., the key.
 /// \param locks                Array used for locking in order to prevent data races when

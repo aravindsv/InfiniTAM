@@ -147,7 +147,9 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 	}
 };
 
-// TODO(andrei): Change back to hybrid code. _CPU_AND_GPU_CODE_
+// TODO-LOW(andrei): Change back to hybrid code. _CPU_AND_GPU_CODE_
+// Note that you'd then need to add CPU-specific locking since the code can still run in parallel
+// on the CPU, but there's no fast CUDA atomics there.
 __device__
 inline void buildHashAllocAndVisibleTypePP(
 		DEVICEPTR(uchar) *entriesAllocType,
@@ -197,7 +199,8 @@ inline void buildHashAllocAndVisibleTypePP(
 
 	direction /= (float)(noSteps - 1);
 
-	// TODO(andrei): Inspect this code to see if you can go for finer-grained fusion by taking smaller steps.
+	// TODO(andrei): Inspect this code to see if you can go for finer-grained fusion by taking
+	// smaller steps.
 	//add neighbouring blocks
 	for (int i = 0; i < noSteps; i++)
 	{
@@ -254,13 +257,12 @@ inline void buildHashAllocAndVisibleTypePP(
 
 			if (!isFound) //still not found
 			{
-				// TODO(andrei): It seems there may be a data race here. Namely, it seems that
-				// (albeit with low probability) it may be that two different blocks *think* they
-				// ought to be allocated in the VBA, when, in fact, one of them should be put in the
-				// VBA and one in the excess list, after it. This is discussed in the InfiniTAM
-				// technical report.
+				// Note: there can be a data race here. The InfiniTAM mentions this, and how it
+				// doesn't really matter, since a block whose info gets overwritten can just
+				// re-request to be allocated the next frame. However, in our fast-moving context
+				// which also has to support correct block deletions, we avoid it by locking the
+				// buckets when allocating and deleting.
 
-				// TODO(andrei): Could we detect allocation failures here?
 				entriesAllocType[hashIdx] = isExcess ? 2 : 1; 		// needs allocation
 				if (!isExcess) entriesVisibleType[hashIdx] = 1; 	//new entry is visible
 

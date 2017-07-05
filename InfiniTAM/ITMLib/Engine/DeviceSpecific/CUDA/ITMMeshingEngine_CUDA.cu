@@ -54,20 +54,12 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 	{ // identify used voxel blocks
 		dim3 cudaBlockSize(256); 
 		dim3 gridSize((int)ceil((float)noTotalEntries / (float)cudaBlockSize.x));
-
-		std::cout << "Finding the allocated scene blocks using CUDA grid size: " << gridSize
-				  << " and block size: " << cudaBlockSize << std::endl;
 		findAllocatedBlocks << <gridSize, cudaBlockSize >> >(visibleBlockGlobalPos_device, hashTable, noTotalEntries);
-		ITMSafeCall(cudaDeviceSynchronize());
-		ITMSafeCall(cudaGetLastError());
 	}
 
 	{ // mesh used voxel blocks
 		dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 		dim3 gridSize(sdfLocalBlockNum / 16, 16);
-
-		std::cout << "Meshing the scene using CUDA grid size: " << gridSize << " and block size: "
-				<< cudaBlockSize << std::endl;
 
 		meshScene_device<TVoxel> << <gridSize, cudaBlockSize >> >(
 				triangles,
@@ -78,8 +70,6 @@ void ITMMeshingEngine_CUDA<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, 
 				visibleBlockGlobalPos_device,
 				localVBA,
 				hashTable);
-		ITMSafeCall(cudaDeviceSynchronize());
-		ITMSafeCall(cudaGetLastError());
 
 		ITMSafeCall(cudaMemcpy(
 				&mesh->noTotalTriangles,

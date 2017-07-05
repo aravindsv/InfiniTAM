@@ -306,7 +306,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelWeight(
 
 	// Whether the block is in the excess list AND we care about coloring it differently because of it.
 	bool isExcess = (blockIdx >= SDF_BUCKET_NUM) && params.differentiateOrderedExcess;
-	Vector4u saturatedColor = isExcess ? Vector4u(128, 0, 0, 255) : Vector4u(0, 0, 255, 255);
+	Vector4u saturatedColor = isExcess ? Vector4u(0, 0, 128, 255) : Vector4u(0, 0, 255, 255);
 	Vector4u noisyColor = isExcess ? Vector4u(255, 255, 0, 255) : Vector4u(255, 0, 0, 255);
 	Vector4u gradualColor = isExcess ? Vector4u(50, intensity, 255, 255) : Vector4u(intensity, intensity, intensity, 255);
 	Vector4u invalidColor(255, 255, 255, 255);
