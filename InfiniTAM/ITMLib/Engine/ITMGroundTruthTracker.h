@@ -114,6 +114,7 @@ namespace ITMLib {
 			this->currentFrame++;
 			Matrix4f Minc = groundTruthPoses[currentFrame];
 			currentPose = currentPose * Minc;
+			cout << "Current pose in GT tracker:" << endl << currentPose << endl;
 			trackingState->pose_d->SetInvM(currentPose);
 		}
 

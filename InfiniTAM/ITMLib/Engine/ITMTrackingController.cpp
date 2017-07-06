@@ -10,7 +10,10 @@ using namespace ITMLib::Engine;
 
 void ITMTrackingController::Track(ITMTrackingState *trackingState, const ITMView *view)
 {
-	if (trackingState->age_pointCloud!=-1) tracker->TrackCamera(trackingState, view);
+  // XXX: re-enable and do this in a smarter way. I disabled this to make the GT tracker sync better
+	// with the scene flow.
+//	if (trackingState->age_pointCloud!=-1)
+		tracker->TrackCamera(trackingState, view);
 
 	trackingState->requiresFullRendering = trackingState->TrackerFarFromPointCloud() || !settings->useApproximateRaycast;
 }

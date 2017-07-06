@@ -298,6 +298,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	size_t visibleBlockCount = static_cast<size_t>(tempData->noVisibleBlocks);
 	size_t visibleBlocksByteCount = visibleBlockCount * sizeof(Vector3i);
 
+	ITMSafeCall(cudaDeviceSynchronize());
+	ITMSafeCall(cudaGetLastError());
+
   	ORUtils::MemoryBlock<Vector3i> *visibleEntryIDsCopy = nullptr;
 	if (visibleBlocksByteCount > 0) {
 		visibleEntryIDsCopy = new ORUtils::MemoryBlock<Vector3i>(visibleBlocksByteCount, MEMORYDEVICE_CUDA);
