@@ -455,7 +455,8 @@ _CPU_AND_GPU_CODE_ inline void processPixelColour(
 	Vector3f outNormal;
 	float angle;
 	// TODO(andrei): Make this customizable.
-	const Vector4u backgroundColor(30, 30, 180, 255);
+	const Vector4u kLightSkyBlue(135, 206, 250, 255);
+	const Vector4u backgroundColor = kLightSkyBlue;
 
 	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
 
