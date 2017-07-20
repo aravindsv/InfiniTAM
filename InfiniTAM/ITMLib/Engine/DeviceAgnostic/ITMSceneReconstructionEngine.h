@@ -176,6 +176,9 @@ inline void buildHashAllocAndVisibleTypePP(
 	if (depth_measure <= 0 || (depth_measure - mu) < 0 || (depth_measure - mu) < viewFrustum_min || (depth_measure + mu) > viewFrustum_max) return;
 
 	// This triangulates the point's position from x, y, and depth.
+  // Using a single ray to do this represents an approximation. We could, e.g., when
+  // `pt_camera_f.z > threshold` use some extra rays. This may make, e.g., road reconstructions,
+  // smoother, especially far away.
 	pt_camera_f.z = depth_measure;
 	pt_camera_f.x = pt_camera_f.z * ((float(x) - projParams_d.z) * projParams_d.x);
 	pt_camera_f.y = pt_camera_f.z * ((float(y) - projParams_d.w) * projParams_d.y);
