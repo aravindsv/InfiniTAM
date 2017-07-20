@@ -30,6 +30,10 @@ void __cudaSafeCall(cudaError err, const char *file, const int line) {
 		// become clickable in CLion.
 		Printer p;
 		p.address = true;
+
+		// As of July 2017, this sometimes crashes while printing the stack trace, because of course
+		// it does. So some CUDA errors may be reported as a simple segfault, since the printer
+		// segfaults while attempting to print the true stack trace.
 		p.print(st);
 		fprintf(stderr, "\n");
 #endif
