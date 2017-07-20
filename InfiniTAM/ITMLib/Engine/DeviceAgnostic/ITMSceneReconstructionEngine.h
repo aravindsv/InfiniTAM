@@ -173,17 +173,26 @@ inline void buildHashAllocAndVisibleTypePP(
 
 	depth_measure = depth[x + y * imgSize.x];
 
-	if (depth_measure <= 0 || (depth_measure - mu) < 0 || (depth_measure - mu) < viewFrustum_min || (depth_measure + mu) > viewFrustum_max) return;
+	if (depth_measure <= 0 || (depth_measure - mu) < 0 ||
+		(depth_measure - mu) < viewFrustum_min || (depth_measure + mu) > viewFrustum_max
+	) {
+		return;
+	}
 
 	// This triangulates the point's position from x, y, and depth.
-  // Using a single ray to do this represents an approximation. We could, e.g., when
-  // `pt_camera_f.z > threshold` use some extra rays. This may make, e.g., road reconstructions,
-  // smoother, especially far away.
+	// Using a single ray to do this represents an approximation. We could, e.g., when
+	// `pt_camera_f.z > threshold` use some extra rays. This may make, e.g., road reconstructions,
+	// smoother, especially far away. The ideal case would be to project an entire frustum from each
+	// pixel, but that would be prohibitively expensive. The Nießner et al., 2013 paper on voxel
+	// hashing covers this in more detail.
 	pt_camera_f.z = depth_measure;
 	pt_camera_f.x = pt_camera_f.z * ((float(x) - projParams_d.z) * projParams_d.x);
 	pt_camera_f.y = pt_camera_f.z * ((float(y) - projParams_d.w) * projParams_d.y);
 
-	float norm = sqrt(pt_camera_f.x * pt_camera_f.x +pt_camera_f.y * pt_camera_f.y + pt_camera_f.z * pt_camera_f.z);
+	float norm = static_cast<float>(sqrt(
+			pt_camera_f.x * pt_camera_f.x +
+			pt_camera_f.y * pt_camera_f.y +
+			pt_camera_f.z * pt_camera_f.z));
 
 	Vector4f tmp;
 	tmp.x = pt_camera_f.x * (1.0f - mu / norm);
@@ -204,7 +213,8 @@ inline void buildHashAllocAndVisibleTypePP(
 
 	// TODO(andrei): Inspect this code to see if you can go for finer-grained fusion by taking
 	// smaller steps.
-	//add neighbouring blocks
+	// Walk the ray and flag blocks close (distance < mu) to the depth measurement for allocation,
+	// if necessary.
 	for (int i = 0; i < noSteps; i++)
 	{
 		blockPos = TO_SHORT_FLOOR3(point);
@@ -260,8 +270,8 @@ inline void buildHashAllocAndVisibleTypePP(
 
 			if (!isFound) //still not found
 			{
-				// Note: there can be a data race here. The InfiniTAM mentions this, and how it
-				// doesn't really matter, since a block whose info gets overwritten can just
+				// Note: there can be a data race here. The InfiniTAM paper mentions this, and how
+				// it doesn't really matter, since a block whose info gets overwritten can just
 				// re-request to be allocated the next frame. However, in our fast-moving context
 				// which also has to support correct block deletions, we avoid it by locking the
 				// buckets when allocating and deleting.

@@ -227,9 +227,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	if (gridSizeVS.x > 0) {
 		// Flags all previously visible blocks accordingly (runs for every element in the
 		// visibleEntryIDs list).
-		// 0 = invisible (I think)
+		// 0 = invisible
 		// 1 = visible and in memory
-		// 2 = visible but swapped out
+		// 2 = visible and swapped out
 		// 3 = visible at previous frame and in memory
 		//
 		// Note: we could have a kernel map from visible keys to visible IDs here, or simply pass
@@ -242,7 +242,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 				hashTable);
 	}
 
-	ITMSafeCall(cudaMemset( locks_device, 0, sizeof(int) * SDF_BUCKET_NUM));
+	ITMSafeCall(cudaMemset(locks_device, 0, sizeof(int) * SDF_BUCKET_NUM));
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType,
 		blockCoords_device, depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max, locks_device);
@@ -298,10 +298,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	size_t visibleBlockCount = static_cast<size_t>(tempData->noVisibleBlocks);
 	size_t visibleBlocksByteCount = visibleBlockCount * sizeof(Vector3i);
 
-	ITMSafeCall(cudaDeviceSynchronize());
-	ITMSafeCall(cudaGetLastError());
-
-  	ORUtils::MemoryBlock<Vector3i> *visibleEntryIDsCopy = nullptr;
+	// Keep track of the visible blocks, which will be used later by the voxel decay mechanism.
+	ORUtils::MemoryBlock<Vector3i> *visibleEntryIDsCopy = nullptr;
 	if (visibleBlocksByteCount > 0) {
 		visibleEntryIDsCopy = new ORUtils::MemoryBlock<Vector3i>(visibleBlocksByteCount, MEMORYDEVICE_CUDA);
 		ITMSafeCall(cudaMemcpy(visibleEntryIDsCopy->GetData(MEMORYDEVICE_CUDA),
@@ -321,7 +319,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	long allocatedBlocks = scene->index.getNumAllocatedVoxelBlocks();
 	// This is the number of blocks we are using out of the chunk that was allocated initially on
 	// the GPU (for non-swapping case).
-	long usedBlocks = allocatedBlocks - scene->localVBA.lastFreeBlockId;
+	long usedBlocks = allocatedBlocks - scene->localVBA.lastFreeBlockId - 1;
 
 	long allocatedExcessEntries = SDF_EXCESS_LIST_SIZE;
 	long usedExcessEntries = allocatedExcessEntries - tempData->noAllocatedExcessEntries;
@@ -711,7 +709,8 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 
 	if (!isFound || entryId < 0) {
 		if (locId == 0) {
-			printf("FATAL ERROR in integrateIntoScene_device (isFound = %d, entryId = %d, "
+			printf("FATAL ERROR in integrateIntoScene_device: could not find block in hash map ("
+				   "isFound = %d, entryId = %d, "
 				   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
 				   static_cast<int>(isFound),
 				   entryId,
