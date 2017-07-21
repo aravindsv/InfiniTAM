@@ -38,6 +38,10 @@ namespace ITMLib
 			virtual void UpdateView(ITMView **view, ITMUChar4Image *rgbImage, ITMShortImage *depthImage, bool useBilateralFilter,
 				ITMIMUMeasurement *imuMeasurement) = 0;
 
+			const ITMRGBDCalib* GetCalib() const {
+				return calib;
+			}
+
 			ITMViewBuilder(const ITMRGBDCalib *calib)
 			{
 				this->calib = calib;

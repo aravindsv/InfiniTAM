@@ -51,7 +51,8 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 	}
 
 	// compute updated SDF value and reliability
-	oldF = TVoxel::SDF_valueToFloat(voxel.sdf); oldW = voxel.w_depth;
+	oldF = TVoxel::SDF_valueToFloat(voxel.sdf);
+	oldW = voxel.w_depth;
 
 	newF = MIN(1.0f, eta / mu);
 	newW = 1;
@@ -211,8 +212,6 @@ inline void buildHashAllocAndVisibleTypePP(
 
 	direction /= (float)(noSteps - 1);
 
-	// TODO(andrei): Inspect this code to see if you can go for finer-grained fusion by taking
-	// smaller steps.
 	// Walk the ray and flag blocks close (distance < mu) to the depth measurement for allocation,
 	// if necessary.
 	for (int i = 0; i < noSteps; i++)
