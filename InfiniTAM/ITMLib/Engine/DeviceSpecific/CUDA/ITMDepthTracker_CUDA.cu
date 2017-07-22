@@ -11,6 +11,7 @@ struct ITMDepthTracker_CUDA::AccuCell {
 	int numPoints;
 	float f;
 	float g[6];
+	// Half of the 6x6 Hessian.
 	float h[6+5+4+3+2+1];
 };
 

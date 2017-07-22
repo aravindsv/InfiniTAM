@@ -145,6 +145,10 @@ void ITMDepthTracker::ApplyDelta(const Matrix4f & para_old, const float *delta, 
 
 void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView *view)
 {
+	// Note on using this for refining: compute the new M using RANSAC, and put it here, then add
+	// tons of print statements to monitor how the pose evolves, what the residuals are doing and
+	// if, overall, the refinement is actually helping...
+
 	std::cout << "Old pose:" << std::endl;
 	std::cout << trackingState->pose_d->GetM() << std::endl;
 
