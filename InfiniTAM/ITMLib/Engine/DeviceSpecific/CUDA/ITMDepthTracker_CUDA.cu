@@ -66,7 +66,8 @@ int ITMDepthTracker_CUDA::ComputeGandH(float &f, float *nabla, float *hessian, M
 	int noPara = shortIteration ? 3 : 6;
 
 	dim3 blockSize(16, 16);
-	dim3 gridSize((int)ceil((float)viewImageSize.x / (float)blockSize.x), (int)ceil((float)viewImageSize.y / (float)blockSize.y));
+	dim3 gridSize((int)ceil((float)viewImageSize.x / (float)blockSize.x),
+				  (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
 	ITMSafeCall(cudaMemset(accu_device, 0, sizeof(AccuCell)));
 
@@ -112,6 +113,11 @@ int ITMDepthTracker_CUDA::ComputeGandH(float &f, float *nabla, float *hessian, M
 
 	memcpy(nabla, accu_host->g, noPara * sizeof(float));
 	f = (accu_host->numPoints > 100) ? sqrt(accu_host->f) / accu_host->numPoints : 1e5f;
+  if (accu_host->numPoints <= 100) {
+	  printf("Too few points: %d/101...\n", accu_host->numPoints);
+  }
+
+	printf("Energy function value: %10.5f\n", f);
 
 	return accu_host->numPoints;
 }

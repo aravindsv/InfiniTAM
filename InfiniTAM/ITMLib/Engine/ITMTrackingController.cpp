@@ -10,10 +10,12 @@ using namespace ITMLib::Engine;
 
 void ITMTrackingController::Track(ITMTrackingState *trackingState, const ITMView *view)
 {
-  // TODO(andrei): re-enable and do this in a smarter way. I disabled this to make the GT tracker sync better
-	// with the scene flow.
-//	if (trackingState->age_pointCloud!=-1)
+	// The ground truth tracker should also be called on the first frame. Other trackers shouldn't,
+	// since they wouldn't have anything to track against.
+	bool is_gt_tracker = (nullptr != dynamic_cast<ITMGroundTruthTracker*>(tracker));
+	if (is_gt_tracker || trackingState->age_pointCloud != -1) {
 		tracker->TrackCamera(trackingState, view);
+	}
 
 	trackingState->requiresFullRendering = trackingState->TrackerFarFromPointCloud() || !settings->useApproximateRaycast;
 }

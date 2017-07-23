@@ -34,7 +34,8 @@ ITMLibSettings::ITMLibSettings(void)
 	depthTrackerTerminationThreshold = 1e-3f;
 
 	/// skips every other point when using the colour tracker
-	skipPoints = true;
+//	skipPoints = true;
+	skipPoints = false;	// changed when experimenting with instance reconstruction
 
 #ifndef COMPILE_WITHOUT_CUDA
 	deviceType = DEVICE_CUDA;
@@ -85,10 +86,14 @@ ITMLibSettings::ITMLibSettings(void)
 	else
 	{
 		noHierarchyLevels = 5;
+//		noHierarchyLevels = 1;
 		trackingRegime = new TrackerIterationType[noHierarchyLevels];
 
 		trackingRegime[0] = TRACKER_ITERATION_BOTH;
 		trackingRegime[1] = TRACKER_ITERATION_BOTH;
+//		trackingRegime[2] = TRACKER_ITERATION_BOTH;
+//		trackingRegime[3] = TRACKER_ITERATION_BOTH;
+//		trackingRegime[4] = TRACKER_ITERATION_BOTH;
 		trackingRegime[2] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[3] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[4] = TRACKER_ITERATION_ROTATION;

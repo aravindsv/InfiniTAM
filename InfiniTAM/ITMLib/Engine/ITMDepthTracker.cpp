@@ -16,7 +16,9 @@ ITMDepthTracker::ITMDepthTracker(Vector2i imgSize, TrackerIterationType *trackin
 	this->noIterationsPerLevel = new int[noHierarchyLevels];
 	this->distThresh = new float[noHierarchyLevels];
 	
-	this->noIterationsPerLevel[0] = 2; //TODO -> make parameter
+//	this->noIterationsPerLevel[0] = 2; //TODO -> make parameter
+	this->noIterationsPerLevel[0] = 10; //TODO -> make parameter
+  fprintf(stderr, "Experimental iteration count with limited hierarchy\n");
 	for (int levelId = 1; levelId < noHierarchyLevels; levelId++)
 	{
 		noIterationsPerLevel[levelId] = noIterationsPerLevel[levelId - 1] + 2;
@@ -148,9 +150,10 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 	// Note on using this for refining: compute the new M using RANSAC, and put it here, then add
 	// tons of print statements to monitor how the pose evolves, what the residuals are doing and
 	// if, overall, the refinement is actually helping...
+	using namespace std;
+	bool verbose = true;
 
-	std::cout << "Old pose:" << std::endl;
-	std::cout << trackingState->pose_d->GetM() << std::endl;
+	Matrix4f oldPose = trackingState->pose_d->GetM();
 
 	this->SetEvaluationData(trackingState, view);
 	this->PrepareForEvaluation();
@@ -164,6 +167,12 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 
 	for (int levelId = viewHierarchy->noLevels - 1; levelId >= noICPLevel; levelId--)
 	{
+		if (verbose) {
+			cout << "Coarse-to-fine | Hierarchy level: " << levelId << " until " << noICPLevel << endl;
+			cout << "We'll perform [" << noIterationsPerLevel[levelId] << "] optimization iterations." << endl;
+
+		}
+
 		this->SetEvaluationParams(levelId);
 		if (iterationType == TRACKER_ITERATION_NONE) continue;
 
@@ -200,9 +209,21 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 			trackingState->pose_d->Coerce();
 			approxInvPose = trackingState->pose_d->GetInvM();
 
+			// TODO(andrei): Print residual stats here.
+
 			// if step is small, assume it's going to decrease the error and finish
-			if (HasConverged(step)) break;
+			if (HasConverged(step)) {
+				cout << "ICP converged. We're done." << endl;
+				break;
+			}
 		}
+	}
+
+	if (verbose) {
+		cout << "ICP tracker old pose:" << endl;
+		cout << oldPose << endl;
+		cout << "ICP tracker new pose:" << endl;
+		cout << trackingState->pose_d->GetM() << endl;
 	}
 }
 
