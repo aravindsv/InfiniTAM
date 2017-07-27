@@ -303,6 +303,13 @@ static void RenderImage_common(
 		break;
 	}
 
+	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
+		// TODO(andrei): Implement.
+		// TODO(andrei): Also consider rendering float map instead of uchar, if necessary for the
+		// 				 depth evaluation.
+		break;
+	}
+
 	case IITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
 	default:
 		renderGrey_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),

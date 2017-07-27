@@ -95,7 +95,8 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &v
 
 	rgb_measure = TO_VECTOR3(interpolateBilinear(rgb, pt_image, imgSize)) / 255.0f;
 	//rgb_measure = rgb[(int)(pt_image.x + 0.5f) + (int)(pt_image.y + 0.5f) * imgSize.x].toVector3().toFloat() / 255.0f;
-	newW = 5;		// aggressive color updates based on hints in Niessner et al. (original was 1)
+//	newW = 5;		// aggressive color updates based on hints in Niessner et al. (original was 1)
+  newW = 1;
 
 	newC = oldC * oldW + rgb_measure * newW;
 	newW = oldW + newW;

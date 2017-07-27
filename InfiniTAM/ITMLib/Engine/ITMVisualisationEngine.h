@@ -26,7 +26,9 @@ namespace ITMLib
 				RENDER_COLOUR_FROM_NORMAL,
 			  	// Note: not supported on the CPU (TODO(andrei): Support this on the CPU based on
 				// the CUDA code. It should be very straightforward.)
-				RENDER_COLOUR_FROM_DEPTH_WEIGHT
+				RENDER_COLOUR_FROM_DEPTH_WEIGHT,
+				// Note: not supported on the CPU.
+				RENDER_DEPTH_MAP
 			};
 
 			virtual ~IITMVisualisationEngine(void) {}

@@ -68,8 +68,15 @@ namespace ITMLib
 
 				if (f != NULL)
 				{
+					// TODO(andrei): Do this in chunks. It doesn't seem like the order of the
+					// triangles matters, so we can just launch multiple phases of the meshing
+					// kernel, which runs fast but is memory-hungry, in order to really support
+					// arbitrary-sized maps.
 					printf("Starting to write mesh...\n");
 					for (uint i = 0; i < noTotalTriangles; i++) {
+						if ((i + 1) % 100000 == 0) {
+							printf("Triangle %d/%d\n", i + 1, noTotalTriangles);
+						}
 						const Vector3f &c0 = triangleArray[i].c0;
 						const Vector3f &c1 = triangleArray[i].c1;
 						const Vector3f &c2 = triangleArray[i].c2;
