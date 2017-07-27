@@ -154,7 +154,11 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 	} else pt_found = false;
 
 	pt_out.x = pt_result.x; pt_out.y = pt_result.y; pt_out.z = pt_result.z;
-	if (pt_found) pt_out.w = 1.0f; else pt_out.w = 0.0f;
+	if (pt_found) {
+		pt_out.w = 1.0f + totalLength;	// HACK!!!
+	} else {
+		pt_out.w = 0.0f;
+	}
 
 	return pt_found;
 }
@@ -279,6 +283,52 @@ _CPU_AND_GPU_CODE_ inline void drawPixelColour(DEVICEPTR(Vector4u) & dest, const
 	dest.z = (uchar)(clr.z * 255.0f);
 	dest.w = 255;
 }
+
+/// \brief Renders a voxel based on its Z coordinate in the (raycasting) camera's frame.
+template<class TVoxel, class TIndex>
+_CPU_AND_GPU_CODE_ inline void drawPixelDepth(
+		DEVICEPTR(Vector4u) & dest,
+		const CONSTPTR(Vector3f) & point,
+		const CONSTPTR(TVoxel) *voxelBlockData,
+		const CONSTPTR(typename TIndex::IndexData) *indexData,
+		const CONSTPTR(Matrix4f) &invM,
+		float w
+) {
+	/// TODO(andrei): XXX pass this as a parameter and set it VERY CAREFULLY!
+	float maxDepthMeters = 20.0f;
+	bool isFound = false;
+	typename TIndex::IndexCache cache;
+	Vector3i ipos(point.x, point.y, point.z);
+	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
+
+	Vector4f point_h;
+	point_h.x = point.x;
+	point_h.y = point.y;
+	point_h.z = point.z;
+	point_h.w = 1.0f;
+
+	Vector4f point_cam = invM * point_h;
+	point_cam /= point_cam.w;
+
+	Vector3f point_cam_3;
+	point_cam_3.x = point_cam.x;
+	point_cam_3.y = point_cam.y;
+	point_cam_3.z = point_cam.z;
+
+	// TODO(andrei): XXX unhardcode voxel size
+  	Vector3f delta = (point_cam_3 * 0.035f);
+//	double magn = sqrt(delta.x*delta.x + delta.y*delta.y + delta.z*delta.z);
+	/// TODO(andrei): XXX saner way of recording ray depth
+
+	double magn = (w-1.0f) * 0.035f;
+	if(magn>maxDepthMeters) {
+		magn=0;
+	}
+	uchar intensity = (uchar)(magn / maxDepthMeters * 255);
+
+	dest = Vector4u(intensity);
+};
+
 
 /// \brief Renders a voxel based on the weight associated with its depth and allocation spot.
 /// Saturated (max-weight) voxels are rendered as blue, while single-measurement ones (weight 1) are
@@ -490,6 +540,36 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 	else {
 		outRendering = Vector4u((uchar)0);
 	}
+}
+
+/// \brief Colors the pixel using a grayscale value based on its depth from the camera.
+/// Used for rendering depth maps from arbitrary viewpoints, which is very handy for evaluating the
+/// SLAM system.
+/// \param lightSource Only necessary for historical reasons. We're obviously not shading anything
+///                    here.
+template<class TVoxel, class TIndex>
+_CPU_AND_GPU_CODE_ inline void processPixelColourDepth(
+    DEVICEPTR(Vector4u) &outRendering,
+    const CONSTPTR(Vector3f) &point,
+    bool foundPoint,
+    const CONSTPTR(TVoxel) *voxelData,
+    const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
+    Vector3f &lightSource,
+    Matrix4f &invM,
+	float w
+) {
+  // TODO(andrei): Compute the normal without the angle, which is only used for shading => simplifies code. Or just remvoe this code from here; it seems unnecessary.
+  Vector3f outNormal;
+  float angle;
+
+  computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
+
+  if (foundPoint) {
+    drawPixelDepth<TVoxel, TIndex>(outRendering, point, voxelData, voxelIndex, invM, w);
+  }
+  else {
+    outRendering = Vector4u((uchar)0);
+  }
 }
 
 

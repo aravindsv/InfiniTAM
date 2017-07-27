@@ -221,6 +221,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_DEPTH_WEIGHT:
+	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_DEPTH:
 	{
 		IITMVisualisationEngine::RenderImageType type = IITMVisualisationEngine::RENDER_SHADED_GREYSCALE;
 		if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME) {
@@ -231,6 +232,9 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		}
 		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_DEPTH_WEIGHT) {
 			type = IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT;
+		}
+		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_DEPTH) {
+			type = IITMVisualisationEngine::RENDER_DEPTH_MAP;
 		}
 		if (renderState_freeview == NULL) {
 			renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);

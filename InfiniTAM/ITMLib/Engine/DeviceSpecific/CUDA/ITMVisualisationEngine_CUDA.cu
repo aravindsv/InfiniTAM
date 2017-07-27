@@ -76,6 +76,18 @@ __global__ void renderColourFromWeight_device(
 		Vector3f lightSource,
 		WeightRenderingParams params);
 
+/// \brief Renders a depth map using ray casting.
+template<class TVoxel, class TIndex>
+__global__ void renderColourFromDepth_device(
+		Vector4u *outRendering,
+		const Vector4f *ptsRay,
+		const TVoxel *voxelData,
+		const typename TIndex::IndexData *voxelIndex,
+		Vector2i imgSize,
+		Vector3f lightSource,
+        Matrix4f invM);
+
+
 // class implementation
 
 template<class TVoxel, class TIndex>
@@ -292,7 +304,7 @@ static void RenderImage_common(
 				scene->sceneParams->maxW,
 				maxNoiseWeight
 		);
-		renderColourFromWeight_device<TVoxel, TIndex> << < gridSize, cudaBlockSize >> > (
+		renderColourFromWeight_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 				outRendering,
 				pointsRay,
 				scene->localVBA.GetVoxelBlocks(),
@@ -304,9 +316,19 @@ static void RenderImage_common(
 	}
 
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
-		// TODO(andrei): Implement.
 		// TODO(andrei): Also consider rendering float map instead of uchar, if necessary for the
-		// 				 depth evaluation.
+		// 				 depth evaluation. Papers doing this sort of evaluation seem to be using
+		// 				integer deltas, so I don't think they do this.
+		// TODO(andrei): Scale based on the max value in the depth maps we get as input, so 255 should
+		// be 20m.
+		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
+				outRendering,
+				pointsRay,
+				scene->localVBA.GetVoxelBlocks(),
+				scene->index.getIndexData(),
+				imgSize,
+				lightSource,
+				pose->GetInvM());
 		break;
 	}
 
@@ -768,6 +790,36 @@ __global__ void renderColourFromWeight_device(
 			lightSource,
 			params);
 }
+
+template<class TVoxel, class TIndex>
+__global__ void renderColourFromDepth_device(
+	Vector4u *outRendering,
+	const Vector4f *ptsRay,
+	const TVoxel *voxelData,
+	const typename TIndex::IndexData *voxelIndex,
+	Vector2i imgSize,
+	Vector3f lightSource,
+    Matrix4f invM
+) {
+	int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
+	if (x >= imgSize.x || y >= imgSize.y) {
+		return;
+	}
+	int locId = x + y * imgSize.x;
+
+	Vector4f ptRay = ptsRay[locId];
+	processPixelColourDepth<TVoxel, TIndex>(
+			outRendering[locId],
+			ptRay.toVector3(),
+			ptRay.w > 0,
+			voxelData,
+			voxelIndex,
+			lightSource,
+			invM,
+			ptRay.w
+	);
+
+};
 
 template<class TVoxel, class TIndex>
 __global__ void renderPointCloud_device(Vector4u *outRendering, Vector4f *locations, Vector4f *colours, uint *noTotalPoints,
