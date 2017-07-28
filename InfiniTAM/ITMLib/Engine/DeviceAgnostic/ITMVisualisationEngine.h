@@ -155,7 +155,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 
 	pt_out.x = pt_result.x; pt_out.y = pt_result.y; pt_out.z = pt_result.z;
 	if (pt_found) {
-		pt_out.w = 1.0f + totalLength;	// HACK!!!
+		pt_out.w = 1.0f;
 	} else {
 		pt_out.w = 0.0f;
 	}
@@ -296,36 +296,38 @@ _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
 ) {
 	/// TODO(andrei): XXX pass this as a parameter and set it VERY CAREFULLY!
 	float maxDepthMeters = 20.0f;
-	bool isFound = false;
-	typename TIndex::IndexCache cache;
-	Vector3i ipos(point.x, point.y, point.z);
-	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
+	// TODO(andrei): XXX unhardcode voxel size
+	const float voxelSize = 0.035f;
+
+//	bool isFound = false;
+//	typename TIndex::IndexCache cache;
+//	Vector3i ipos(point.x, point.y, point.z);
+//	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
 
 	Vector4f point_h;
-	point_h.x = point.x;
-	point_h.y = point.y;
-	point_h.z = point.z;
+	point_h.x = point.x * voxelSize;
+	point_h.y = point.y * voxelSize;
+	point_h.z = point.z * voxelSize;
 	point_h.w = 1.0f;
 
 	Vector4f point_cam = invM * point_h;
 	point_cam /= point_cam.w;
 
-	Vector3f point_cam_3;
-	point_cam_3.x = point_cam.x;
-	point_cam_3.y = point_cam.y;
-	point_cam_3.z = point_cam.z;
+//	if(ipos.x % 171 == 0 && ipos.y % 23 == 0 && ipos.z % 3 == 0) {
+//		printf("matrix translation parts: %f %f %f %f\n",
+//			   invM.m[3 * 4 + 0],
+//			   invM.m[3 * 4 + 1],
+//			   invM.m[3 * 4 + 2],
+//			   invM.m[3 * 4 + 3]);
+//
+//		printf("point.z: %f, point_h.z: %f, point_cam.z: %f\n", point.z, point_h.z, point_cam.z);
+//	}
 
-	// TODO(andrei): XXX unhardcode voxel size
-  	Vector3f delta = (point_cam_3 * 0.035f);
-//	double magn = sqrt(delta.x*delta.x + delta.y*delta.y + delta.z*delta.z);
-	/// TODO(andrei): XXX saner way of recording ray depth
-
-	double magn = (w-1.0f) * 0.035f;
-	if(magn>maxDepthMeters) {
-		magn=0;
+	double Z = point_cam.z;
+	if(Z >= maxDepthMeters) {
+		Z = 0;
 	}
-	uchar intensity = (uchar)(magn / maxDepthMeters * 255);
-
+	uchar intensity = (uchar)(Z / maxDepthMeters * 255);
 	dest = Vector4u(intensity);
 };
 
