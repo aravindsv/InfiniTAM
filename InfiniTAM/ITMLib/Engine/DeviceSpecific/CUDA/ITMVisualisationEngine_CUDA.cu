@@ -85,7 +85,9 @@ __global__ void renderColourFromDepth_device(
 		const typename TIndex::IndexData *voxelIndex,
 		Vector2i imgSize,
 		Vector3f lightSource,
-        Matrix4f invM);
+        Matrix4f camPose,
+        float voxelSizeMeters,
+        float maxDepthMeters);
 
 
 // class implementation
@@ -316,11 +318,8 @@ static void RenderImage_common(
 	}
 
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
-		// TODO(andrei): Also consider rendering float map instead of uchar, if necessary for the
-		// 				 depth evaluation. Papers doing this sort of evaluation seem to be using
-		// 				integer deltas, so I don't think they do this.
-		// TODO(andrei): Scale based on the max value in the depth maps we get as input, so 255 should
-		// be 20m.
+		// TODO pass this as param
+		float maxDepthMeters = 16.0f;
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 				outRendering,
 				pointsRay,
@@ -328,8 +327,10 @@ static void RenderImage_common(
 				scene->index.getIndexData(),
 				imgSize,
 				lightSource,
-				pose->GetM());
-//		std::cout << "Pose M used: " << pose->GetInvM() << std::endl;
+				pose->GetM(),
+				scene->sceneParams->voxelSize,
+				maxDepthMeters
+		);
 		break;
 	}
 
@@ -787,7 +788,9 @@ __global__ void renderColourFromDepth_device(
 	const typename TIndex::IndexData *voxelIndex,
 	Vector2i imgSize,
 	Vector3f lightSource,
-    Matrix4f invM
+    Matrix4f camPose,
+	float voxelSizeMeters,
+	float maxDepthMeters
 ) {
 	int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
 	if (x >= imgSize.x || y >= imgSize.y) {
@@ -800,11 +803,9 @@ __global__ void renderColourFromDepth_device(
 			outRendering[locId],
 			ptRay.toVector3(),
 			ptRay.w > 0,
-			voxelData,
-			voxelIndex,
-			lightSource,
-			invM,
-			ptRay.w
+			camPose,
+			voxelSizeMeters,
+			maxDepthMeters
 	);
 
 };

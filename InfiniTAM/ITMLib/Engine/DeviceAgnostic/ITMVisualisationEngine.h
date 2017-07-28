@@ -289,39 +289,18 @@ template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
 		DEVICEPTR(Vector4u) & dest,
 		const CONSTPTR(Vector3f) & point,
-		const CONSTPTR(TVoxel) *voxelBlockData,
-		const CONSTPTR(typename TIndex::IndexData) *indexData,
-		const CONSTPTR(Matrix4f) &invM,
-		float w
+		const CONSTPTR(Matrix4f) &camPose,
+		const float voxelSizeMeters,
+		const float maxDepthMeters
 ) {
-	/// TODO(andrei): XXX pass this as a parameter and set it VERY CAREFULLY!
-	float maxDepthMeters = 20.0f;
-	// TODO(andrei): XXX unhardcode voxel size
-	const float voxelSize = 0.035f;
-
-//	bool isFound = false;
-//	typename TIndex::IndexCache cache;
-//	Vector3i ipos(point.x, point.y, point.z);
-//	TVoxel resn = readVoxel(voxelBlockData, indexData, ipos, isFound, cache);
-
 	Vector4f point_h;
-	point_h.x = point.x * voxelSize;
-	point_h.y = point.y * voxelSize;
-	point_h.z = point.z * voxelSize;
+	point_h.x = point.x * voxelSizeMeters;
+	point_h.y = point.y * voxelSizeMeters;
+	point_h.z = point.z * voxelSizeMeters;
 	point_h.w = 1.0f;
 
-	Vector4f point_cam = invM * point_h;
+	Vector4f point_cam = camPose * point_h;
 	point_cam /= point_cam.w;
-
-//	if(ipos.x % 171 == 0 && ipos.y % 23 == 0 && ipos.z % 3 == 0) {
-//		printf("matrix translation parts: %f %f %f %f\n",
-//			   invM.m[3 * 4 + 0],
-//			   invM.m[3 * 4 + 1],
-//			   invM.m[3 * 4 + 2],
-//			   invM.m[3 * 4 + 3]);
-//
-//		printf("point.z: %f, point_h.z: %f, point_cam.z: %f\n", point.z, point_h.z, point_cam.z);
-//	}
 
 	double Z = point_cam.z;
 	if(Z >= maxDepthMeters) {
@@ -547,27 +526,17 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 /// \brief Colors the pixel using a grayscale value based on its depth from the camera.
 /// Used for rendering depth maps from arbitrary viewpoints, which is very handy for evaluating the
 /// SLAM system.
-/// \param lightSource Only necessary for historical reasons. We're obviously not shading anything
-///                    here.
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void processPixelColourDepth(
     DEVICEPTR(Vector4u) &outRendering,
     const CONSTPTR(Vector3f) &point,
     bool foundPoint,
-    const CONSTPTR(TVoxel) *voxelData,
-    const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
-    Vector3f &lightSource,
-    Matrix4f &invM,
-	float w
+    Matrix4f &camPose,
+	float voxelSizeMeters,
+	float maxDepthMeters
 ) {
-  // TODO(andrei): Compute the normal without the angle, which is only used for shading => simplifies code. Or just remvoe this code from here; it seems unnecessary.
-  Vector3f outNormal;
-  float angle;
-
-  computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
-
   if (foundPoint) {
-    drawPixelDepth<TVoxel, TIndex>(outRendering, point, voxelData, voxelIndex, invM, w);
+    drawPixelDepth<TVoxel, TIndex>(outRendering, point, camPose, voxelSizeMeters, maxDepthMeters);
   }
   else {
     outRendering = Vector4u((uchar)0);
