@@ -306,7 +306,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
 	if(Z >= maxDepthMeters) {
 		Z = 0;
 	}
-	uchar intensity = (uchar)(Z / maxDepthMeters * 255);
+	uchar intensity = (uchar)(round(Z / maxDepthMeters * 255));
 	dest = Vector4u(intensity);
 };
 
