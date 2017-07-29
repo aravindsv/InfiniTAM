@@ -319,7 +319,7 @@ static void RenderImage_common(
 
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
 		// TODO pass this as param
-		float maxDepthMeters = 16.0f;
+		float maxDepthMeters = 25.0f;
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 				outRendering,
 				pointsRay,

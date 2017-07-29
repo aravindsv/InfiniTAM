@@ -49,9 +49,11 @@ namespace ITMLib
 				bool shouldDelete = false;
 				if (memoryType == MEMORYDEVICE_CUDA)
 				{
+					printf("Copying generated mesh from GPU to CPU memory...\n");
 					cpu_triangles = new ORUtils::MemoryBlock<Triangle>(noMaxTriangles, MEMORYDEVICE_CPU);
 					cpu_triangles->SetFrom(triangles, ORUtils::MemoryBlock<Triangle>::CUDA_TO_CPU);
 					shouldDelete = true;
+					printf("Triangles copied to RAM.\n");
 				}
 				else cpu_triangles = triangles;
 

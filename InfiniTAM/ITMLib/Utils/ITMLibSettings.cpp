@@ -26,6 +26,8 @@ ITMLibSettings::ITMLibSettings(void)
 // 	to hack the translation scale when processing the ground truth.
 //	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
 : sceneParams(0.30f, 10, 0.035f, 0.1f, 300.0f, false)
+// Good, low resolution reconstructions => HUGE scalability.
+//: sceneParams(0.90f, 10, 0.1f, 0.1f, 300.0f, false)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
@@ -114,7 +116,7 @@ ITMLibSettings::ITMLibSettings(void)
 	groundTruthPoseFpath = "";
 	groundTruthPoseOffset = 0;
 
-	sdfLocalBlockNum = 0xD0000; 		// Original: 0x40000
+	sdfLocalBlockNum = 0xA0000; 		// Original: 0x40000
 }
 
 ITMLibSettings::~ITMLibSettings()
