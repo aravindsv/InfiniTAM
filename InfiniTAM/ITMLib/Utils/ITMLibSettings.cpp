@@ -36,8 +36,7 @@ ITMLibSettings::ITMLibSettings(void)
 	depthTrackerTerminationThreshold = 1e-3f;
 
 	/// skips every other point when using the colour tracker
-//	skipPoints = true;
-	skipPoints = false;	// changed when experimenting with instance reconstruction
+	skipPoints = true;
 
 #ifndef COMPILE_WITHOUT_CUDA
 	deviceType = DEVICE_CUDA;
@@ -56,13 +55,17 @@ ITMLibSettings::ITMLibSettings(void)
 	useSwapping = false;
 //	useSwapping = true;
 
+	if (useSwapping) {
+		throw std::runtime_error("DynSLAM is untested with swapping emabled.");
+	}
+
 	/// enables or disables approximate raycast
 	useApproximateRaycast = false;
 
 	/// enable or disable bilateral depth filtering;
 	/// When used with stereo depth maps, it seems to increase reconstruction quality.
-//	useBilateralFilter = false;
-	useBilateralFilter = true;
+	useBilateralFilter = false;
+//	useBilateralFilter = true;
 
 //	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;
@@ -93,9 +96,6 @@ ITMLibSettings::ITMLibSettings(void)
 
 		trackingRegime[0] = TRACKER_ITERATION_BOTH;
 		trackingRegime[1] = TRACKER_ITERATION_BOTH;
-//		trackingRegime[2] = TRACKER_ITERATION_BOTH;
-//		trackingRegime[3] = TRACKER_ITERATION_BOTH;
-//		trackingRegime[4] = TRACKER_ITERATION_BOTH;
 		trackingRegime[2] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[3] = TRACKER_ITERATION_ROTATION;
 		trackingRegime[4] = TRACKER_ITERATION_ROTATION;
@@ -116,7 +116,7 @@ ITMLibSettings::ITMLibSettings(void)
 	groundTruthPoseFpath = "";
 	groundTruthPoseOffset = 0;
 
-	sdfLocalBlockNum = 0xA0000; 		// Original: 0x40000
+	sdfLocalBlockNum = 0xC0000; 		// Original: 0x40000
 }
 
 ITMLibSettings::~ITMLibSettings()
