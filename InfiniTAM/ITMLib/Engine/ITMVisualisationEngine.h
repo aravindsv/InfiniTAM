@@ -85,8 +85,19 @@ namespace ITMLib
 			*/
 			virtual ITMRenderState* CreateRenderState(const Vector2i & imgSize) const = 0;
 
+			void SetMaxDepthMeters(float maxDepthMeters) {
+				this->maxDepthMeters = maxDepthMeters;
+			}
+
+			float GetMaxDepthMeters() const {
+				return maxDepthMeters;
+			}
+
 		 protected:
 			const ITMLibSettings *settings;
+
+			// Used for correctly scaling the pixels when rendering depth maps.
+			float maxDepthMeters = 0.0f;
 		};
 
 		template<class TIndex> struct IndexToRenderState { typedef ITMRenderState type; };

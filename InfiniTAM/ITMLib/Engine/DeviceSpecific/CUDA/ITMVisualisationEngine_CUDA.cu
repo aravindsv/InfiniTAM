@@ -271,7 +271,8 @@ static void RenderImage_common(
 		const ITMIntrinsics *intrinsics,
 		const ITMRenderState *renderState,
 		ITMUChar4Image *outputImage,
-		IITMVisualisationEngine::RenderImageType type
+		IITMVisualisationEngine::RenderImageType type,
+		float maxDepthMeters
 ) {
 	Vector2i imgSize = outputImage->noDims;
 	Matrix4f invM = pose->GetInvM();
@@ -318,8 +319,7 @@ static void RenderImage_common(
 	}
 
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
-		// TODO pass this as param XXX
-		float maxDepthMeters = 16.0f;
+		assert(maxDepthMeters > 1e-3 && "maxDepthMeters must be set when rendering a depth map");
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 				outRendering,
 				pointsRay,
@@ -456,14 +456,14 @@ template<class TVoxel, class TIndex>
 void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics, const ITMRenderState *renderState, 
 	ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type) const
 {
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type);
+	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type, this->maxDepthMeters);
 }
 
 template<class TVoxel>
 void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
 	const ITMRenderState *renderState, ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type) const
 {
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type);
+	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type, this->maxDepthMeters);
 }
 
 template<class TVoxel, class TIndex>
