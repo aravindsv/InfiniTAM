@@ -52,9 +52,14 @@ namespace ITMLib
 			virtual void CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
 				ITMRenderState *renderState) const = 0;
 
-			/** This will render an image using raycasting. */
+			/** This will render an image using raycasting.
+			 * 		'outputCharImage' is used for 8-bit RGBA output
+			 * 		'outputFloatImage' is used for 32-bit depth rendering.
+			 */
 			virtual void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics,
-				const ITMRenderState *renderState, ITMUChar4Image *outputImage, RenderImageType type = RENDER_SHADED_GREYSCALE) const = 0;
+				const ITMRenderState *renderState, ITMUChar4Image *outputCharImage,
+									 ITMFloatImage *outputFloatImage,
+									 RenderImageType type = RENDER_SHADED_GREYSCALE) const = 0;
 
 			/** Finds the scene surface using raycasting. */
 			virtual void FindSurface(const ITMPose *pose, const ITMIntrinsics *intrinsics,

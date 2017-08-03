@@ -211,9 +211,12 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 	{
 		ORUtils::Image<Vector4u> *srcImage = renderState_live->raycastImage;
 		out->ChangeDims(srcImage->noDims);
-		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA)
+		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA) {
 			out->SetFrom(srcImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
-		else out->SetFrom(srcImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);	
+		}
+		else {
+			out->SetFrom(srcImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+		}
 		break;
 	}
 
@@ -236,14 +239,17 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_DEPTH) {
 			type = IITMVisualisationEngine::RENDER_DEPTH_MAP;
 		}
-		if (renderState_freeview == NULL) {
+		if (nullptr == renderState_freeview) {
 			renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
 		}
 
 		// This renders the free camera view. It uses raycasting.
 		visualisationEngine->FindVisibleBlocks(pose, intrinsics, renderState_freeview);
 		visualisationEngine->CreateExpectedDepths(pose, intrinsics, renderState_freeview);
-		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, renderState_freeview->raycastImage, type);
+		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview,
+										 renderState_freeview->raycastImage,
+										 renderState_freeview->raycastFloatImage,
+										 type);
 
 		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA) {
 			out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);

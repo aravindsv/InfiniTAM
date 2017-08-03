@@ -193,7 +193,7 @@ static void GenericRaycast(const ITMScene<TVoxel,TIndex> *scene, const Vector2i&
 
 template<class TVoxel, class TIndex>
 static void RenderImage_common(const ITMScene<TVoxel,TIndex> *scene, const ITMPose *pose, const ITMIntrinsics *intrinsics, 
-	const ITMRenderState *renderState, ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type)
+	const ITMRenderState *renderState, ITMUChar4Image *outputImage, ITMFloatImage *, IITMVisualisationEngine::RenderImageType type)
 {
 	Vector2i imgSize = outputImage->noDims;
 	Matrix4f invM = pose->GetInvM();
@@ -230,6 +230,11 @@ static void RenderImage_common(const ITMScene<TVoxel,TIndex> *scene, const ITMPo
 			processPixelNormal<TVoxel, TIndex>(outRendering[locId], ptRay.toVector3(), ptRay.w > 0, voxelData, voxelIndex, lightSource);
 		}
 		break;
+
+		case IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT:
+		case IITMVisualisationEngine::RENDER_DEPTH_MAP:
+			throw std::runtime_error("Unsupported render mode for the CPU renderer (which lagged behind the CUDA one).");
+
 	case IITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
 	default:
 #ifdef WITH_OPENMP
@@ -359,16 +364,16 @@ static void ForwardRender_common(const ITMScene<TVoxel, TIndex> *scene, const IT
 
 template<class TVoxel, class TIndex>
 void ITMVisualisationEngine_CPU<TVoxel,TIndex>::RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
-	const ITMRenderState *renderState, ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type) const
+	const ITMRenderState *renderState, ITMUChar4Image *outputCharImage, ITMFloatImage *outputFloatImage, IITMVisualisationEngine::RenderImageType type) const
 {
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type);
+	RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage, type);
 }
 
 template<class TVoxel>
 void ITMVisualisationEngine_CPU<TVoxel,ITMVoxelBlockHash>::RenderImage(const ITMPose *pose,  const ITMIntrinsics *intrinsics, 
-	const ITMRenderState *renderState, ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type) const
+	const ITMRenderState *renderState, ITMUChar4Image *outputCharImage, ITMFloatImage *outputFloatImage, IITMVisualisationEngine::RenderImageType type) const
 {
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type);
+	RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage, type);
 }
 
 template<class TVoxel, class TIndex>

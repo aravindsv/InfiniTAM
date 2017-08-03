@@ -192,7 +192,7 @@ void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::CreateExpectedDepths(const ITM
 }
 
 template<class TVoxel>
-void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
+void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics,
 	ITMRenderState *renderState) const
 {
 	float voxelSize = this->scene->sceneParams->voxelSize;
@@ -271,6 +271,7 @@ static void RenderImage_common(
 		const ITMIntrinsics *intrinsics,
 		const ITMRenderState *renderState,
 		ITMUChar4Image *outputImage,
+		ITMFloatImage *outputFloatImage,		// For, e.g., depth map rendering.
 		IITMVisualisationEngine::RenderImageType type,
 		float maxDepthMeters
 ) {
@@ -321,6 +322,7 @@ static void RenderImage_common(
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
 		assert(maxDepthMeters > 1e-3 && "maxDepthMeters must be set when rendering a depth map");
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
+				// just pass float here...
 				outRendering,
 				pointsRay,
 				scene->localVBA.GetVoxelBlocks(),
@@ -390,7 +392,7 @@ void CreateICPMaps_common(const ITMScene<TVoxel, TIndex> *scene, const ITMView *
 }
 
 template<class TVoxel, class TIndex>
-static void ForwardRender_common(const ITMScene<TVoxel, TIndex> *scene, const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState, 
+static void ForwardRender_common(const ITMScene<TVoxel, TIndex> *scene, const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState,
 	uint *noTotalPoints_device)
 {
 	Vector2i imgSize = renderState->raycastResult->noDims;
@@ -430,7 +432,7 @@ static void ForwardRender_common(const ITMScene<TVoxel, TIndex> *scene, const IT
 		blockSize = dim3(16, 16);
 		gridSize = dim3((int)ceil((float)imgSize.x / (float)blockSize.x), (int)ceil((float)imgSize.y / (float)blockSize.y));
 
-		findMissingPoints_device << <gridSize, blockSize >> >(fwdProjMissingPoints, noTotalPoints_device, minmaximg, 
+		findMissingPoints_device << <gridSize, blockSize >> >(fwdProjMissingPoints, noTotalPoints_device, minmaximg,
 			forwardProjection, currentDepth, imgSize);
 	}
 
@@ -453,17 +455,28 @@ static void ForwardRender_common(const ITMScene<TVoxel, TIndex> *scene, const IT
 }
 
 template<class TVoxel, class TIndex>
-void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics, const ITMRenderState *renderState, 
-	ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type) const
+void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::RenderImage(
+	const ITMPose *pose,
+	const ITMIntrinsics *intrinsics,
+	const ITMRenderState *renderState,
+	ITMUChar4Image *outputCharImage,
+	ITMFloatImage *outputFloatImage,
+	IITMVisualisationEngine::RenderImageType type) const
 {
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type, this->maxDepthMeters);
+	RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage,
+					   type, this->maxDepthMeters);
 }
 
 template<class TVoxel>
-void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
-	const ITMRenderState *renderState, ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type) const
-{
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type, this->maxDepthMeters);
+void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::RenderImage(
+	const ITMPose *pose,
+	const ITMIntrinsics *intrinsics,
+	const ITMRenderState *renderState,
+	ITMUChar4Image *outputCharImage,
+	ITMFloatImage *outputFloatImage,
+	IITMVisualisationEngine::RenderImageType type) const {
+  RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage,
+					 type, this->maxDepthMeters);
 }
 
 template<class TVoxel, class TIndex>
@@ -480,42 +493,42 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::FindSurface(const I
 }
 
 template<class TVoxel, class TIndex>
-void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::CreatePointCloud(const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState, 
+void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::CreatePointCloud(const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState,
 	bool skipPoints) const
 {
 	CreatePointCloud_common(this->scene, view, trackingState, renderState, skipPoints, noTotalPoints_device);
 }
 
 template<class TVoxel>
-void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreatePointCloud(const ITMView *view, ITMTrackingState *trackingState, 
+void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreatePointCloud(const ITMView *view, ITMTrackingState *trackingState,
 	ITMRenderState *renderState, bool skipPoints) const
 {
 	CreatePointCloud_common(this->scene, view, trackingState, renderState, skipPoints, noTotalPoints_device);
 }
 
 template<class TVoxel, class TIndex>
-void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, 
+void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState,
 	ITMRenderState *renderState) const
 {
 	CreateICPMaps_common(this->scene, view, trackingState, renderState);
 }
 
 template<class TVoxel>
-void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, 
+void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState,
 	ITMRenderState *renderState) const
 {
 	CreateICPMaps_common(this->scene, view, trackingState, renderState);
 }
 
 template<class TVoxel, class TIndex>
-void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::ForwardRender(const ITMView *view, ITMTrackingState *trackingState, 
+void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::ForwardRender(const ITMView *view, ITMTrackingState *trackingState,
 	ITMRenderState *renderState) const
 {
 	ForwardRender_common(this->scene, view, trackingState, renderState, this->noTotalPoints_device);
 }
 
 template<class TVoxel>
-void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::ForwardRender(const ITMView *view, ITMTrackingState *trackingState, 
+void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::ForwardRender(const ITMView *view, ITMTrackingState *trackingState,
 	ITMRenderState *renderState) const
 {
 	ForwardRender_common(this->scene, view, trackingState, renderState, this->noTotalPoints_device);

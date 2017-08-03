@@ -46,7 +46,10 @@ namespace ITMLib
 			ORUtils::Image<int> *fwdProjMissingPoints;
 			int noFwdProjMissingPoints;
 
+			// Used for most visualization operations, whose output is typcally 8-bit RGB(A).
 			ORUtils::Image<Vector4u> *raycastImage;
+			// Used for depth map rendering
+			ORUtils::Image<float> *raycastFloatImage;
 
 			ITMRenderState(const Vector2i &imgSize, float vf_min, float vf_max, MemoryDeviceType memoryType)
 			{
@@ -55,6 +58,7 @@ namespace ITMLib
 				forwardProjection = new ORUtils::Image<Vector4f>(imgSize, memoryType);
 				fwdProjMissingPoints = new ORUtils::Image<int>(imgSize, memoryType);
 				raycastImage = new ORUtils::Image<Vector4u>(imgSize, memoryType);
+				raycastFloatImage = new ORUtils::Image<float>(imgSize, memoryType);
 
 				ORUtils::Image<Vector2f> *buffImage = new ORUtils::Image<Vector2f>(imgSize, MEMORYDEVICE_CPU);
 
@@ -81,6 +85,7 @@ namespace ITMLib
 				delete forwardProjection;
 				delete fwdProjMissingPoints;
 				delete raycastImage;
+				delete raycastFloatImage;
 			}
 		};
 	}
