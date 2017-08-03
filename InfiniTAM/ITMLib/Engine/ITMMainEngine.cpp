@@ -174,7 +174,8 @@ Vector2i ITMMainEngine::GetImageSize(void) const
 	return renderState_live->raycastImage->noDims;
 }
 
-void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITMPose *pose, ITMIntrinsics *intrinsics)
+void ITMMainEngine::GetImage(ITMUChar4Image *out, ITMFloatImage *outFloat, GetImageType getImageType,
+							 ITMPose *pose, ITMIntrinsics *intrinsics)
 {
 	if (view == NULL) return;
 
@@ -252,9 +253,18 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 										 type);
 
 		if (settings->deviceType == ITMLibSettings::DEVICE_CUDA) {
-			out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
+			// Depth is rendered as float, the rest, as RGBA uchars.
+			if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_DEPTH) {
+				outFloat->SetFrom(renderState_freeview->raycastFloatImage,
+								   ORUtils::MemoryBlock<float>::CUDA_TO_CPU);
+			}
+			else {
+				out->SetFrom(renderState_freeview->raycastImage,
+							 ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
+			}
 		}
 		else {
+			// depth rendering is unsupported in CPU mode
 			out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
 		}
 		break;

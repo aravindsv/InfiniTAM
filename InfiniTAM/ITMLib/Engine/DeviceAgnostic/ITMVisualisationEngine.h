@@ -287,7 +287,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelColour(DEVICEPTR(Vector4u) & dest, const
 /// \brief Renders a voxel based on its Z coordinate in the (raycasting) camera's frame.
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
-		DEVICEPTR(Vector4u) & dest,
+		DEVICEPTR(float) & dest,
 		const CONSTPTR(Vector3f) & point,
 		const CONSTPTR(Matrix4f) &camPose,
 		const float voxelSizeMeters,
@@ -302,12 +302,15 @@ _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
 	Vector4f point_cam = camPose * point_h;
 	point_cam /= point_cam.w;
 
-	double Z = point_cam.z;
-	if(Z >= maxDepthMeters) {
-		Z = 0;
-	}
-	uchar intensity = (uchar)(round(Z / maxDepthMeters * 255));
-	dest = Vector4u(intensity);
+	// Old version, which attempted to squish the depth into a byte (not ideal).
+//	double Z = point_cam.z;
+//	if(Z >= maxDepthMeters) {
+//		Z = 0;
+//	}
+//	uchar intensity = (uchar)(round(Z / maxDepthMeters * 255));
+//	dest = Vector4u(intensity);
+
+	dest = point_cam.z;
 };
 
 
@@ -528,7 +531,7 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 /// SLAM system.
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void processPixelColourDepth(
-    DEVICEPTR(Vector4u) &outRendering,
+    DEVICEPTR(float) &outRendering,
     const CONSTPTR(Vector3f) &point,
     bool foundPoint,
     Matrix4f &camPose,
@@ -539,7 +542,7 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourDepth(
     drawPixelDepth<TVoxel, TIndex>(outRendering, point, camPose, voxelSizeMeters, maxDepthMeters);
   }
   else {
-    outRendering = Vector4u((uchar)0);
+    outRendering = 0.0f;
   }
 }
 

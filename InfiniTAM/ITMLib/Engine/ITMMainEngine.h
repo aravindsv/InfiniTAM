@@ -114,7 +114,8 @@ namespace ITMLib
 			Vector2i GetImageSize(void) const;
 
 			/// \brief Returns a specific buffer from inside InfiniTAM, for visualization and debugging.
-			void GetImage(ITMUChar4Image *out, GetImageType getImageType, ITMPose *pose = NULL, ITMIntrinsics *intrinsics = NULL);
+			/// Either uchar4 or float image is returned; it dependson the 'GetImageType'.
+			void GetImage(ITMUChar4Image *out, ITMFloatImage *outFloat, GetImageType getImageType, ITMPose *pose = NULL, ITMIntrinsics *intrinsics = NULL);
 
 			/// switch for turning integration on/off
 			void turnOnIntegration();

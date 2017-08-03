@@ -79,7 +79,7 @@ __global__ void renderColourFromWeight_device(
 /// \brief Renders a depth map using ray casting.
 template<class TVoxel, class TIndex>
 __global__ void renderColourFromDepth_device(
-		Vector4u *outRendering,
+		float *outFloatRendering,
 		const Vector4f *ptsRay,
 		const TVoxel *voxelData,
 		const typename TIndex::IndexData *voxelIndex,
@@ -270,21 +270,23 @@ static void RenderImage_common(
 		const ITMPose *pose,
 		const ITMIntrinsics *intrinsics,
 		const ITMRenderState *renderState,
-		ITMUChar4Image *outputImage,
+		ITMUChar4Image *outputCharImage,
 		ITMFloatImage *outputFloatImage,		// For, e.g., depth map rendering.
 		IITMVisualisationEngine::RenderImageType type,
 		float maxDepthMeters
 ) {
-	Vector2i imgSize = outputImage->noDims;
+	Vector2i imgSize = outputCharImage->noDims;
 	Matrix4f invM = pose->GetInvM();
 
 	GenericRaycast(scene, imgSize, invM, intrinsics->projectionParamsSimple.all, renderState);
 
 	Vector3f lightSource = -Vector3f(invM.getColumn(2));
-	Vector4u *outRendering = outputImage->GetData(MEMORYDEVICE_CUDA);
+	Vector4u *outCharRendering = outputCharImage->GetData(MEMORYDEVICE_CUDA);
+	float *outFloatRendering = outputFloatImage->GetData(MEMORYDEVICE_CUDA);
 	Vector4f *pointsRay = renderState->raycastResult->GetData(MEMORYDEVICE_CUDA);
 
-	dim3 cudaBlockSize(8, 8);
+	dim3 cudaBlockSize(32, 32);
+//	dim3 cudaBlockSize(8, 8);
 	dim3 gridSize((int)ceil((float)imgSize.x / (float)cudaBlockSize.x), (int)ceil((float)imgSize.y / (float)cudaBlockSize.y));
 
 	if ((type == IITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME)&&
@@ -292,11 +294,11 @@ static void RenderImage_common(
 
 	switch (type) {
 	case IITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME:
-		renderColour_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
+		renderColour_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outCharRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
 			scene->index.getIndexData(), imgSize, lightSource);
 		break;
 	case IITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL:
-		renderColourFromNormal_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
+		renderColourFromNormal_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outCharRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
 			scene->index.getIndexData(), imgSize, lightSource);
 		break;
 	case IITMVisualisationEngine::RENDER_COLOUR_FROM_DEPTH_WEIGHT: {
@@ -309,7 +311,7 @@ static void RenderImage_common(
 				maxNoiseWeight
 		);
 		renderColourFromWeight_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
-				outRendering,
+				outCharRendering,
 				pointsRay,
 				scene->localVBA.GetVoxelBlocks(),
 				scene->index.getIndexData(),
@@ -322,8 +324,7 @@ static void RenderImage_common(
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
 		assert(maxDepthMeters > 1e-3 && "maxDepthMeters must be set when rendering a depth map");
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
-				// just pass float here...
-				outRendering,
+				outFloatRendering,
 				pointsRay,
 				scene->localVBA.GetVoxelBlocks(),
 				scene->index.getIndexData(),
@@ -338,7 +339,7 @@ static void RenderImage_common(
 
 	case IITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
 	default:
-		renderGrey_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
+		renderGrey_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(outCharRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
 			scene->index.getIndexData(), imgSize, lightSource);
 		break;
 	}
@@ -795,7 +796,7 @@ __global__ void renderColourFromWeight_device(
 
 template<class TVoxel, class TIndex>
 __global__ void renderColourFromDepth_device(
-	Vector4u *outRendering,
+	float *outFloatRendering,
 	const Vector4f *ptsRay,
 	const TVoxel *voxelData,
 	const typename TIndex::IndexData *voxelIndex,
@@ -813,7 +814,7 @@ __global__ void renderColourFromDepth_device(
 
 	Vector4f ptRay = ptsRay[locId];
 	processPixelColourDepth<TVoxel, TIndex>(
-			outRendering[locId],
+			outFloatRendering[locId],
 			ptRay.toVector3(),
 			ptRay.w > 0,
 			camPose,
