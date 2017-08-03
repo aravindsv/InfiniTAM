@@ -55,7 +55,16 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 	oldW = voxel.w_depth;
 
 	newF = MIN(1.0f, eta / mu);
-	newW = 1;
+//	if ((int)pt_image.x % 31 == 0 && (int)pt_image.y % 17 == 0) {
+//		printf("Depth measure: %.4f\n", depth_measure);
+//	}
+
+  // old way:
+//	 newW = 1; //always
+
+  // new way:
+    newW = (int)(600 / depth_measure);
+	if (newW < 1) { newW = 1; }
 
 	newF = oldW * oldF + newW * newF;
 	newW = oldW + newW;

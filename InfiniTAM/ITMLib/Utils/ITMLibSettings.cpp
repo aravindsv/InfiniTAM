@@ -11,8 +11,8 @@ ITMLibSettings::ITMLibSettings(void)
 //  It seems that larger mu values lead to denser maps in our case, at the cost of being somewhat
 // more sensitive to noise.
 // maxW = max # of observations to average, per voxel, before a running average starts getting
-//        computed. Decreasing this can seriously lower the memory footprint, but at the cost of quality.
-//        Going down to ~25 or 10 should still be quite OK given our fast motion.
+//        computed. Going down to ~25 or 10 should still be quite OK given our fast motion, unless
+//        we're using dynamic weights.
 // voxSize = voxel size, in meters. Can have a HUGE impact on quality, but making it too small
 //           leads to HUGE memory consumption. Moreover, making it extremely small prevents fusion
 //           from occurring properly.
@@ -25,13 +25,13 @@ ITMLibSettings::ITMLibSettings(void)
 // 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
 // 	to hack the translation scale when processing the ground truth.
 //	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
-//: sceneParams(0.50f, 10, 0.035f, 0.1f, 300.0f, false)
+: sceneParams(0.50f, 5000, 0.050f, 0.1f, 300.0f, false)
 // Slightly lower-res
-: sceneParams(0.75f, 10, 0.05f, 0.1f, 300.0f, false)
+//: sceneParams(0.75f, 1000, 0.05f, 0.1f, 300.0f, false)
 // Good, low resolution reconstructions => HUGE scalability.
-//: sceneParams(1.0f, 10, 0.1f, 0.1f, 300.0f, false)
+//: sceneParams(1.5f, 10, 0.1f, 0.1f, 300.0f, false)
 {
-	/// depth threashold for the ICP tracker
+	/// depth threshold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
 
 	/// For ITMDepthTracker: ICP iteration termination threshold
