@@ -322,7 +322,8 @@ static void RenderImage_common(
 	}
 
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
-		assert(maxDepthMeters > 1e-3 && "maxDepthMeters must be set when rendering a depth map");
+      // TODO(andrei): get rid of this
+//		assert(maxDepthMeters > 1e-3 && "maxDepthMeters must be set when rendering a depth map");
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 				outFloatRendering,
 				pointsRay,

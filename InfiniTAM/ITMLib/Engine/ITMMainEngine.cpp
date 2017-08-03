@@ -179,7 +179,14 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, ITMFloatImage *outFloat, GetIm
 {
 	if (view == NULL) return;
 
-	out->Clear();
+	if (nullptr != out) {
+		out->Clear();
+	}
+	if (nullptr != outFloat) {
+		outFloat->Clear();
+	}
+
+	auto noDims = (nullptr != out) ? out->noDims : outFloat->noDims;
 
 	switch (getImageType)
 	{
@@ -241,7 +248,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, ITMFloatImage *outFloat, GetIm
 			type = IITMVisualisationEngine::RENDER_DEPTH_MAP;
 		}
 		if (nullptr == renderState_freeview) {
-			renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+			renderState_freeview = visualisationEngine->CreateRenderState(noDims);
 		}
 
 		// This renders the free camera view. It uses raycasting.
