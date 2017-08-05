@@ -45,7 +45,9 @@ namespace ITMLib
 				//! Identifies a tracker that use weighted ICP only on depth image
 				TRACKER_WICP,
 				//! Identifies a tracker which uses a set of known poses.
-				TRACKER_GROUND_TRUTH
+				TRACKER_GROUND_TRUTH,
+				//! Identifies a NOP tracker symbolizing that the ITM pose should be set directly.
+				TRACKER_EXTERNAL
 			} TrackerType;
 
 			/// Select the type of tracker to use

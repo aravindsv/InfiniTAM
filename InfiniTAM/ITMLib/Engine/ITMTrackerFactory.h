@@ -10,6 +10,7 @@
 #include "ITMLowLevelEngine.h"
 #include "ITMTracker.h"
 #include "ITMGroundTruthTracker.h"
+#include "ITMExternalTracker.h"
 
 #include "DeviceSpecific/CPU/ITMColorTracker_CPU.h"
 #include "DeviceSpecific/CPU/ITMDepthTracker_CPU.h"
@@ -67,6 +68,7 @@ namespace ITMLib
             std::make_pair(ITMLibSettings::TRACKER_REN, &MakeRenTracker));
         makers.insert(std::make_pair(ITMLibSettings::TRACKER_GROUND_TRUTH,
                                      &MakeGroundTruthTracker));
+        makers.insert(std::make_pair(ITMLibSettings::TRACKER_EXTERNAL, &MakeExternalTracker));
       }
 
     public:
@@ -384,6 +386,16 @@ namespace ITMLib
         return new ITMGroundTruthTracker(
             settings->groundTruthPoseFpath,
             settings->groundTruthPoseOffset);
+      }
+
+      static ITMTracker * MakeExternalTracker(
+          const Vector2i &trackedImageSize,
+          const ITMLibSettings *settings,
+          const ITMLowLevelEngine *lowLevelEngine,
+          ITMIMUCalibrator *imuCalibrator,
+          ITMScene<TVoxel, TIndex> *scene
+      ) {
+        return new ITMExternalTracker();
       }
     };
   }

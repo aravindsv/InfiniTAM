@@ -60,11 +60,12 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 //	}
 
   // old way:
-//	 newW = 1; //always
+	 newW = 1; //always
 
   // new way:
-    newW = (int)(600 / depth_measure);
-	if (newW < 1) { newW = 1; }
+//    newW = (int)(200 / (depth_measure * sqrt(depth_measure)));
+//	if (newW < 1) { newW = 1; }
+//	if (newW > 10) { newW = 10; }
 
 	newF = oldW * oldF + newW * newF;
 	newW = oldW + newW;
