@@ -249,7 +249,8 @@ static void GenericRaycast(const ITMScene<TVoxel, TIndex> *scene, const Vector2i
 	projParams.x = 1.0f / projParams.x;
 	projParams.y = 1.0f / projParams.y;
 
-	dim3 cudaBlockSize(16, 12);
+//	dim3 cudaBlockSize(16, 12);
+	dim3 cudaBlockSize(32, 32);
 	dim3 gridSize((int)ceil((float)imgSize.x / (float)cudaBlockSize.x), (int)ceil((float)imgSize.y / (float)cudaBlockSize.y));
 	genericRaycast_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 		renderState->raycastResult->GetData(MEMORYDEVICE_CUDA),
@@ -306,7 +307,7 @@ static void RenderImage_common(
 		int maxNoiseWeight = 2;
 		WeightRenderingParams params(
 				1.0,
-				true,
+				false,
 				scene->sceneParams->maxW,
 				maxNoiseWeight
 		);

@@ -25,9 +25,9 @@ ITMLibSettings::ITMLibSettings(void)
 // 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
 // 	to hack the translation scale when processing the ground truth.
 //	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
-: sceneParams(0.50f, 5000, 0.050f, 0.1f, 300.0f, false)
+: sceneParams(0.50f, 10, 0.050f, 0.1f, 300.0f, false)
 // Slightly lower-res
-//: sceneParams(0.75f, 1000, 0.05f, 0.1f, 300.0f, false)
+//: sceneParams(0.75f, 10, 0.05f, 0.1f, 300.0f, false)
 // Good, low resolution reconstructions => HUGE scalability.
 //: sceneParams(1.5f, 10, 0.1f, 0.1f, 300.0f, false)
 {
@@ -66,8 +66,8 @@ ITMLibSettings::ITMLibSettings(void)
 
 	/// enable or disable bilateral depth filtering;
 	/// When used with stereo depth maps, it seems to increase reconstruction quality.
-	useBilateralFilter = false;
-//	useBilateralFilter = true;
+//	useBilateralFilter = false;
+	useBilateralFilter = true;
 
 //	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;

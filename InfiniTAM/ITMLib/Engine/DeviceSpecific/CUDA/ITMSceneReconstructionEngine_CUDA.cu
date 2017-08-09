@@ -1151,7 +1151,12 @@ void decayVoxel(
 	}
 
 	if (safeToClear) {
-		if (localVBA[voxelIdx].w_depth <= maxWeight && localVBA[voxelIdx].w_depth > 0) {
+		// The SDF limit it EXPERIMENTAL and enabling it may be to aggressive when applied on a
+		// per-voxel basis.
+		float sdfLim = 10.00f;
+//		bool isNoisy = (localVBA[voxelIdx].w_depth <= maxWeight || localVBA[voxelIdx].sdf > sdfLim);
+		bool isNoisy = (localVBA[voxelIdx].w_depth <= maxWeight);
+		if (isNoisy && localVBA[voxelIdx].w_depth > 0) {
 			localVBA[voxelIdx].reset();
 			emptyVoxel = true;
 		}
@@ -1162,7 +1167,6 @@ void decayVoxel(
 	}
 
 	// Count the empty voxels in the block, to determine if it's empty
-
 	// TODO(andrei): Try summing all the weights and empty == weightSum < k (==3-10). Niessner et
 	// al. do this.
 	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;

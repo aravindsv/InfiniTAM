@@ -50,22 +50,23 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 		return eta;
 	}
 
+	// Hack to account for strange disparity offset when using libelas.
+//	eta -= 0.10f;
+
 	// compute updated SDF value and reliability
 	oldF = TVoxel::SDF_valueToFloat(voxel.sdf);
 	oldW = voxel.w_depth;
 
 	newF = MIN(1.0f, eta / mu);
-//	if ((int)pt_image.x % 31 == 0 && (int)pt_image.y % 17 == 0) {
-//		printf("Depth measure: %.4f\n", depth_measure);
-//	}
 
   // old way:
 	 newW = 1; //always
 
   // new way:
-//    newW = (int)(200 / (depth_measure * sqrt(depth_measure)));
+//	int maxNewW = 9500;
+//    newW = (int)(1000.0 / (depth_measure - 5.0)); //* sqrt(depth_measure)));
 //	if (newW < 1) { newW = 1; }
-//	if (newW > 10) { newW = 10; }
+//	if (newW > maxNewW) { newW = maxNewW; }
 
 	newF = oldW * oldF + newW * newF;
 	newW = oldW + newW;

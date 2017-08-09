@@ -100,7 +100,9 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 	float sdfValue = 1.0f;
 	float totalLength, stepLength, totalLengthMax, stepScale;
 
-	stepScale = mu * oneOverVoxelSize;
+	// Originally, this was 1.0f, but making it smaller seems to improve the preview quality.
+	const float scaleFactor = 0.001f;
+	stepScale = mu * oneOverVoxelSize * scaleFactor;
 
 	pt_camera_f.z = viewFrustum_minmax.x;
 	pt_camera_f.x = pt_camera_f.z * ((float(x) - projParams.z) * projParams.x);
@@ -130,10 +132,19 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 		if (!hash_found) {
 			stepLength = SDF_BLOCK_SIZE;
 		} else {
-			if ((sdfValue <= 0.1f) && (sdfValue >= -0.5f)) {
+			// Original parameters
+//			float maxSdf = 0.1f;
+//			float minSdf = -0.5f;
+
+			float maxSdf = 20.0;
+			float minSdf = -100.0f;
+			if ((sdfValue <= maxSdf) && (sdfValue >= minSdf)) {
 				sdfValue = readFromSDF_float_interpolated(voxelData, voxelIndex, pt_result, hash_found, cache);
 			}
-			if (sdfValue <= 0.0f) break;
+			if (sdfValue <= 0.0f) {
+				break;
+			}
+
 			stepLength = MAX(sdfValue * stepScale, 1.0f);
 		}
 
@@ -151,7 +162,9 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 		pt_result += stepLength * rayDirection;
 
 		pt_found = true;
-	} else pt_found = false;
+	} else {
+		pt_found = false;
+	}
 
 	pt_out.x = pt_result.x; pt_out.y = pt_result.y; pt_out.z = pt_result.z;
 	if (pt_found) {
