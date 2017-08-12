@@ -86,8 +86,7 @@ __global__ void renderColourFromDepth_device(
 		Vector2i imgSize,
 		Vector3f lightSource,
         Matrix4f camPose,
-        float voxelSizeMeters,
-        float maxDepthMeters);
+        float voxelSizeMeters);
 
 
 // class implementation
@@ -273,8 +272,7 @@ static void RenderImage_common(
 		const ITMRenderState *renderState,
 		ITMUChar4Image *outputCharImage,
 		ITMFloatImage *outputFloatImage,		// For, e.g., depth map rendering.
-		IITMVisualisationEngine::RenderImageType type,
-		float maxDepthMeters
+		IITMVisualisationEngine::RenderImageType type
 ) {
 	Vector2i imgSize = outputCharImage->noDims;
 	Matrix4f invM = pose->GetInvM();
@@ -323,8 +321,6 @@ static void RenderImage_common(
 	}
 
 	case IITMVisualisationEngine::RENDER_DEPTH_MAP: {
-      // TODO(andrei): get rid of this
-//		assert(maxDepthMeters > 1e-3 && "maxDepthMeters must be set when rendering a depth map");
 		renderColourFromDepth_device<TVoxel, TIndex> <<<gridSize, cudaBlockSize>>>(
 				outFloatRendering,
 				pointsRay,
@@ -333,8 +329,7 @@ static void RenderImage_common(
 				imgSize,
 				lightSource,
 				pose->GetM(),
-				scene->sceneParams->voxelSize,
-				maxDepthMeters
+				scene->sceneParams->voxelSize
 		);
 		break;
 	}
@@ -466,8 +461,7 @@ void ITMVisualisationEngine_CUDA<TVoxel, TIndex>::RenderImage(
 	ITMFloatImage *outputFloatImage,
 	IITMVisualisationEngine::RenderImageType type) const
 {
-	RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage,
-					   type, this->maxDepthMeters);
+	RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage, type);
 }
 
 template<class TVoxel>
@@ -478,8 +472,7 @@ void ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash>::RenderImage(
 	ITMUChar4Image *outputCharImage,
 	ITMFloatImage *outputFloatImage,
 	IITMVisualisationEngine::RenderImageType type) const {
-  RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage,
-					 type, this->maxDepthMeters);
+  RenderImage_common(this->scene, pose, intrinsics, renderState, outputCharImage, outputFloatImage, type);
 }
 
 template<class TVoxel, class TIndex>
@@ -805,8 +798,7 @@ __global__ void renderColourFromDepth_device(
 	Vector2i imgSize,
 	Vector3f lightSource,
     Matrix4f camPose,
-	float voxelSizeMeters,
-	float maxDepthMeters
+	float voxelSizeMeters
 ) {
 	int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
 	if (x >= imgSize.x || y >= imgSize.y) {
@@ -820,8 +812,7 @@ __global__ void renderColourFromDepth_device(
 			ptRay.toVector3(),
 			ptRay.w > 0,
 			camPose,
-			voxelSizeMeters,
-			maxDepthMeters
+			voxelSizeMeters
 	);
 
 };

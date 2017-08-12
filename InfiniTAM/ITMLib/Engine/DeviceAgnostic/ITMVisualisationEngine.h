@@ -304,8 +304,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
 		DEVICEPTR(float) & dest,
 		const CONSTPTR(Vector3f) & point,
 		const CONSTPTR(Matrix4f) &camPose,
-		const float voxelSizeMeters,
-		const float maxDepthMeters
+		const float voxelSizeMeters
 ) {
 	Vector4f point_h;
 	point_h.x = point.x * voxelSizeMeters;
@@ -315,14 +314,6 @@ _CPU_AND_GPU_CODE_ inline void drawPixelDepth(
 
 	Vector4f point_cam = camPose * point_h;
 	point_cam /= point_cam.w;
-
-	// Old version, which attempted to squish the depth into a byte (not ideal).
-//	double Z = point_cam.z;
-//	if(Z >= maxDepthMeters) {
-//		Z = 0;
-//	}
-//	uchar intensity = (uchar)(round(Z / maxDepthMeters * 255));
-//	dest = Vector4u(intensity);
 
 	dest = point_cam.z;
 };
@@ -545,19 +536,18 @@ _CPU_AND_GPU_CODE_ inline void processPixelColourWeight(
 /// SLAM system.
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void processPixelColourDepth(
-    DEVICEPTR(float) &outRendering,
-    const CONSTPTR(Vector3f) &point,
-    bool foundPoint,
-    Matrix4f &camPose,
-	float voxelSizeMeters,
-	float maxDepthMeters
+	DEVICEPTR(float) &outRendering,
+	const CONSTPTR(Vector3f) &point,
+	bool foundPoint,
+	Matrix4f &camPose,
+	float voxelSizeMeters
 ) {
-  if (foundPoint) {
-    drawPixelDepth<TVoxel, TIndex>(outRendering, point, camPose, voxelSizeMeters, maxDepthMeters);
-  }
-  else {
-    outRendering = 0.0f;
-  }
+	if (foundPoint) {
+		drawPixelDepth<TVoxel, TIndex>(outRendering, point, camPose, voxelSizeMeters);
+	}
+	else {
+		outRendering = 0.0f;
+	}
 }
 
 
