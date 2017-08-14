@@ -94,8 +94,13 @@ namespace ITMLib
 			// - uses additional memory (lots!)
 			bool createMeshingEngine = true;
 
-			ITMLibSettings(void);
-			~ITMLibSettings(void);
+			// maxW gets set to this when dynamic fusion weights (which depend on the depth of each
+			// measurement) are enabled.
+			static const int maxWDynamic = 50000;
+
+			ITMLibSettings();
+			ITMLibSettings(const ITMLibSettings &other) = default;
+			~ITMLibSettings();
 
 			// Suppress the default copy constructor and assignment operator
 			// Re-enabled for DynSLAM, since we need to pass modified copies of the settings object

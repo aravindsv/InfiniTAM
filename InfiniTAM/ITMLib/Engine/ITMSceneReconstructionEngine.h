@@ -17,6 +17,11 @@ namespace ITMLib
 {
 	namespace Engine
 	{
+		// Used to configure the measurement fusion weighting.
+		struct WeightParams {
+			bool depthWeighting = false;
+		};
+
 		/** \brief
 		    Interface to engines implementing the main KinectFusion
 		    depth integration process.
@@ -28,6 +33,9 @@ namespace ITMLib
 		template<class TVoxel, class TIndex>
 		class ITMSceneReconstructionEngine
 		{
+		private:
+			WeightParams fusionWeightParams;
+
 		public:
 			/** Clear and reset a scene to set up a new empty
 			    one.
@@ -56,6 +64,14 @@ namespace ITMLib
 
 			/** Returns the total number of decayed and deallocated voxel blocks. */
 			virtual size_t GetDecayedBlockCount() = 0;
+
+			virtual void SetFusionWeightParams(const WeightParams &weightParams) {
+				this->fusionWeightParams = weightParams;
+			}
+
+			WeightParams GetFusionWeightParams() {
+				return fusionWeightParams;
+			}
 
 			ITMSceneReconstructionEngine(void) { }
 			virtual ~ITMSceneReconstructionEngine(void) { }

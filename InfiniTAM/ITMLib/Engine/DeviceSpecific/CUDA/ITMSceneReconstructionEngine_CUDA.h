@@ -11,7 +11,7 @@ namespace ITMLib
 {
 	namespace Engine
 	{
-		/// \brief A snapshot of what blocks were visible at some point in time. Used for the voxel
+		/// \brief A snapshot of what blocks were visible at some point in time. Needed by the voxel
 		///        decay.
 		struct VisibleBlockInfo {
 			size_t count;
@@ -60,6 +60,8 @@ namespace ITMLib
 				int maxWeight);
 
 		public:
+//			WeightParams fusionWeightParams;
+
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
 
 			void AllocateSceneFromDepth(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,

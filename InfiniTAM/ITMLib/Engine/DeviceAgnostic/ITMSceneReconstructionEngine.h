@@ -5,6 +5,7 @@
 #include "../../Utils/ITMLibDefines.h"
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
+#include "../ITMSceneReconstructionEngine.h"
 
 // Used by the bucket locking when allocating and deleting voxel blocks.
 const int BUCKET_UNLOCKED = 0;
@@ -18,7 +19,8 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 		const CONSTPTR(Vector4f) & projParams_d,
 		float mu, int maxW,
 		const CONSTPTR(float) *depth,
-		const CONSTPTR(Vector2i) &imgSize
+		const CONSTPTR(Vector2i) &imgSize,
+		ITMLib::Engine::WeightParams weightParams
 ) {
 	Vector4f pt_camera; Vector2f pt_image;
 	float depth_measure, eta, oldF, newF;
@@ -59,14 +61,19 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 
 	newF = MIN(1.0f, eta / mu);
 
-  // old way:
-	 newW = 1; //always
-
-  // new way:
-//	int maxNewW = 9500;
-//    newW = (int)(1000.0 / (depth_measure - 5.0)); //* sqrt(depth_measure)));
-//	if (newW < 1) { newW = 1; }
-//	if (newW > maxNewW) { newW = maxNewW; }
+	if (weightParams.depthWeighting) {
+		int maxNewW = 10;
+		// This milder variant also produces minor bumps, but they're smaller.
+		newW = (int)(100.0 / depth_measure);
+		// This does not improve scores and, moreover, produces artifacts in the reconstruction.
+//		newW = (int)(2500.0 / depth_measure * sqrt(depth_measure));
+		if (newW < 1) { newW = 1; }
+		if (newW > maxNewW) { newW = maxNewW; }
+	}
+	else {
+		// Classic mode
+		newW = 1;
+	}
 
 	newF = oldW * oldF + newW * newF;
 	newW = oldW + newW;
@@ -106,8 +113,8 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &v
 
 	rgb_measure = TO_VECTOR3(interpolateBilinear(rgb, pt_image, imgSize)) / 255.0f;
 	//rgb_measure = rgb[(int)(pt_image.x + 0.5f) + (int)(pt_image.y + 0.5f) * imgSize.x].toVector3().toFloat() / 255.0f;
-//	newW = 5;		// aggressive color updates based on hints in Niessner et al. (original was 1)
-  newW = 1;
+	newW = 5;		// aggressive color updates based on hints in Niessner et al. (original was 1)
+//  newW = 1;
 
 	newC = oldC * oldW + rgb_measure * newW;
 	newW = oldW + newW;
@@ -129,9 +136,11 @@ struct ComputeUpdatedVoxelInfo<false, TVoxel> {
 		const CONSTPTR(Matrix4f) & M_rgb, const CONSTPTR(Vector4f) & projParams_rgb,
 		float mu, int maxW,
 		const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize_d,
-		const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & imgSize_rgb)
+		const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & imgSize_rgb,
+		ITMLib::Engine::WeightParams weightParams
+  )
 	{
-		computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
+		computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d, weightParams);
 	}
 };
 
@@ -149,9 +158,10 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 		const CONSTPTR(float) *depth,
 		const CONSTPTR(Vector2i) & imgSize_d,
 		const CONSTPTR(Vector4u) *rgb,
-		const THREADPTR(Vector2i) & imgSize_rgb)
+		const THREADPTR(Vector2i) & imgSize_rgb,
+		ITMLib::Engine::WeightParams weightParams)
 	{
-		float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
+		float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d, weightParams);
 		if ((eta > mu) || (fabs(eta / mu) > 0.25f)) {
 			return;
 		}

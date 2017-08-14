@@ -28,7 +28,8 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 										  Vector4f projParams_rgb,
 										  float _voxelSize,
 										  float mu,
-										  int maxW);
+										  int maxW,
+										  ITMLib::Engine::WeightParams weightParams);
 
 template<class TVoxel, bool stopMaxW, bool approximateIntegration>
 __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxelArray::ITMVoxelArrayInfo *arrayInfo,
@@ -394,6 +395,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	dim3 voxelBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	dim3 visibleBlockGrid(renderState_vh->noVisibleBlocks);
 
+	WeightParams fusionWeightParams = this->GetFusionWeightParams();
+
 	// These kernels are launched over ALL visible blocks, whose IDs are placed conveniently as the
 	// first `renderState_vh->noVisibleEntries` elements of the `visibleEntryIDs` array, which could,
 	// in theory, accommodate ALL possible blocks, but usually contains O(10k) blocks.
@@ -401,11 +404,11 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 		if (trackingState->requiresFullRendering) {
 			integrateIntoScene_device<TVoxel, true, false> <<<visibleBlockGrid, voxelBlockSize>>> (
 				localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
-				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW, fusionWeightParams);
 		} else {
 			integrateIntoScene_device<TVoxel, true, true> <<<visibleBlockGrid, voxelBlockSize>>> (
 				localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
-				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+				M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW, fusionWeightParams);
 		}
 	}
 	else {
@@ -413,12 +416,12 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 			// While developing dynslam, this is the version that is run.
 			integrateIntoScene_device<TVoxel, false, false> <<<visibleBlockGrid, voxelBlockSize>>> (
 					localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
-						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW, fusionWeightParams);
 		}
 		else {
 			integrateIntoScene_device<TVoxel, false, true> <<<visibleBlockGrid, voxelBlockSize>>> (
 				localVBA, hashTable, visibleBlockPositions, rgb, rgbImgSize, depth, depthImgSize,
-						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+						M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW, fusionWeightParams);
 		}
 	}
 }
@@ -698,7 +701,8 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 										  Vector4f projParams_rgb,
 										  float _voxelSize,
 										  float mu,
-										  int maxW)
+										  int maxW,
+										  ITMLib::Engine::WeightParams weightParams)
 {
 	Vector3i globalPos;
 	bool isFound = false;
@@ -740,7 +744,7 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 	pt_model.z = (float)(globalPos.z + z) * _voxelSize;
 	pt_model.w = 1.0f;
 
-	ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(localVoxelBlock[locId], pt_model, M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
+	ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(localVoxelBlock[locId], pt_model, M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize, weightParams);
 }
 
 __global__ void buildHashAllocAndVisibleType_device(
@@ -1153,7 +1157,7 @@ void decayVoxel(
 	if (safeToClear) {
 		// The SDF limit it EXPERIMENTAL and enabling it may be to aggressive when applied on a
 		// per-voxel basis.
-		float sdfLim = 10.00f;
+//		float sdfLim = 10.00f;
 //		bool isNoisy = (localVBA[voxelIdx].w_depth <= maxWeight || localVBA[voxelIdx].sdf > sdfLim);
 		bool isNoisy = (localVBA[voxelIdx].w_depth <= maxWeight);
 		if (isNoisy && localVBA[voxelIdx].w_depth > 0) {

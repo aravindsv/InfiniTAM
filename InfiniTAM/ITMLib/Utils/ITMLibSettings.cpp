@@ -6,7 +6,7 @@
 
 using namespace ITMLib::Objects;
 
-ITMLibSettings::ITMLibSettings(void)
+ITMLibSettings::ITMLibSettings()
 //	: sceneParams(mu, maxW, voxSize, vFrust_min, vFrust_max, stopIntAtMaxW)
 //  It seems that larger mu values lead to denser maps in our case, at the cost of being somewhat
 // more sensitive to noise.
@@ -25,7 +25,7 @@ ITMLibSettings::ITMLibSettings(void)
 // 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
 // 	to hack the translation scale when processing the ground truth.
 //	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
-: sceneParams(0.50f, 10, 0.050f, 0.1f, 300.0f, false)
+: sceneParams(0.50f, 50, 0.050f, 0.1f, 300.0f, false)
 // Slightly lower-res
 //: sceneParams(0.75f, 10, 0.05f, 0.1f, 300.0f, false)
 // Good, low resolution reconstructions => HUGE scalability.
