@@ -170,9 +170,13 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	{
 		int y = locId / depthImgSize.x;
 		int x = locId - y * depthImgSize.x;
+
+		// Note: this call and all the stuff surrounding were disabled when voxel decay support was
+		// added to DynSLAM. This code would require to be brought up to date to e.g., support
+		// bucket locking, etc. before it can work in the DynSLAM context.
 		buildHashAllocAndVisibleTypePP(entriesAllocType, entriesVisibleType, x, y, blockCoords, depth, invM_d,
 			invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable, scene->sceneParams->viewFrustum_min,
-			scene->sceneParams->viewFrustum_max, 0);	// XXX: remove the 0 or pass in real array
+			scene->sceneParams->viewFrustum_max, 0);	// TODO: remove the 0 or pass in real array
 	}
 
 	if (onlyUpdateVisibleList) useSwapping = false;

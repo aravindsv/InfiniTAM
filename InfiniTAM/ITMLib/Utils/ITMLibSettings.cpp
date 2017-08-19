@@ -119,7 +119,7 @@ ITMLibSettings::ITMLibSettings()
 	groundTruthPoseFpath = "";
 	groundTruthPoseOffset = 0;
 
-	sdfLocalBlockNum = 0xA0000; 		// Original: 0x40000
+	sdfLocalBlockNum = 0x80000; 		// Original: 0x40000
 }
 
 ITMLibSettings::~ITMLibSettings()
