@@ -9,7 +9,7 @@
 #endif
 
 // Toggles printing of verbose allocation/deallocation messages.
-//#define MEMORY_BLOCK_DEBUG
+#define MEMORY_BLOCK_DEBUG
 
 #ifndef __METALC__
 

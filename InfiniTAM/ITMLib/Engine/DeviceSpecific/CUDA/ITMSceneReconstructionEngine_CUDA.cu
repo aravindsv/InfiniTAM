@@ -713,17 +713,19 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA,
 
 	if (!isFound || entryId < 0) {
 		if (locId == 0) {
-			printf("FATAL ERROR in integrateIntoScene_device: could not find block in hash map ("
-				   "isFound = %d, entryId = %d, "
-				   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
-				   static_cast<int>(isFound),
-				   entryId,
-				   blockIdx.x,
-				   locId,
-				   visibleBlockPositions[blockIdx.x].x,
-				   visibleBlockPositions[blockIdx.x].y,
-				   visibleBlockPositions[blockIdx.x].z
-			);
+			// Disabled since this is to be expected when resetting volumes of tracks which were being
+			// reconstructed but suddenly got lost.
+//			printf("FATAL ERROR in integrateIntoScene_device: could not find block in hash map ("
+//				   "isFound = %d, entryId = %d, "
+//				   "blockIdx.x = %d, locId = %d)! | (%d, %d, %d)\n",
+//				   static_cast<int>(isFound),
+//				   entryId,
+//				   blockIdx.x,
+//				   locId,
+//				   visibleBlockPositions[blockIdx.x].x,
+//				   visibleBlockPositions[blockIdx.x].y,
+//				   visibleBlockPositions[blockIdx.x].z
+//			);
 		}
 
 		return;
