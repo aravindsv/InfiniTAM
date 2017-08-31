@@ -18,16 +18,10 @@ ITMLibSettings::ITMLibSettings()
 //           from occurring properly.
 // Defaults:
 //	: sceneParams(0.02f, 100, 0.0050f, 0.2f, 3.0f, false)
-// Work well in most KITTI cases:
-//	: sceneParams(0.02f, 10, 0.0035f, 0.1f, 30.0f, false)
-// 0.005 also works well for a voxel size, at least for the static map. Cars can be higher-res.
-// Current:
-// 	Meant to work with metric reconstructions at the correct scale. This means we no longer have
-// 	to hack the translation scale when processing the ground truth.
+// Classic (for most experiments in the thesis)
 //	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
-: sceneParams(0.50f, 50, 0.050f, 0.1f, 300.0f, false)
-// Slightly lower-res
-//: sceneParams(0.75f, 10, 0.05f, 0.1f, 300.0f, false)
+// XXX change back to 0.050 !!!
+: sceneParams(0.75f, 50, 0.075f, 0.1f, 300.0f, false)
 // Good, low resolution reconstructions => HUGE scalability.
 //: sceneParams(1.5f, 10, 0.1f, 0.1f, 300.0f, false)
 {
@@ -119,7 +113,7 @@ ITMLibSettings::ITMLibSettings()
 	groundTruthPoseFpath = "";
 	groundTruthPoseOffset = 0;
 
-	sdfLocalBlockNum = 0xB0000; 		// Original: 0x40000
+	sdfLocalBlockNum = 0x80000; 		// Original: 0x40000
 }
 
 ITMLibSettings::~ITMLibSettings()

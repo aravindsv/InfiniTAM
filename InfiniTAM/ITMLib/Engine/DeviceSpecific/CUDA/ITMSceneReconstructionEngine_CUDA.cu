@@ -1023,11 +1023,12 @@ void deleteBlock(
 
 	// Lock the bucket for the operation, to ensure the lists stay consistent
 	int status = atomicExch(&locks[keyHash], BUCKET_LOCKED);
-	if (status != BUCKET_UNLOCKED) {
-		printf("Contention on bucket of hash value %d. Not going further with deletion of block "
-					   "(%d, %d, %d).\n", keyHash, blockPos.x, blockPos.y, blockPos.z);
-		return;
-	}
+  // XXX: readded bug on purpose
+//	if (status != BUCKET_UNLOCKED) {
+//		printf("Contention on bucket of hash value %d. Not going further with deletion of block "
+//					   "(%d, %d, %d).\n", keyHash, blockPos.x, blockPos.y, blockPos.z);
+//		return;
+//	}
 
 	bool isFound = false;
 	int outBlockIdx = -1;
@@ -1091,8 +1092,9 @@ void deleteBlock(
 			// to it in the visible list from some to-be-decayed frame.
 			// [RIP] Not doing this can mean the zombie block gets detected as valid in the future,
 			// even though it's in the excess area but nobody is pointing at it.
-			hashTable[nextIdx].offset = 0;
-			hashTable[nextIdx].ptr = -2;
+          // XXX: more intent. bugs for illustration purposes
+//			hashTable[nextIdx].offset = 0;
+//			hashTable[nextIdx].ptr = -2;
 		}
 		else {
 			// In the ordered list, and no successor.
@@ -1149,12 +1151,13 @@ void decayVoxel(
 	bool emptyVoxel = false;
 	bool safeToClear = true;
 	int age = currentFrame - hashTable[blockHashIdx].allocatedTime;
-	if (age < minAge) {
-		// Important corner case: when we had a block in the visible list, but it got deleted in
-		// a previous decay pass, and ended up also getting reallocated (and thus the old ID in
-		// the visible list was pointing to the wrong thing).
-		safeToClear = false;
-	}
+  /// XXX: readded bug
+//	if (age < minAge) {
+//		// Important corner case: when we had a block in the visible list, but it got deleted in
+//		// a previous decay pass, and ended up also getting reallocated (and thus the old ID in
+//		// the visible list was pointing to the wrong thing).
+//		safeToClear = false;
+//	}
 
 	if (safeToClear) {
 		// The SDF limit it EXPERIMENTAL and enabling it may be to aggressive when applied on a
@@ -1173,8 +1176,7 @@ void decayVoxel(
 	}
 
 	// Count the empty voxels in the block, to determine if it's empty
-	// TODO(andrei): Try summing all the weights and empty == weightSum < k (==3-10). Niessner et
-	// al. do this.
+	// TODO(andrei): Try summing all the weights and empty == weightSum < k (==3-10).
 	static const int voxelsPerBlock = SDF_BLOCK_SIZE3;
 	__shared__ int countBuffer[voxelsPerBlock];
 	countBuffer[locId] = static_cast<int>(emptyVoxel);
