@@ -20,8 +20,7 @@ ITMLibSettings::ITMLibSettings()
 //	: sceneParams(0.02f, 100, 0.0050f, 0.2f, 3.0f, false)
 // Classic (for most experiments in the thesis)
 //	: sceneParams(0.3f, 10, 0.035f, 0.1f, 30.0f, false)
-// XXX change back to 0.050 !!!
-: sceneParams(0.75f, 50, 0.075f, 0.1f, 300.0f, false)
+: sceneParams(0.75f, 50, 0.050f, 0.1f, 300.0f, false)
 // Good, low resolution reconstructions => HUGE scalability.
 //: sceneParams(1.5f, 10, 0.1f, 0.1f, 300.0f, false)
 {
@@ -52,7 +51,7 @@ ITMLibSettings::ITMLibSettings()
 //	useSwapping = true;
 
 	if (useSwapping) {
-		throw std::runtime_error("DynSLAM is untested with swapping emabled.");
+		throw std::runtime_error("DynSLAM is untested with swapping enabled.");
 	}
 
 	/// enables or disables approximate raycast
@@ -63,13 +62,13 @@ ITMLibSettings::ITMLibSettings()
 //	useBilateralFilter = false;
 	useBilateralFilter = true;
 
-//	trackerType = TRACKER_COLOR;
+	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;
 //	trackerType = TRACKER_REN;
 	//trackerType = TRACKER_IMU;
 //	trackerType = TRACKER_WICP;
 //  trackerType = TRACKER_GROUND_TRUTH;
-  trackerType = TRACKER_EXTERNAL;
+//  trackerType = TRACKER_EXTERNAL;
 
 	/// model the sensor noise as the weight for weighted ICP
 	modelSensorNoise = false;
@@ -113,7 +112,7 @@ ITMLibSettings::ITMLibSettings()
 	groundTruthPoseFpath = "";
 	groundTruthPoseOffset = 0;
 
-	sdfLocalBlockNum = 0x80000; 		// Original: 0x40000
+	sdfLocalBlockNum = 0x60000; 		// Original: 0x40000
 }
 
 ITMLibSettings::~ITMLibSettings()
