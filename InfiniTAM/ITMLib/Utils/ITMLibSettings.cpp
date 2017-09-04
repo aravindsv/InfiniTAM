@@ -62,13 +62,13 @@ ITMLibSettings::ITMLibSettings()
 //	useBilateralFilter = false;
 	useBilateralFilter = true;
 
-	trackerType = TRACKER_COLOR;
+//	trackerType = TRACKER_COLOR;
 //	trackerType = TRACKER_ICP;
 //	trackerType = TRACKER_REN;
 	//trackerType = TRACKER_IMU;
 //	trackerType = TRACKER_WICP;
 //  trackerType = TRACKER_GROUND_TRUTH;
-//  trackerType = TRACKER_EXTERNAL;
+  trackerType = TRACKER_EXTERNAL;
 
 	/// model the sensor noise as the weight for weighted ICP
 	modelSensorNoise = false;

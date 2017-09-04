@@ -103,6 +103,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(DEVICEPTR(Vector4f) &pt_out, int x, int y
 	// Originally, this was 1.0f, but making it smaller seems to improve the preview quality.
 	// WARNING: Causes artifacts in reconstructions, making them look blocky. Should not be changed.
 	const float scaleFactor = 1.0f;
+//	const float scaleFactor = 0.01f;
 	stepScale = mu * oneOverVoxelSize * scaleFactor;
 
 	pt_camera_f.z = viewFrustum_minmax.x;
