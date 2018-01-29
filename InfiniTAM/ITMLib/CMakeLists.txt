@@ -214,12 +214,21 @@ if(WITH_CUDA)
   foreach(a ${CUDA_ARCH_LIST})
     set(CUDA_ARCH_OPTIONS "${CUDA_ARCH_OPTIONS} -gencode arch=compute_${a},code=compute_${a}")
   endforeach()
+  # WTF this seems to help but WHY OH WHY does not this happen by default?
+  set(CUDA_NVCC_FLAGS 
+    ${CUDA_NVCC_FLAGS}; -std=c++11)
+  # This seems to fix some bugs which appear when attempting to build on
+  # certain systems. Unclear whether there's a performance hit.
+  # TODO(andrei): It's likely just a temp fix.
+  # SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
   include_directories(${CUDA_INCLUDE_DIRS})
   cuda_add_library(ITMLib
 	${ITMLIB_CPU_OBJECTS}
 	${ITMLIB_CUDA_OBJECTS}
 	${ITMLIB_COMMON_OBJECTS}
 	OPTIONS "${CUDA_ARCH_OPTIONS} --use_fast_math")
+  message(STATUS "CUDA library: ${CUDA_LIBRARY}")
+  message(STATUS "${CUDA_HOST_COMPILER}")
   target_link_libraries(ITMLib ${CUDA_LIBRARY})
 else()
   add_definitions(-DCOMPILE_WITHOUT_CUDA)

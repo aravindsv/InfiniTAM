@@ -8,7 +8,7 @@
 if(CUDA_FOUND)
     # TODO(andrei): Un-hardcode this, somehow...
         # PROJECT_SOURCE_DIR could maybe help?
-#    message(STATUS "${CMAKE_MODULE_PATH}/cuda_compute_capability.c")
+    message(STATUS "${CMAKE_MODULE_PATH}/cuda_compute_capability.c")
     try_run(RUN_RESULT_VAR COMPILE_RESULT_VAR
         ${CMAKE_BINARY_DIR}/InfiniTAMTmp
         ${PROJECT_SOURCE_DIR}/cmake/cuda_compute_capability.c
