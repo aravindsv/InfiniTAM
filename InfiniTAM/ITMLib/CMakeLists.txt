@@ -235,6 +235,10 @@ else()
   add_library(ITMLib ${ITMLIB_CPU_OBJECTS} ${ITMLIB_COMMON_OBJECTS})
 endif()
 
+
+find_package(Threads)
+
+target_link_libraries(ITMLib ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(ITMLib Utils)
 target_link_libraries(ITMLib InstRecLib)
 
