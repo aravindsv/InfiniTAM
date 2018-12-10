@@ -44,8 +44,6 @@ namespace ITMLib
 			bool HasConverged(float *step) const;
 
 			void SetEvaluationData(ITMTrackingState *trackingState, const ITMView *view);
-
-			std::ifstream myfile;
 		protected:
 			float *distThresh;
 
