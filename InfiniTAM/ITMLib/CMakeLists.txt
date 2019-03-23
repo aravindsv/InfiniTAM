@@ -216,7 +216,7 @@ if(WITH_CUDA)
   endforeach()
   # WTF this seems to help but WHY OH WHY does not this happen by default?
   set(CUDA_NVCC_FLAGS 
-    ${CUDA_NVCC_FLAGS}; -std=c++11)
+    ${CUDA_NVCC_FLAGS})
   # This seems to fix some bugs which appear when attempting to build on
   # certain systems. Unclear whether there's a performance hit.
   # TODO(andrei): It's likely just a temp fix.
